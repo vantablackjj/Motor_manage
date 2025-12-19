@@ -1,0 +1,97 @@
+const { query } = require('../config/database');
+
+class InventoryService {
+  // Lấy tất cả tồn kho
+  static async getAll(filters = {}) {
+    let sql = `
+      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
+      FROM tm_phu_tung_ton_kho
+      WHERE 1 = 1
+    `;
+
+    const params = [];
+
+    if (filters.ma_kho) {
+      sql += ` AND ma_kho = $${params.length + 1}`;
+      params.push(filters.ma_kho);
+    }
+
+    if (filters.ma_pt) {
+      sql += ` AND ma_pt = $${params.length + 1}`;
+      params.push(filters.ma_pt);
+    }
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  // Tạo tồn kho ban đầu
+  static async createInitial({ ma_kho, ma_pt, so_luong_ton }) {
+    const sql = `
+      INSERT INTO tm_phu_tung_ton_kho (ma_kho, ma_pt, so_luong_ton)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (ma_kho, ma_pt)
+      DO UPDATE SET so_luong_ton = EXCLUDED.so_luong_ton, ngay_cap_nhat = NOW()
+      RETURNING *;
+    `;
+    const result = await query(sql, [ma_kho, ma_pt, so_luong_ton]);
+    return result.rows[0];
+  }
+
+  // Tăng số lượng (nhập kho)
+  static async increaseStock(ma_kho, ma_pt, qty) {
+    const sql = `
+      UPDATE tm_phu_tung_ton_kho
+      SET so_luong_ton = so_luong_ton + $3, ngay_cap_nhat = NOW()
+      WHERE ma_kho = $1 AND ma_pt = $2
+      RETURNING *;
+    `;
+    const result = await query(sql, [ma_kho, ma_pt, qty]);
+    return result.rows[0];
+  }
+
+  // Giảm số lượng (xuất kho)
+  static async decreaseStock(ma_kho, ma_pt, qty) {
+    const checkSql = `
+      SELECT so_luong_ton FROM tm_phu_tung_ton_kho 
+      WHERE ma_kho = $1 AND ma_pt = $2
+    `;
+    const check = await query(checkSql, [ma_kho, ma_pt]);
+
+    if (check.rowCount === 0) {
+      throw new Error('Không tìm thấy tồn kho');
+    }
+
+    if (check.rows[0].so_luong_ton < qty) {
+      throw new Error('Số lượng tồn không đủ');
+    }
+
+    const sql = `
+      UPDATE tm_phu_tung_ton_kho
+      SET so_luong_ton = so_luong_ton - $3, ngay_cap_nhat = NOW()
+      WHERE ma_kho = $1 AND ma_pt = $2
+      RETURNING *;
+    `;
+
+    const result = await query(sql, [ma_kho, ma_pt, qty]);
+    return result.rows[0];
+  }
+
+  // Chuyển kho
+  static async transfer(fromKho, toKho, ma_pt, qty) {
+    // Giảm kho nguồn
+    await InventoryService.decreaseStock(fromKho, ma_pt, qty);
+
+    // Tăng kho đích
+    const sqlInsert = `
+      INSERT INTO tm_phu_tung_ton_kho (ma_kho, ma_pt, so_luong_ton)
+      VALUES ($1, $2, 0)
+      ON CONFLICT (ma_kho, ma_pt) DO NOTHING;
+    `;
+    await query(sqlInsert, [toKho, ma_pt]);
+
+    return await InventoryService.increaseStock(toKho, ma_pt, qty);
+  }
+}
+
+module.exports = InventoryService;

@@ -1,0 +1,46 @@
+// validators/brand.schema.js
+const Joi = require('joi');
+
+const express = require('express');
+const router = express.Router();
+
+const brandSchema = Joi.object({
+  ma_nh: Joi.string().required().max(50),
+  ten_nh: Joi.string().required().max(200),
+  status: Joi.boolean().default(true),
+});
+
+const { authenticate } = require('../middleware/auth');
+const { checkRole } = require('../middleware/roleCheck');
+const { validate } = require('../middleware/validation');
+const { ROLES } = require('../config/constants');
+
+const controller = require('../controllers/brand.controller');
+
+router.get('/', authenticate, controller.getAll);
+router.get('/:ma_nh',authenticate,controller.getOne)
+
+router.post(
+  '/',
+  authenticate,
+  checkRole(ROLES.ADMIN),
+  validate(brandSchema),
+  controller.create
+);
+
+router.put(
+    '/:ma_nh',
+    authenticate,
+    checkRole(ROLES.ADMIN),
+    validate(brandSchema),
+    controller.update
+)
+
+router.delete(
+    '/:ma_nh',
+    authenticate,
+    checkRole(ROLES.ADMIN),
+    controller.delete
+)
+
+module.exports = router;
