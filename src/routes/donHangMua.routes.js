@@ -61,10 +61,7 @@ router.post('/:ma_phieu/phe-duyet',
   donHangMuaController.pheDuyet
 );
 
-router.post("/ma_phieu/huy-duyet",
-  authenticate,
-  checkRole(ROLES.ADMIN,ROLES.QUAN_LY_CTY),
-  donHangMuaController.huyduyet
-)
+
+
 
 module.exports = router;
