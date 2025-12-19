@@ -32,7 +32,7 @@ const updateKhoSchema = Joi.object({
   ghi_chu: Joi.string().allow("", null),
 });
 
-// GET /api/v1/kho - Lấy danh sách kho
+// GET /api/kho - Lấy danh sách kho
 router.get("/", authenticate, async (req, res, next) => {
   try {
     const filters = {
@@ -132,19 +132,6 @@ router.delete(
   }
 );
 
-router.post(
-  "/ton-kho",
-  authenticate,
-  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY_CHI_NHANH, ROLES.QUAN_LY_CTY, ROLES.ADMIN),
-  async(req,res,next)=>{
-    try{
-      
-    }catch(error){
-      next(error);
-    }
-  }
-
-)
 
 module.exports = router;
 

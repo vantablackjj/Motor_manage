@@ -3,8 +3,6 @@ const app = require("./src/app");
 const logger = require("./src/ultils/logger");
 const { pool } = require("./src/config/database");
 
-require("dotenv").config();
-
 const PORT = process.env.PORT || 3000;
 
 // Test database connection

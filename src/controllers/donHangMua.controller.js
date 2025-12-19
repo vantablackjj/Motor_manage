@@ -96,6 +96,21 @@ class DonHangMuaController {
       next(error);
     }
   }
+  
+async huyDuyet(req,res,next){
+  try {
+    const { ma_phieu } = req.params;
+    const username = req.user.username;
+    const { ly_do } = req.body;
+    
+    const data = await donHangMuaService.tuChoiDonHang(ma_phieu, username, ly_do);
+    
+    sendSuccess(res, data, 'Đơn mua xe đã bị từ chối');
+  } catch (err) {
+    next(err);
+  }
 }
+}
+
 
 module.exports = new DonHangMuaController();
