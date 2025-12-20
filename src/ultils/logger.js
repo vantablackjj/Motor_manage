@@ -13,7 +13,8 @@ const logger = winston.createLogger({
   defaultMeta: { service: 'warehouse-api' },
   transports: [
 
-    new winston.transport.Console(),
+    new winston.transports.Console(),
+
 
     new winston.transports.File({ 
       filename: 'logs/error.log', 
