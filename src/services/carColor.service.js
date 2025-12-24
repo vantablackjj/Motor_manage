@@ -2,6 +2,24 @@ const { query } = require('../config/database');
 
 class CarColorService {
 
+
+  static async getAll() {
+    const result = await query(
+      `
+   SELECT 
+  xm.ma_loai_xe,
+  xm.ma_mau,
+  m.ten_mau
+FROM tm_xe_mau xm
+JOIN sys_mau m 
+  ON xm.ma_mau = m.ma_mau
+JOIN tm_xe_loai xl 
+  ON xl.ma_loai = xm.ma_loai_xe
+WHERE xm.status = true;
+      `)
+    return result.rows;
+  }
+
   // ======================
   // LẤY MÀU THEO LOẠI XE
   // ======================

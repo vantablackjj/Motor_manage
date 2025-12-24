@@ -3,11 +3,12 @@ const logger = require('../ultils/logger');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
+  ssl: process.env.DATABASE_URL?.includes('render.com')
     ? { rejectUnauthorized: false }
     : false,
   connectionTimeoutMillis: 5000,
 });
+
 
 const query = async (text, params) => {
   const start = Date.now();

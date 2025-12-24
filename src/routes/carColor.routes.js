@@ -16,7 +16,14 @@ const carColor = Joi.object({
     status : Joi.boolean().default(true)
 })
 
-
+router.get('/', authenticate, checkRole('ADMIN'), async (req, res, next) => {
+    try {
+        const data = await CarColorService.getAll();
+        sendSuccess(res, data);
+    } catch (e) {
+        next(e);
+    }
+});
 
 // ======================
 // GET COLORS OF MODEL

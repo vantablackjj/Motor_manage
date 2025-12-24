@@ -18,6 +18,8 @@ const carColor = require("./carColor.routes")
 const taoPhieuXeMoi = require("./hoaDonMuaXe.routes")
 const themXe = require("./donHangMuaXe.routes")
 const thuChi = require("./thuChi.routes")
+const khachHangRoutes = require("./khachHang.routes")
+const user = require("./user.routes")
 // Mount routes
 router.use("/auth", authRoutes);
 router.use("/kho", khoRoutes);
@@ -36,4 +38,6 @@ router.use("/hoa-don-mua-xe",taoPhieuXeMoi)
 router.use("/car-color",carColor)
 router.use("/don-hang-mua-xe",themXe)
 router.use("/thu-chi",thuChi)
+router.use("/khach-hang",khachHangRoutes)
+router.use("/users", user);
 module.exports = router;
