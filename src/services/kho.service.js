@@ -78,16 +78,13 @@ class Kho {
 
   // Xóa mềm
   static async softDelete(ma_kho) {
-   const exists = await query(
-  'SELECT 1 FROM sys_kho WHERE ma_kho = $1 AND status = TRUE',
-  [ma_kho]
-);
+  const result = await query(
+    'UPDATE sys_kho SET status = FALSE WHERE ma_kho = $1 RETURNING *',
+    [ma_kho]
+  );
 
-if (exists.rows.length > 0) {
-  throw new Error('Duplicate entry');
+  return result.rows[0];
 }
-
-  }
 
   // Kiểm tra kho có tồn tại không
   static async exists(ma_kho) {
