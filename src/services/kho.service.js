@@ -42,22 +42,23 @@ class Kho {
 
   // Tạo kho mới
   static async create(data) {
-  const {
+  const { ma_kho, ten_kho, dia_chi, dien_thoai, loai_kho, ghi_chu } = data;
+
+// Map loai_kho sang chinh / daily
+let chinh = false;
+let daily = false;
+if (loai_kho === "CHINH") chinh = true;
+if (loai_kho === "DAILY") daily = true;
+console.log(loai_kho,data);
+const result = await query(
+  `INSERT INTO sys_kho (
     ma_kho, ten_kho, dia_chi, dien_thoai,
-    mac_dinh, loai_kho, ghi_chu
-  } = data;
-  let chinh = false;
-  let daily = false ;
-  if(loai_kho ==="CHINH") chinh = true;
-  if(loai_kho ==="DAILY") daily = true;
-  const result = await query(
-    `INSERT INTO sys_kho (
-      ma_kho, ten_kho, dia_chi, dien_thoai,
-      mac_dinh, chinh, daily, ghi_chu, status
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8, TRUE)
-    RETURNING *`,
-    [ma_kho, ten_kho, dia_chi, dien_thoai, mac_dinh, chinh, daily, ghi_chu]
-  );
+    chinh, daily, ghi_chu, status
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7, TRUE)
+  RETURNING *`,
+  [ma_kho, ten_kho, dia_chi, dien_thoai, chinh, daily, ghi_chu]
+);
+
 
   return result.rows[0];
 }

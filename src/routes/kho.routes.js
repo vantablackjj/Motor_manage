@@ -16,11 +16,11 @@ const createKhoSchema = Joi.object({
   ten_kho: Joi.string().required().max(200),
   dia_chi: Joi.string().max(500).allow("", null),
   dien_thoai: Joi.string().max(50).allow("", null),
+  loai_kho: Joi.string().valid("CHINH", "DAILY").required(),
   mac_dinh: Joi.boolean().default(false),
-  chinh: Joi.boolean().default(false),
-  daily: Joi.boolean().default(false),
   ghi_chu: Joi.string().allow("", null),
 });
+
 
 const updateKhoSchema = Joi.object({
   ten_kho: Joi.string().required().max(200),
