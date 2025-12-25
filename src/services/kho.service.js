@@ -42,19 +42,23 @@ class Kho {
 
   // Tạo kho mới
   static async create(data) {
-    const { ma_kho, ten_kho, dia_chi, dien_thoai, mac_dinh, chinh, daily, ghi_chu } = data;
-    
-    const result = await query(
-      `INSERT INTO sys_kho (
-        ma_kho, ten_kho, dia_chi, dien_thoai, 
-        mac_dinh, chinh, daily, ghi_chu
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *`,
-      [ma_kho, ten_kho, dia_chi, dien_thoai, mac_dinh, chinh, daily, ghi_chu]
-    );
-    
-    return result.rows[0];
-  }
+  const {
+    ma_kho, ten_kho, dia_chi, dien_thoai,
+    mac_dinh, chinh, daily, ghi_chu
+  } = data;
+
+  const result = await query(
+    `INSERT INTO sys_kho (
+      ma_kho, ten_kho, dia_chi, dien_thoai,
+      mac_dinh, chinh, daily, ghi_chu, status
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8, TRUE)
+    RETURNING *`,
+    [ma_kho, ten_kho, dia_chi, dien_thoai, mac_dinh, chinh, daily, ghi_chu]
+  );
+
+  return result.rows[0];
+}
+
 
   // Cập nhật kho
   static async update(ma_kho, data) {
@@ -74,11 +78,15 @@ class Kho {
 
   // Xóa mềm
   static async softDelete(ma_kho) {
-    const result = await query(
-      'UPDATE sys_kho SET status = FALSE WHERE ma_kho = $1 RETURNING *',
-      [ma_kho]
-    );
-    return result.rows[0];
+   const exists = await query(
+  'SELECT 1 FROM sys_kho WHERE ma_kho = $1 AND status = TRUE',
+  [ma_kho]
+);
+
+if (exists.rows.length > 0) {
+  throw new Error('Duplicate entry');
+}
+
   }
 
   // Kiểm tra kho có tồn tại không
