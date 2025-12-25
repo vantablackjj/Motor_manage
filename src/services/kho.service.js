@@ -44,9 +44,12 @@ class Kho {
   static async create(data) {
   const {
     ma_kho, ten_kho, dia_chi, dien_thoai,
-    mac_dinh, chinh, daily, ghi_chu
+    mac_dinh, loai_kho, ghi_chu
   } = data;
-
+  let chinh = false;
+  let daily = false ;
+  if(loai_kho ==="CHINH") chinh = true;
+  if(loai_kho ==="DAILY") daily = true;
   const result = await query(
     `INSERT INTO sys_kho (
       ma_kho, ten_kho, dia_chi, dien_thoai,
