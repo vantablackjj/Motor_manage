@@ -13,7 +13,7 @@ exports.getAll = async (req, res, next) => {
 
 exports.getOne = async (req, res, next) => {
   try {
-    const data = await NoiSxService.getById(req.params.ma);
+    const data = await NoiSxService.getById(req.params.id);
     if (!data) {
       return sendError(res, 'Nơi sản xuất không tồn tại', 404);
     }
@@ -37,7 +37,7 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const data = await NoiSxService.update(req.params.ma, req.body);
+    const data = await NoiSxService.update(req.params.id, req.body);
     sendSuccess(res, data, 'Cập nhật nơi sản xuất thành công');
   } catch (err) {
     if (err.message.includes('không tồn tại')) {
@@ -49,7 +49,7 @@ exports.update = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    const data = await NoiSxService.delete(req.params.ma);
+    const data = await NoiSxService.delete(req.params.id);
     if (!data) {
       return sendError(res, 'Nơi sản xuất không tồn tại', 404);
     }

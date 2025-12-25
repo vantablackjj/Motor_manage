@@ -58,7 +58,7 @@ router.get("/", authenticate, async (req, res, next) => {
 });
 
 // GET /api/kho/:ma_kho - Lấy chi tiết kho
-router.get("/:ma_kho", authenticate, async (req, res, next) => {
+router.get("/:id", authenticate, async (req, res, next) => {
   try {
     const { ma_kho } = req.params;
     const data = await Kho.getByMaKho(ma_kho);
@@ -113,13 +113,13 @@ router.put(
 
 // DELETE /api/v1/kho/:ma_kho - Xóa kho (soft delete)
 router.delete(
-  "/:ma_kho",
+  "/:id",
   authenticate,
   checkRole(ROLES.ADMIN),
   async (req, res, next) => {
     try {
-      const { ma_kho } = req.params;
-      const data = await Kho.softDelete(ma_kho);
+      const { id } = req.params;
+      const data = await Kho.softDeleteById(id);
 
       if (!data) {
         return sendError(res, "Kho không tồn tại", 404);

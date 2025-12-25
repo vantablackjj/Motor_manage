@@ -18,7 +18,7 @@ const { ROLES } = require('../config/constants');
 const controller = require('../controllers/brand.controller');
 
 router.get('/', authenticate, controller.getAll);
-router.get('/:ma_nh',authenticate,controller.getOne)
+router.get('/:id',authenticate,controller.getOne)
 
 router.post(
   '/',
@@ -29,7 +29,7 @@ router.post(
 );
 
 router.put(
-    '/:ma_nh',
+    '/:id',
     authenticate,
     checkRole(ROLES.ADMIN),
     validate(brandSchema),
@@ -37,7 +37,7 @@ router.put(
 )
 
 router.delete(
-    '/:ma_nh',
+    '/:id',
     authenticate,
     checkRole(ROLES.ADMIN),
     controller.delete

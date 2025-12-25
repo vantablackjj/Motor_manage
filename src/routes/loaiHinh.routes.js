@@ -21,7 +21,7 @@ const controller = require('../controllers/loaiHinh.controller');
 
 
 router.get('/', authenticate, controller.getAll);
-router.get('/:ma_lh', authenticate, controller.getOne);
+router.get('/:id', authenticate, controller.getOne);
 
 router.post(
   '/',
@@ -32,7 +32,7 @@ router.post(
 );
 
 router.put(
-  '/:ma_lh',
+  '/:id',
   authenticate,
   checkRole(ROLES.ADMIN),
   validate(loaiHinhShema),
@@ -40,7 +40,7 @@ router.put(
 );
 
 router.delete(
-  '/:ma_lh',
+  '/:id',
   authenticate,
   checkRole(ROLES.ADMIN),
   controller.remove

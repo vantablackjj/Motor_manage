@@ -52,7 +52,7 @@ exports.update = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    const data = await ColorService.delete(req.params.ma_mau);
+    const data = await ColorService.delete(req.params.id);
     if (!data) {
       return sendError(res, 'Màu không tồn tại', 404);
     }

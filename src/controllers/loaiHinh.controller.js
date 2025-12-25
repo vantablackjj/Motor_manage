@@ -13,9 +13,9 @@ exports.getAll = async (req, res, next) => {
 
 exports.getOne = async (req, res, next) => {
   try {
-    const data = await loaiHinhService.getById(req.params.ma_lh);
+    const data = await loaiHinhService.getByID(req.params.id);
     if (!data) {
-      return sendError(res, 'Màu không tồn tại', 404);
+      return sendError(res, 'Loại hình không tồn tại', 404);
     }
     sendSuccess(res, data);
   } catch (err) {
@@ -26,7 +26,7 @@ exports.getOne = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const data = await loaiHinhService.create(req.body);
-    sendSuccess(res, data, 'Tạo màu thành công', 201);
+    sendSuccess(res, data, 'Tạo loại hình thành công', 201);
   } catch (err) {
     if (err.message.includes('tồn tại')) {
       return sendError(res, err.message, 409);
@@ -38,10 +38,10 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const data = await loaiHinhService.update(
-      req.params.ma_lh,
+      req.params.id,
       req.body
     );
-    sendSuccess(res, data, 'Cập nhật màu thành công');
+    sendSuccess(res, data, 'Cập nhật loại hình thành công');
   } catch (err) {
     if (err.message.includes('không tồn tại')) {
       return sendError(res, err.message, 404);
@@ -52,11 +52,11 @@ exports.update = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    const data = await loaiHinhService.delete(req.params.ma_lh);
+    const data = await loaiHinhService.delete(req.params.id);
     if (!data) {
-      return sendError(res, 'Màu không tồn tại', 404);
+      return sendError(res, 'Loại hình không tồn tại', 404);
     }
-    sendSuccess(res, null, 'Xóa màu thành công');
+    sendSuccess(res, null, 'Xóa loại hình thành công');
   } catch (err) {
     next(err);
   }

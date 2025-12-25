@@ -54,39 +54,46 @@ class ColorService {
     return result.rows[0];
   }
 
-  // Cập nhật
-  static async update(ma_mau, data) {
-    const exists = await this.getById(ma_mau);
-    if (!exists) {
-      throw new Error('Màu không tồn tại');
-    }
 
-    if (data.mac_dinh) {
-      await query(`UPDATE sys_mau SET mac_dinh = false`);
-    }
+static async update(ma_mau, data) {
+  
+  const trimmedMaMau = String(ma_mau).trim();
+  console.log("Updating color with ma_mau:", JSON.stringify(trimmedMaMau));
 
-    const result = await query(
-      `UPDATE sys_mau
-       SET ten_mau=$1, gia_tri=$2, mac_dinh=$3, status=$4
-       WHERE ma_mau=$5
-       RETURNING *`,
-      [
-        data.ten_mau,
-        data.gia_tri,
-        data.mac_dinh,
-        data.status,
-        ma_mau,
-      ]
-    );
-
-    return result.rows[0];
+  const exists = await this.getById(trimmedMaMau);
+  if (!exists) {
+    throw new Error('Màu không tồn tại');
   }
 
+
+  if (data.mac_dinh) {
+    await query(`UPDATE sys_mau SET mac_dinh = false`);
+  }
+
+  // Cập nhật màu
+  const result = await query(
+    `UPDATE sys_mau
+     SET ten_mau=$1, gia_tri=$2, mac_dinh=$3, status=$4
+     WHERE ma_mau=$5
+     RETURNING *`,
+    [
+      data.ten_mau,
+      data.gia_tri,
+      data.mac_dinh,
+      data.status,
+      trimmedMaMau,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+
   // Xóa
-  static async delete(ma_mau) {
+  static async delete(id) {
     const result = await query(
-      `DELETE FROM sys_mau WHERE ma_mau=$1 RETURNING *`,
-      [ma_mau]
+      `DELETE FROM sys_mau WHERE id=$1 RETURNING *`,
+      [id]
     );
     return result.rows[0];
   }

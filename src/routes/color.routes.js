@@ -21,7 +21,7 @@ const colorController = require('../controllers/color.controller');
 
 
 router.get('/', authenticate, colorController.getAll);
-router.get('/:ma_mau', authenticate, colorController.getOne);
+router.get('/:id', authenticate, colorController.getOne);
 
 router.post(
   '/',
@@ -40,7 +40,7 @@ router.put(
 );
 
 router.delete(
-  '/:ma_mau',
+  '/:id',
   authenticate,
   checkRole(ROLES.ADMIN),
   colorController.remove

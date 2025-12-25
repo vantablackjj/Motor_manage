@@ -23,7 +23,7 @@ const controller = require('../controllers/noiSx.controller');
 
 
 router.get('/', authenticate, controller.getAll);
-router.get('/:ma', authenticate, controller.getOne);
+router.get('/:id', authenticate, controller.getOne);
 
 router.post(
   '/',
@@ -34,7 +34,7 @@ router.post(
 );
 
 router.put(
-  '/:ma',
+  '/:id',
   authenticate,
   checkRole(ROLES.ADMIN),
   validate(noiSx),
@@ -42,7 +42,7 @@ router.put(
 );
 
 router.delete(
-  '/:ma',
+  '/:id',
   authenticate,
   checkRole(ROLES.ADMIN),
   controller.remove

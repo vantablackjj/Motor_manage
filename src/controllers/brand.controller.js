@@ -37,10 +37,10 @@ exports.create = async(req,res,next)=>{
 exports.update = async (req, res, next) => {
   try {
     const data = await BrandService.update(
-      req.params.ma_nh,
+      req.params.id,
       req.body
     );
-    sendSuccess(res, data, 'Cập nhật màu thành công');
+    sendSuccess(res, data, 'Cập nhật hãng xe thành công');
   } catch (err) {
     if (err.message.includes('không tồn tại')) {
       return sendError(res, err.message, 404);
@@ -50,7 +50,7 @@ exports.update = async (req, res, next) => {
 }
 exports.delete = async (req,res,next)=>{
     try{
-        const data = await BrandService.delete(req,data)
+        const data = await BrandService.delete(req.params.id)
         sendSuccess(res,data)
     }catch(err){
         next(err)

@@ -5,7 +5,7 @@ class NoiSxService {
   // Lấy danh sách nơi sản xuất
   static async getAll() {
     const result = await query(`
-      SELECT ma, ten_noi_sx, status
+      SELECT id, ma, ten_noi_sx, status
       FROM sys_noi_sx
       ORDER BY ten_noi_sx
     `);
@@ -13,10 +13,10 @@ class NoiSxService {
   }
 
   // Lấy theo mã
-  static async getById(ma) {
+  static async getById(id) {
     const result = await query(
-      `SELECT * FROM sys_noi_sx WHERE ma = $1`,
-      [ma]
+      `SELECT * FROM sys_noi_sx WHERE id = $1`,
+      [id]
     );
     return result.rows[0];
   }
@@ -43,8 +43,8 @@ class NoiSxService {
   }
 
   // Cập nhật
-  static async update(ma, data) {
-    const exists = await this.getById(ma);
+  static async update(id, data) {
+    const exists = await this.getById(id);
     if (!exists) {
       throw new Error('Nơi sản xuất không tồn tại');
     }
@@ -52,20 +52,20 @@ class NoiSxService {
     const result = await query(
       `UPDATE sys_noi_sx
        SET ten_noi_sx = $1,
-           status = $2
-       WHERE ma = $3
+           ma = $2
+       WHERE id = $3
        RETURNING *`,
-      [data.ten_noi_sx, data.status, ma]
+      [data.ten_noi_sx, data.ma, id]
     );
 
     return result.rows[0];
   }
 
   // Xóa
-  static async delete(ma) {
+  static async delete(id) {
     const result = await query(
-      `DELETE FROM sys_noi_sx WHERE ma = $1 RETURNING *`,
-      [ma]
+      `DELETE FROM sys_noi_sx WHERE id = $1 RETURNING *`,
+      [id]
     );
     return result.rows[0];
   }

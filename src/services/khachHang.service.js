@@ -5,7 +5,7 @@ class khachHangService {
   // Lấy danh sách màu
   static async getAll() {
     const result = await query(
-      `SELECT ma_kh, ho_ten, dia_chi, dien_thoai, email, ho_khau, status
+      `SELECT id, ma_kh, ho_ten, dia_chi, dien_thoai, email, ho_khau, status
        FROM tm_khach_hang
        ORDER BY ho_ten`
     );
@@ -13,10 +13,10 @@ class khachHangService {
   }
 
 
-  static async getById(ma_kh) {
+  static async getById(id) {
     const result = await query(
-      `SELECT * FROM tm_khach_hang WHERE ma_kh = $1`,
-      [ma_kh]
+      `SELECT * FROM tm_khach_hang WHERE id = $1`,
+      [id]
     );
     return result.rows[0];
   }
@@ -56,8 +56,8 @@ class khachHangService {
   }
 
   // Cập nhật
-  static async update(ma_kh, data) {
-    const exists = await this.getById(ma_kh);
+  static async update(id, data) {
+    const exists = await this.getById(id);
     if (!exists) {
       throw new Error('Khách hàng không tồn tại');
     }
@@ -86,10 +86,10 @@ class khachHangService {
   }
 
   // Xóa
-  static async delete(ma_kh) {
+  static async delete(id) {
     const result = await query(
-      `DELETE FROM tm_khach_hang WHERE ma_kh=$1 RETURNING *`,
-      [ma_kh]
+      `DELETE FROM tm_khach_hang WHERE id=$1 RETURNING *`,
+      [id]
     );
     return result.rows[0];
   }

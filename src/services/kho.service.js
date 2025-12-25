@@ -81,14 +81,14 @@ const result = await query(
   }
 
   // Xóa mềm
-  static async softDelete(ma_kho) {
+ static async softDeleteById(id) {
   const result = await query(
-    'UPDATE sys_kho SET status = FALSE WHERE ma_kho = $1 RETURNING *',
-    [ma_kho]
+    'UPDATE sys_kho SET status = FALSE WHERE id = $1 RETURNING *',
+    [id]
   );
-
   return result.rows[0];
 }
+
 
   // Kiểm tra kho có tồn tại không
   static async exists(ma_kho) {

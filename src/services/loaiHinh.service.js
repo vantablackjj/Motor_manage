@@ -7,15 +7,15 @@ class loaiHinhService{
             Order by ten_lh
             `
         )
-        return result.rows[0]
+        return result.rows
     }
 
-    static async getByID(ma_lh){
+    static async getByID(id){
         const result = await  query(`
             select * from sys_loai_hinh
-            where ma_lh = $1
+            where id = $1
             `
-            ,[ma_lh]
+            ,[id]
         )
         return result.rows[0]
     }
@@ -38,24 +38,30 @@ class loaiHinhService{
         return result.rows[0]
     }
 
-    static async update(ma_nh, data) {
+    static async update(id, data) {
     const result = await query(
-      `UPDATE sys_hang_xe
-       SET ten_nh=$1, status=$2
-       WHERE ma_nh=$3
+      `UPDATE sys_loai_hinh
+       SET ma_lh=$1, ten_lh=$2, status=$3
+       WHERE id=$4
        RETURNING *`,
-      [data.ten_nh, data.status, ma_nh]
+      [data.ma_lh, data.ten_lh, data.status, id]
     );
     return result.rows[0];
   }
 
-  static async delete(ma_nh) {
-    const result = await query(
-      `DELETE FROM sys_hang_xe WHERE ma_nh=$1 RETURNING *`,
-      [ma_nh]
-    );
-    return result.rows[0];
-  }
+  static async delete(id) {
+        const exists = await this.getByID(id);
+        if (!exists) throw new Error('Loại hình không tồn tại');
+
+        const result = await query(
+            `UPDATE sys_loai_hinh
+             SET status = false
+             WHERE id = $1
+             RETURNING *`,
+            [id]
+        );
+        return result.rows[0];
+    }
 }
 
 module.exports = loaiHinhService;
