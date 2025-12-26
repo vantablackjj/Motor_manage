@@ -1,111 +1,187 @@
 const express = require("express");
 const router = express.Router();
 
+const Xe = require("../services/xe.service");
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { sendSuccess, sendError } = require("../ultils/respone");
-
 const Joi = require("joi");
-const { ROLES } = require("../config/constants");
-const XeService = require("../services/xe.service");
 
-/* =====================================================
- * VALIDATION
- * ===================================================== */
-const themXeSchema = Joi.object({
-  xe_key: Joi.string().required().max(50),
-  ma_loai_xe: Joi.string().max(50),
+const  themXeSchema = Joi.object({
+  xe_key: Joi.string().max(50).required(),
+  ma_loai_xe: Joi.string().max(50).required(),
   ma_mau: Joi.string().max(50).allow(null),
-  so_khung: Joi.string().required().max(100),
-  so_may: Joi.string().required().max(100),
-  ma_kho_hien_tai: Joi.string().required().max(50),
+  so_khung: Joi.string().max(100).required(),
+  so_may: Joi.string().max(100).required(),
+  ma_kho_hien_tai: Joi.string().max(50).required(),
   ngay_nhap: Joi.date().required(),
   gia_nhap: Joi.number().min(0).required(),
-  ghi_chu: Joi.string().allow("", null),
+  ghi_chu: Joi.string().allow("", null)
 });
 
-/* =====================================================
- * GET /api/v1/xe/ton-kho/:ma_kho
- * ===================================================== */
-router.get(
-  "/ton-kho/:ma_kho",
-  authenticate,
-  async (req, res, next) => {
-    try {
-      const { ma_kho } = req.params;
-      const { ma_loai_xe, ma_mau, locked } = req.query;
+const capNhatXeSchema = Joi.object({
+  ma_loai_xe: Joi.string().max(50),
+  ma_mau: Joi.string().max(50).allow(null),
+  so_khung: Joi.string().max(100),
+  so_may: Joi.string().max(100),
+  bien_so: Joi.string().max(50).allow(null),
+  gia_nhap: Joi.number().min(0),
+  ghi_chu: Joi.string().allow("", null)
+}).min(1);
 
-      const filters = {
-        ma_loai_xe,
-        ma_mau,
-      };
 
-      if (locked !== undefined) {
-        filters.locked = locked === "true";
-      }
 
-      const data = await XeService.getTonKho(ma_kho, filters);
-      sendSuccess(res, data, "Lấy tồn kho xe thành công");
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+/**
+ * =========================
+ * GET
+ * =========================
+ */
 
-/* =====================================================
- * GET /api/v1/xe/:xe_key
- * ===================================================== */
+// Lấy xe theo xe_key
 router.get("/:xe_key", authenticate, async (req, res, next) => {
   try {
     const { xe_key } = req.params;
+    const xe = await Xe.getByXeKey(xe_key);
 
-    const xe = await XeService.getByXeKey(xe_key);
     if (!xe) {
-      return sendError(res, "Xe không tồn tại", 404);
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy xe"
+      });
     }
 
-    sendSuccess(res, xe, "Lấy thông tin xe thành công");
-  } catch (error) {
-    next(error);
+    res.json({ success: true, data: xe });
+  } catch (err) {
+    next(err);
   }
 });
 
-/* =====================================================
- * GET /api/v1/xe/:xe_key/lich-su
- * ===================================================== */
+// Lấy tồn kho theo kho
+router.get("/kho/:ma_kho", authenticate, async (req, res, next) => {
+  try {
+    const { ma_kho } = req.params;
+    const filters = req.query;
+
+    const data = await Xe.getTonKho(ma_kho, filters);
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Lấy lịch sử xe
 router.get("/:xe_key/lich-su", authenticate, async (req, res, next) => {
   try {
     const { xe_key } = req.params;
+    const data = await Xe.getLichSu(xe_key);
 
-    const lichSu = await XeService.getLichSu(xe_key);
-    sendSuccess(res, lichSu, "Lấy lịch sử xe thành công");
-  } catch (error) {
-    next(error);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
 });
 
-/* =====================================================
- * POST /api/v1/xe
- * ===================================================== */
+/**
+ * =========================
+ * POST
+ * =========================
+ */
+
+// Tạo xe mới
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
   validate(themXeSchema),
   async (req, res, next) => {
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.username,
+        nguoi_tao: req.user.id
       };
 
-      const xe = await XeService.create(data);
-      sendSuccess(res, xe, "Thêm xe thành công", 201);
-    } catch (error) {
-      next(error);
+      const xe = await Xe.create(data);
+
+      res.status(201).json({
+        success: true,
+        data: xe
+      });
+    } catch (err) {
+      next(err);
     }
   }
 );
+
+/**
+ * =========================
+ * PUT
+ * =========================
+ */
+
+// Cập nhật xe
+router.put(
+  "/:xe_key",
+  authenticate,
+  validate(capNhatXeSchema),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const data = req.body;
+
+      const xe = await Xe.update(xe_key, data, req.user.id);
+
+      res.json({
+        success: true,
+        data: xe
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Khóa xe
+router.put("/:xe_key/lock", authenticate, async (req, res, next) => {
+  try {
+    const { xe_key } = req.params;
+    const { ma_phieu, ly_do } = req.body;
+
+    const xe = await Xe.lock(xe_key, ma_phieu, ly_do);
+
+    res.json({ success: true, data: xe });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mở khóa xe
+router.put("/:xe_key/unlock", authenticate, async (req, res, next) => {
+  try {
+    const { xe_key } = req.params;
+
+    const xe = await Xe.unlock(xe_key);
+
+    res.json({ success: true, data: xe });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * =========================
+ * UTIL
+ * =========================
+ */
+
+// Mở khóa theo phiếu
+router.put("/unlock/phieu/:ma_phieu", authenticate, async (req, res, next) => {
+  try {
+    const { ma_phieu } = req.params;
+    const data = await Xe.unlockByPhieu(ma_phieu);
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

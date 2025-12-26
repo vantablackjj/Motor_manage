@@ -83,7 +83,17 @@ class Xe {
         xe_key, ma_loai_xe, ma_mau, so_khung, so_may,
         ma_kho_hien_tai, ngay_nhap, gia_nhap, ghi_chu, nguoi_tao
       } = data;
-      
+
+      const exists = await client.query(
+  `SELECT 1 FROM tm_xe_thuc_te
+   WHERE xe_key = $1 OR so_khung = $2 OR so_may = $3`,
+  [xe_key, so_khung, so_may]
+);
+
+if (exists.rows.length > 0) {
+  throw new Error("Xe đã tồn tại (trùng mã, số khung hoặc số máy)");
+}
+
       // Insert xe
       const xeResult = await client.query(
         `INSERT INTO tm_xe_thuc_te (
@@ -190,6 +200,70 @@ class Xe {
     
     return true;
   }
+  static async update(xe_key, data, nguoi_sua) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. Check xe
+    const xe = await client.query(
+      `SELECT xe_key, locked, trang_thai
+       FROM tm_xe_thuc_te
+       WHERE xe_key = $1 AND status = TRUE`,
+      [xe_key]
+    );
+
+    if (!xe.rows.length) {
+      throw new Error("Xe không tồn tại");
+    }
+
+    if (xe.rows[0].locked) {
+      throw new Error("Xe đang bị khóa");
+    }
+
+    if (xe.rows[0].trang_thai !== "TON_KHO") {
+      throw new Error("Chỉ được sửa xe tồn kho");
+    }
+
+    // 2. Update
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    for (const key in data) {
+      fields.push(`${key} = $${idx++}`);
+      values.push(data[key]);
+    }
+
+    values.push(xe_key);
+
+    const result = await client.query(
+      `UPDATE tm_xe_thuc_te
+       SET ${fields.join(", ")}, ngay_cap_nhat = CURRENT_TIMESTAMP
+       WHERE xe_key = $${idx}
+       RETURNING *`,
+      values
+    );
+
+    // 3. Ghi lịch sử
+    await client.query(
+      `INSERT INTO tm_xe_lich_su (
+        xe_key, loai_giao_dich, ngay_giao_dich,
+        nguoi_thuc_hien, dien_giai
+      ) VALUES ($1, 'CAP_NHAT', CURRENT_TIMESTAMP, $2, $3)`,
+      [xe_key, nguoi_sua, "Cập nhật thông tin xe"]
+    );
+
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 }
 
 module.exports = Xe;

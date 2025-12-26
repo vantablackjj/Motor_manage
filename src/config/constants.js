@@ -35,7 +35,8 @@ module.exports = {
     CHUYEN_KHO: 'CHUYEN_KHO',
     BAN_HANG: 'BAN_HANG',
     TRA_HANG: 'TRA_HANG',
-    KIEM_KE: 'KIEM_KE'
+    KIEM_KE: 'KIEM_KE',
+    CAP_NHAT: 'CAP_NHAT' 
   },
 
   // Payment types
