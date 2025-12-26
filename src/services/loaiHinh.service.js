@@ -3,8 +3,11 @@ const {query} = require("../config/database")
 class loaiHinhService{
     static async getAll(){
         const result = await query(
-            `select * from sys_loai_hinh
-            Order by ten_lh
+            `SELECT ma_lh, ten_lh
+FROM sys_loai_hinh
+WHERE status = true
+ORDER BY ten_lh;
+
             `
         )
         return result.rows

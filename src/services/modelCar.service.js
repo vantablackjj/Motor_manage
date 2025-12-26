@@ -28,7 +28,7 @@ class ModelService {
       FROM tm_xe_loai lx
       JOIN sys_nhan_hieu nh ON lx.ma_nh = nh.ma_nh
       JOIN sys_noi_sx nsx ON lx.noi_sx = nsx.ma
-      JOIN sys_loai_hinh lh ON lx.loai_hinh = lh.ma_lh
+      JOIN sys_loai_hinh lh ON lx.loai_hinh = lh.ma_lh and lh.status = true
       WHERE 1=1
     `;
 
@@ -177,7 +177,7 @@ class ModelService {
   static async delete(ma_loai) {
     // Có thể soft delete nếu muốn
     const result = await query(
-      `DELETE FROM sys_loai_xe WHERE ma_loai=$1 RETURNING *`,
+      `DELETE FROM tm_xe_loai WHERE ma_loai=$1 RETURNING *`,
       [ma_loai]
     );
     return result.rows[0];

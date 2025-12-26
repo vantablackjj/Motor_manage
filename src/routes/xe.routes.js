@@ -15,7 +15,7 @@ const XeService = require("../services/xe.service");
  * ===================================================== */
 const themXeSchema = Joi.object({
   xe_key: Joi.string().required().max(50),
-  ma_loai_xe: Joi.string().required().max(50),
+  ma_loai_xe: Joi.string().max(50),
   ma_mau: Joi.string().max(50).allow(null),
   so_khung: Joi.string().required().max(100),
   so_may: Joi.string().required().max(100),
