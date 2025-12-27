@@ -12,7 +12,24 @@ router.get('/', async (req, res) => {
     sendError(res, err.message);
   }
 });
-
+router.get("/:ma_kho",async(req,res)=>{
+  try{
+    const {ma_kho} = req.params;
+    const data = await InventoryService.getByID(ma_kho)
+    sendSuccess (res,data)
+  }catch(err){
+    sendError (res,err.message)
+  }
+})
+router.get("/:ma_pt",async(req,res)=>{
+  try{
+    const {ma_pt} = req.params;
+    const data = await InventoryService.getByPT(ma_pt)
+    sendSuccess (res,data)
+  }catch(err){
+    sendError (res,err.message)
+  }
+})
 // Tạo tồn kho ban đầu
 router.post('/init', async (req, res) => {
   try {

@@ -79,7 +79,14 @@ router.get("/", authenticate, async (req, res, next) => {
     next(error);
   }
 });
-
+router.get("/:ma_pt/lich-su", authenticate, async (req, res, next) => {
+  try {
+    const { ma_pt } = req.params;
+    const data = await PhuTung.getLichSu(ma_pt);
+    sendSuccess(res, data, "Lấy lịch sử phụ tùng thành công");
+  } catch (error) {
+    next(error);
+  }});
 // GET /api/phu-tung/ton-kho/:ma_kho - Tồn kho phụ tùng theo kho
 router.get(
   "/ton-kho/:ma_kho",
@@ -102,7 +109,7 @@ router.get(
 
 //PUT /api/phu-tung
 router.put(
-  "/",
+  "/:ma_pt",
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
   validate(createPhuTungSchema),
@@ -120,6 +127,25 @@ router.put(
     }
   }
 );
+
+router.post(
+  "/phu-tung/nhap-kho",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      await PhuTungNhapKhoService.nhapKho({
+        ...req.body,
+        nguoi_thuc_hien: req.user.username,
+      });
+
+      sendSuccess(res, null, "Nhập kho phụ tùng thành công");
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 
 // POST /api/phu-tung - Tạo phụ tùng mới
 router.post(
@@ -140,21 +166,55 @@ router.post(
 router.delete(
   "/:ma_pt",
   authenticate,
-  checkRole(ROLES.ADMIN,ROLES.QUAN_LY_CTY,ROLES.QUAN_LY_CHI_NHANH),
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  async (req, res, next) => {
+    try {
+      const { ma_pt } = req.params;
+      const data = await PhuTung.softDelete(ma_pt);
 
-  
-  async(req,res,next)=>{
-    try{
-      const {ma_pt} = req.params;
-      const data = await PhuTung.delete(ma_pt);
-
-      if(!data){
-        return sendError(res,"Phu Tung khong ton tai",404);
+      if (!data) {
+        return sendError(res, "Phụ tùng không tồn tại", 404);
       }
 
-    }catch(error){
+      sendSuccess(res, data, "Khóa phụ tùng thành công");
+    } catch (error) {
       next(error);
     }
-  })
+  }
+);
+
+router.post(
+  "/lock",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      await PhuTung.lock({
+        ...req.body,
+        nguoi_thuc_hien: req.user.username
+      });
+
+      sendSuccess(res, null, "Khóa tồn kho phụ tùng thành công");
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  "/unlock/:so_phieu",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      await PhuTung.unlock(req.params.so_phieu);
+      sendSuccess(res, null, "Mở khóa tồn kho thành công");
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+
 
 module.exports = router;

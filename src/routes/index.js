@@ -20,6 +20,7 @@ const themXe = require("./donHangMuaXe.routes")
 const thuChi = require("./thuChi.routes")
 const khachHangRoutes = require("./khachHang.routes")
 const user = require("./user.routes")
+const phuTungKhoa = require("./phuTungKhoa.routes")
 // Mount routes
 router.use("/auth", authRoutes);
 router.use("/kho", khoRoutes);
@@ -40,4 +41,5 @@ router.use("/don-hang-mua-xe",themXe)
 router.use("/thu-chi",thuChi)
 router.use("/khach-hang",khachHangRoutes)
 router.use("/users", user);
+router.use("/phu-tung-khoa",phuTungKhoa)
 module.exports = router;

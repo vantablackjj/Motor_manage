@@ -25,6 +25,28 @@ class InventoryService {
     return result.rows;
   }
 
+  // Ma KHo 
+  static async getByID(ma_kho) {
+    const sql = `
+      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
+      FROM tm_phu_tung_ton_kho
+      WHERE ma_kho = $1
+    `;
+    const result = await query(sql, [ma_kho]);
+    return result.rows;
+  }
+
+  // Ma PT
+  static async getByPT(ma_pt) {
+    const sql = `
+      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
+      FROM tm_phu_tung_ton_kho
+      WHERE ma_pt = $1
+    `;
+    const result = await query(sql, [ma_pt]);
+    return result.rows;
+  }
+
   // Tạo tồn kho ban đầu
   static async createInitial({ ma_kho, ma_pt, so_luong_ton }) {
     const sql = `

@@ -4,8 +4,10 @@ const router = express.Router();
 const Xe = require("../services/xe.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
+const {checkRole} = require("../middleware/roleCheck");
+const { ROLES } = require("../config/constants");
 const Joi = require("joi");
-
+  
 const  themXeSchema = Joi.object({
   xe_key: Joi.string().max(50).required(),
   ma_loai_xe: Joi.string().max(50).required(),
@@ -91,6 +93,7 @@ router.get("/:xe_key/lich-su", authenticate, async (req, res, next) => {
 router.post(
   "/",
   authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
   validate(themXeSchema),
   async (req, res, next) => {
     try {
