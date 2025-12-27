@@ -4,7 +4,9 @@ class UserService {
   static async getByUsername(username) {
     return User.getByUsername(username);
   }
-
+ static async updateLastLogin(userId) {
+    return User.updateLastLogin(userId);
+  }
   static async getById(id) {
     const user = await User.getById(id);
     if (!user) {
