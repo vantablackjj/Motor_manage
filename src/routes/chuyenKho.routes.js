@@ -74,6 +74,7 @@ router.post(
     try {
       const data = {
         ...req.body,
+        so_phieu:req.body.ma_phieu,
         nguoi_tao: req.user.username,
       };
      

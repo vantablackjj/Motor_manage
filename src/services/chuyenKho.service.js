@@ -623,17 +623,44 @@ class ChuyenKhoService {
     }
 }
 
-  async getChiTiet(ma_phieu) { 
-     const phieuRes = await pool.query( `SELECT so_phieu, ngay_chuyen_kho, ma_kho_xuat, ma_kho_nhap, trang_thai, nguoi_tao, nguoi_gui, nguoi_duyet, ngay_gui, ngay_duyet, dien_giai FROM tm_chuyen_kho WHERE so_phieu = $1 `, [ma_phieu] )
-     
-     if (phieuRes.rowCount === 0) { return null; }
-     
-      
-       const ctRes = await pool.query( 
-        `SELECT 
-        stt, ma_pt, ten_pt, don_vi_tinh, so_luong, so_luong_da_xuat, so_luong_da_nhan, don_gia, thanh_tien FROM tm_chuyen_kho_phu_tung WHERE ma_phieu = $1 ORDER BY stt `, [ma_phieu] ); 
-        return { phieu: phieuRes.rows[0], chi_tiet: ctRes.rows }; 
-      }
+   async getChiTiet(ma_phieu) {
+    const client = await pool.connect();
+    try {
+      // 1. Lấy thông tin phiếu
+      const phieuRes = await client.query(
+        `SELECT * FROM tm_chuyen_kho WHERE so_phieu = $1`,
+        [ma_phieu]
+      );
+
+      if (phieuRes.rowCount === 0) return null;
+
+      // 2. Lấy chi tiết xe (Code cũ của bạn thiếu phần này)
+      const xeRes = await client.query(
+        `SELECT
+            ct.stt, c.xe_key, ct.trang_thai,
+            x.so_khung, x.so_may, x.ma_mau, x.ma_loai_xe
+         FROM tm_chuyen_kho_xe ct
+         JOIN tm_xe_thuc_te x ON ct.xe_key = x.xe_key
+         WHERE ct.ma_phieu = $1
+         ORDER BY ct.stt`,
+        [ma_phieu]
+      );
+
+      // 3. Lấy chi tiết phụ tùng
+      const ptRes = await client.query(
+        `SELECT * FROM tm_chuyen_kho_phu_tung WHERE ma_phieu = $1 ORDER BY stt`,
+        [ma_phieu]
+      );
+
+      return {
+        phieu: phieuRes.rows[0],
+        chi_tiet_xe: xeRes.rows,     // <--- Frontend cần field này
+        chi_tiet_phu_tung: ptRes.rows // <--- Frontend cần field này (đổi tên từ chi_tiet thành chi_tiet_phu_tung cho rõ)
+      };
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = new ChuyenKhoService();
