@@ -33,7 +33,7 @@ class ChuyenKhoService {
         trang_thai
       )
      VALUES (
-    'CK-' || to_char(now(),'YYYYMMDD') || '-' || nextval('seq_chuyen_kho'),
+    'CK-' || to_char(now(),'YYYYMMDD') || '-' || nextval('tm_chuyen_kho'),
     $1,$2,$3,$4,$5,$6
   )
       RETURNING *
