@@ -32,7 +32,10 @@ class ChuyenKhoService {
         dien_giai,
         trang_thai
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+     VALUES (
+    'CK-' || to_char(now(),'YYYYMMDD') || '-' || nextval('seq_chuyen_kho'),
+    $1,$2,$3,$4,$5,$6
+  )
       RETURNING *
       `,
       [
@@ -478,7 +481,7 @@ class ChuyenKhoService {
             locked = FALSE,
             locked_reason = NULL,
             locked_at = NULL,
-            locked_by=NULL,
+            locked_by=NULL
         WHERE xe_key = $1
         `,
         [xe.xe_key]
@@ -637,7 +640,7 @@ class ChuyenKhoService {
       // 2. Lấy chi tiết xe (Code cũ của bạn thiếu phần này)
       const xeRes = await client.query(
         `SELECT
-            ct.stt, c.xe_key, ct.trang_thai,
+            ct.stt, ct.xe_key, ct.trang_thai,
             x.so_khung, x.so_may, x.ma_mau, x.ma_loai_xe
          FROM tm_chuyen_kho_xe ct
          JOIN tm_xe_thuc_te x ON ct.xe_key = x.xe_key
