@@ -4,11 +4,11 @@ const router = express.Router();
 const Xe = require("../services/xe.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
-const {checkRole} = require("../middleware/roleCheck");
+const { checkRole } = require("../middleware/roleCheck");
 const { ROLES } = require("../config/constants");
 const Joi = require("joi");
-  
-const  themXeSchema = Joi.object({
+
+const themXeSchema = Joi.object({
   xe_key: Joi.string().max(50).required(),
   ma_loai_xe: Joi.string().max(50).required(),
   ma_mau: Joi.string().max(50).allow(null),
@@ -17,7 +17,7 @@ const  themXeSchema = Joi.object({
   ma_kho_hien_tai: Joi.string().max(50).required(),
   ngay_nhap: Joi.date().required(),
   gia_nhap: Joi.number().min(0).required(),
-  ghi_chu: Joi.string().allow("", null)
+  ghi_chu: Joi.string().allow("", null),
 });
 
 const capNhatXeSchema = Joi.object({
@@ -27,10 +27,8 @@ const capNhatXeSchema = Joi.object({
   so_may: Joi.string().max(100),
   bien_so: Joi.string().max(50).allow(null),
   gia_nhap: Joi.number().min(0),
-  ghi_chu: Joi.string().allow("", null)
+  ghi_chu: Joi.string().allow("", null),
 }).min(1);
-
-
 
 /**
  * =========================
@@ -47,7 +45,7 @@ router.get("/:xe_key", authenticate, async (req, res, next) => {
     if (!xe) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy xe"
+        message: "Không tìm thấy xe",
       });
     }
 
@@ -99,14 +97,14 @@ router.post(
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.id
+        nguoi_tao: req.user.id,
       };
 
       const xe = await Xe.create(data);
 
       res.status(201).json({
         success: true,
-        data: xe
+        data: xe,
       });
     } catch (err) {
       next(err);
@@ -134,7 +132,7 @@ router.put(
 
       res.json({
         success: true,
-        data: xe
+        data: xe,
       });
     } catch (err) {
       next(err);
@@ -182,6 +180,27 @@ router.put("/unlock/phieu/:ma_phieu", authenticate, async (req, res, next) => {
     const data = await Xe.unlockByPhieu(ma_phieu);
 
     res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Kiểm tra trùng
+router.post("/check-duplicate", async (req, res, next) => {
+  try {
+    const { so_khung, so_may, exclude_id } = req.body;
+    if (!so_khung || !so_may) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu thông tin số khung hoặc số máy",
+      });
+    }
+    const errors = await Xe.checkDuplicate(so_khung, so_may, exclude_id);
+    res.json({
+      success: true,
+      is_duplicate: errors.length > 0,
+      errors: errors,
+    });
   } catch (err) {
     next(err);
   }

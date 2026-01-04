@@ -1,89 +1,126 @@
-const Joi = require('joi');
-const {validate} = require('../middleware/validation')
-const express = require('express')
-const { authenticate } = require('../middleware/auth');
-const {ROLES} = require('../config/constants')
-const router = express.Router()
-const vehicleController = require('../controllers/themXe.controller')
-const { checkRole } = require('../middleware/roleCheck');
+const express = require("express");
+const router = express.Router();
+const Joi = require("joi");
 
+const controller = require("../controllers/donHangMuaXe.controller");
+const { authenticate } = require("../middleware/auth");
+const { checkRole } = require("../middleware/roleCheck");
+const { ROLES } = require("../config/constants");
+const { validate } = require("../middleware/validation");
+
+const nhapXeMoiSchema = Joi.object({
+  ngay_dat_hang: Joi.date().required(),
+  ma_kho_nhap: Joi.string().required(),
+  ma_ncc: Joi.string().required(),
+  tong_tien: Joi.number(),
+
+  nguoi_tao: Joi.string(),
+  nguoi_gui: Joi.string(),
+  nguoi_gui: Joi.string(),
+  nguoi_duyet: Joi.string(),
+  ngay_tao: Joi.date(),
+  ngay_gui: Joi.date(),
+  ngay_duyet: Joi.date(),
+  dien_giai: Joi.string(),
+  ghi_chu: Joi.string(),
+});
+const chiTietDonHang = Joi.object({
+  ma_phieu: Joi.string().required(),
+  stt: Joi.number().integer().required(),
+  ma_loai_xe: Joi.string().trim().required(),
+  ma_mau: Joi.string().trim().required(),
+  so_luong: Joi.number().integer().required(),
+  don_gia: Joi.number().positive().optional(),
+  thanh_tien: Joi.number().optional(),
+  xe_key: Joi.string().max(50).optional(),
+  so_khung: Joi.string().max(50).optional(),
+  so_may: Joi.string().max(100).optional(),
+  da_nhap_kho: Joi.boolean().optional(),
+});
 router.use(authenticate);
 
-const themXeSchema = Joi.object({
-  xe_key: Joi.string().required().max(50),
-  ma_loai_xe: Joi.string().required().max(50),
-  ma_mau: Joi.string().max(50).allow(null),
-  so_khung: Joi.string().required().max(100),
-  so_may: Joi.string().required().max(100),
-  ma_kho_hien_tai: Joi.string().required().max(50),
-  ngay_nhap: Joi.date().required(),
-  gia_nhap: Joi.number().min(0).required(),
-  ghi_chu: Joi.string().allow("", null),
-});
-
 /**
- * POST /api/vehicles/nhap-moi
- * Nhập xe mới vào kho
- * Quyền: NHAN_VIEN, QUAN_LY_CHI_NHANH, QUAN_LY_CTY, ADMIN
- */
-router.post(
-  '/nhap-moi',
-  checkRole([ROLES.ADMIN, ROLES.NHAN_VIEN_BAN_HANG]),
-  validate(themXeSchema),
- 
-  vehicleController.nhapXeMoi
-);
-
-/**
- * POST /api/vehicles/nhap-tu-don-hang
- * Nhập xe từ đơn hàng
- * Quyền: NHAN_VIEN, QUAN_LY_CHI_NHANH, QUAN_LY_CTY, ADMIN
- */
-router.post(
-  '/nhap-tu-don-hang/:ma_phieu/chi-tiet/:ct_id',
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN_BAN_HANG),
-  vehicleController.nhapXeTuDonHang
-);
-
-
-/**
- * GET /api/vehicles/kho/:maKho
- * Lấy danh sách xe trong kho
- * Quyền: ALL
+ * 1. Lấy danh sách đơn mua
  */
 router.get(
-  '/kho/:maKho',
-  vehicleController.getXeInKho
+  "/",
+  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  controller.getList
 );
 
 /**
- * GET /api/vehicles/:xeKey
- * Lấy thông tin chi tiết xe
- * Quyền: ALL
- */
-router.get(
-  '/:xeKey',
-  vehicleController.getXeDetail
-);
-
-/**
- * POST /api/vehicles/check-duplicate
- * Kiểm tra trùng số khung, số máy
- * Quyền: ALL
+ * 2. Tạo đơn mua
  */
 router.post(
-  '/check-duplicate',
-  vehicleController.checkDuplicate
+  "/",
+  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  validate(nhapXeMoiSchema),
+  validate(nhapXeMoiSchema),
+  controller.create
 );
 
 /**
- * GET /api/vehicles/:xeKey/history
- * Lấy lịch sử giao dịch của xe
- * Quyền: ALL
+ * 2.1 Xóa chi tiết đơn
+ */
+router.delete(
+  "/:ma_phieu/chi-tiet/:id",
+  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  controller.deleteChiTiet
+);
+
+/**
+ * 2. Thêm chi tiết đơn
+ */
+router.post(
+  "/:ma_phieu/chi-tiet",
+  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  validate(chiTietDonHang),
+  controller.addChiTiet
+);
+
+/**
+ * 3. Gửi duyệt
+ */
+router.post(
+  "/:ma_phieu/submit",
+  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  controller.submit
+);
+
+/**
+ * 4. Duyệt đơn
+ */
+router.post(
+  "/:ma_phieu/approve",
+  checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
+  controller.approve
+);
+
+/**
+ * 4.1 Từ chối đơn
+ */
+router.post(
+  "/:ma_phieu/reject",
+  checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
+  controller.reject
+);
+
+/**
+ * 5. Lấy chi tiết đơn
  */
 router.get(
-  '/:xeKey/history',
-  vehicleController.getXeHistory
+  "/:ma_phieu",
+  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  controller.detail
+);
+
+/**
+ * 6. Nhập kho xe (Receiving)
+ */
+router.post(
+  "/:ma_phieu/nhap-kho",
+  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  controller.nhapKho
 );
 
 module.exports = router;

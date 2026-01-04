@@ -1,9 +1,8 @@
 // controllers/donHangMuaXe.controller.js - ĐÃ SỬA LỖI
-const DonHangMuaXeService = require('../services/donHangMuaXe.service');
-const { sendSuccess } = require('../ultils/respone');
+const DonHangMuaXeService = require("../services/donHangMuaXe.service");
+const { sendSuccess } = require("../ultils/respone");
 
 class DonHangMuaXeController {
-
   /**
    * ✅ 1. Lấy danh sách đơn hàng - THÊM MỚI
    */
@@ -15,12 +14,13 @@ class DonHangMuaXeController {
         tu_ngay: req.query.tu_ngay,
         den_ngay: req.query.den_ngay,
         limit: req.query.limit,
-        offset: req.query.offset
+        page: req.query.page,
+        keyword: req.query.keyword,
       };
 
       const data = await DonHangMuaXeService.getList(filters);
-      
-      sendSuccess(res, data, 'Lấy danh sách đơn hàng thành công');
+
+      sendSuccess(res, data, "Lấy danh sách đơn hàng thành công");
     } catch (err) {
       next(err);
     }
@@ -33,8 +33,8 @@ class DonHangMuaXeController {
     try {
       const username = req.user.username; // ✅ Dùng username thay vì id
       const data = await DonHangMuaXeService.createDonHang(req.body, username);
-      
-      sendSuccess(res, data, 'Tạo đơn mua xe thành công', 201);
+
+      sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);
     } catch (err) {
       next(err);
     }
@@ -47,8 +47,8 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const data = await DonHangMuaXeService.getDetail(ma_phieu);
-      
-      sendSuccess(res, data, 'Lấy chi tiết đơn mua xe thành công');
+
+      sendSuccess(res, data, "Lấy chi tiết đơn mua xe thành công");
     } catch (err) {
       next(err);
     }
@@ -61,8 +61,8 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const data = await DonHangMuaXeService.addChiTiet(ma_phieu, req.body);
-      
-      sendSuccess(res, data, 'Thêm chi tiết đơn hàng thành công', 201);
+
+      sendSuccess(res, data, "Thêm chi tiết đơn hàng thành công", 201);
     } catch (err) {
       next(err);
     }
@@ -74,9 +74,12 @@ class DonHangMuaXeController {
   async deleteChiTiet(req, res, next) {
     try {
       const { ma_phieu, id } = req.params;
-      const data = await DonHangMuaXeService.deleteChiTiet(ma_phieu, parseInt(id));
-      
-      sendSuccess(res, data, 'Xóa chi tiết đơn hàng thành công');
+      const data = await DonHangMuaXeService.deleteChiTiet(
+        ma_phieu,
+        parseInt(id)
+      );
+
+      sendSuccess(res, data, "Xóa chi tiết đơn hàng thành công");
     } catch (err) {
       next(err);
     }
@@ -89,10 +92,10 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const username = req.user.username; // ✅ Dùng username
-      
+
       const data = await DonHangMuaXeService.submitDonHang(ma_phieu, username);
-      
-      sendSuccess(res, data, 'Đã gửi đơn mua xe để duyệt');
+
+      sendSuccess(res, data, "Đã gửi đơn mua xe để duyệt");
     } catch (err) {
       next(err);
     }
@@ -105,10 +108,10 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const username = req.user.username; // ✅ Dùng username
-      
+
       const data = await DonHangMuaXeService.duyetDonHang(ma_phieu, username);
-      
-      sendSuccess(res, data, 'Đơn mua xe đã được duyệt');
+
+      sendSuccess(res, data, "Đơn mua xe đã được duyệt");
     } catch (err) {
       next(err);
     }
@@ -122,10 +125,43 @@ class DonHangMuaXeController {
       const { ma_phieu } = req.params;
       const username = req.user.username;
       const { ly_do } = req.body;
-      
-      const data = await DonHangMuaXeService.tuChoiDonHang(ma_phieu, username, ly_do);
-      
-      sendSuccess(res, data, 'Đơn mua xe đã bị từ chối');
+
+      const data = await DonHangMuaXeService.tuChoiDonHang(
+        ma_phieu,
+        username,
+        ly_do
+      );
+
+      sendSuccess(res, data, "Đơn mua xe đã bị từ chối");
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * ✅ 9. Nhập kho xe (Receiving) - NEW
+   */
+  async nhapKho(req, res, next) {
+    try {
+      const { ma_phieu } = req.params;
+      const username = req.user.username;
+      const danhSachXe = req.body.danh_sach_xe; // Array of vehicles
+
+      if (
+        !danhSachXe ||
+        !Array.isArray(danhSachXe) ||
+        danhSachXe.length === 0
+      ) {
+        throw { status: 400, message: "Danh sách xe không hợp lệ" };
+      }
+
+      const data = await DonHangMuaXeService.nhapKhoXe(
+        ma_phieu,
+        danhSachXe,
+        username
+      );
+
+      sendSuccess(res, data, "Nhập kho xe thành công");
     } catch (err) {
       next(err);
     }
