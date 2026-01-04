@@ -81,7 +81,7 @@ class ChuyenKhoService {
       /* 2. Khóa xe */
       const xeRes = await client.query(
         `
-        SELECT xe_key, ma_kho_hien_tai, trang_thai, locked
+        SELECT xe_key, ma_kho_hien_tai, trang_thai, locked,gia_nhap
         FROM tm_xe_thuc_te
         WHERE xe_key = $1
         FOR UPDATE
@@ -141,7 +141,7 @@ class ChuyenKhoService {
           data.ma_loai_xe,
           data.ma_mau,
           data.so_may,
-          data.gia_tri_chuyen_kho,
+          xe.gia_nhap,
         ]
       );
 
