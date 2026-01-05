@@ -1,66 +1,111 @@
 const { pool } = require("../config/database");
+const { TRANG_THAI } = require("../config/constants");
+const { withTransaction } = require("../ultils/transaction");
 
 class DonHangMuaXeService {
   /* =========================
-   * 1. Tạo đơn mua (header)
+   * VALIDATION
    * ========================= */
+
+  _validateCreateHeader(data) {
+    if (!data.ma_kho_nhap || !data.ma_ncc) {
+      throw { status: 400, message: "Thiếu kho nhập hoặc nhà cung cấp" };
+    }
+  }
+
+  _validateCreateDetail(data) {
+    if (!data.ma_loai_xe || !data.so_luong || !data.don_gia) {
+      throw { status: 400, message: "Thiếu dữ liệu chi tiết đơn" };
+    }
+  }
+
+  async _checkTrangThai(soPhieu, expectedStatus, client = pool) {
+    const result = await client.query(
+      `SELECT trang_thai FROM tm_don_hang_mua_xe WHERE so_phieu = $1`,
+      [soPhieu]
+    );
+
+    if (!result.rows.length) {
+      throw { status: 404, message: "Đơn hàng không tồn tại" };
+    }
+
+    if (expectedStatus && result.rows[0].trang_thai !== expectedStatus) {
+      throw {
+        status: 400,
+        message: `Đơn không ở trạng thái ${expectedStatus}`,
+      };
+    }
+
+    return result.rows[0].trang_thai;
+  }
+
+  /* =========================
+   * 1. Tạo đơn mua (HEADER)
+   * ========================= */
+
   async createDonHang(data, userId) {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
+    this._validateCreateHeader(data);
 
-      if (!data.ma_kho_nhap || !data.ma_ncc) {
-        throw { status: 400, message: "Thiếu kho nhập hoặc nhà cung cấp" };
-      }
-
+    return withTransaction(pool, async (client) => {
       const result = await client.query(
         `
         INSERT INTO tm_don_hang_mua_xe (
-          so_phieu, ngay_dat_hang,
-          ma_kho_nhap, ma_ncc,
-          tong_tien, trang_thai,
-          nguoi_tao, ngay_tao
+          so_phieu,
+          ngay_dat_hang,
+          ma_kho_nhap,
+          ma_ncc,
+          tong_tien,
+          trang_thai,
+          nguoi_tao,
+          ngay_tao
         ) VALUES (
           CONCAT('PO', TO_CHAR(NOW(),'YYYYMMDDHH24MISS')),
           CURRENT_DATE,
-          $1,$2,
-          $3,'NHAP',
-          $4,NOW()
+          $1, $2,
+          $3,
+          $4,
+          $5,
+          NOW()
         )
         RETURNING *
-      `,
-        [data.ma_kho_nhap, data.ma_ncc, data.tong_tien, userId]
+        `,
+        [
+          data.ma_kho_nhap,
+          data.ma_ncc,
+          data.tong_tien || 0,
+          TRANG_THAI.NHAP,
+          userId,
+        ]
       );
 
-      await client.query("COMMIT");
       return result.rows[0];
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /* =========================
    * 2. Thêm chi tiết đơn
    * ========================= */
+
   async addChiTiet(soPhieu, data) {
-    if (!data.ma_loai_xe || !data.so_luong || !data.don_gia) {
-      throw { status: 400, message: "Thiếu dữ liệu chi tiết" };
-    }
+    this._validateCreateDetail(data);
+    await this._checkTrangThai(soPhieu, TRANG_THAI.NHAP);
 
     const result = await pool.query(
       `
       INSERT INTO tm_don_hang_mua_xe_ct (
-        ma_phieu,stt, ma_loai_xe, ma_mau,
-        so_luong, don_gia,thanh_tien,
+        ma_phieu,
+        stt,
+        ma_loai_xe,
+        ma_mau,
+        so_luong,
+        don_gia,
+        thanh_tien,
         da_nhap_kho
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,false
       )
       RETURNING *
-    `,
+      `,
       [
         soPhieu,
         data.stt,
@@ -78,43 +123,45 @@ class DonHangMuaXeService {
   /* =========================
    * 3. Gửi duyệt
    * ========================= */
+
   async submitDonHang(soPhieu, userId) {
     const result = await pool.query(
       `
       UPDATE tm_don_hang_mua_xe
       SET 
-        trang_thai = 'GUI_DUYET',
-        nguoi_gui = $2
+        trang_thai = $2,
+        nguoi_gui = $3
       WHERE so_phieu = $1
-        AND trang_thai = 'NHAP'
+        AND trang_thai = $4
       RETURNING *
-    `,
-      [soPhieu, userId]
+      `,
+      [soPhieu, TRANG_THAI.GUI_DUYET, userId, TRANG_THAI.NHAP]
     );
 
     if (!result.rowCount) {
-      throw { status: 400, message: "Không thể gửi duyệt đơn này" };
+      throw { status: 400, message: "Không thể gửi duyệt đơn" };
     }
 
     return result.rows[0];
   }
 
   /* =========================
-   * 4. Duyệt đơn
+   * 4. Duyệt / Từ chối
    * ========================= */
+
   async duyetDonHang(soPhieu, userId) {
     const result = await pool.query(
       `
       UPDATE tm_don_hang_mua_xe
       SET 
-        trang_thai = 'DA_DUYET',
-        nguoi_duyet = $2,
+        trang_thai = $2,
+        nguoi_duyet = $3,
         ngay_duyet = NOW()
       WHERE so_phieu = $1
-        AND trang_thai = 'GUI_DUYET'
+        AND trang_thai = $4
       RETURNING *
-    `,
-      [soPhieu, userId]
+      `,
+      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.GUI_DUYET]
     );
 
     if (!result.rowCount) {
@@ -124,65 +171,56 @@ class DonHangMuaXeService {
     return result.rows[0];
   }
 
-  /* =========================
-   * 4.5. Xóa chi tiết đơn
-   * ========================= */
-  async deleteChiTiet(soPhieu, id) {
-    // Check Status first
-    const header = await pool.query(
-      `SELECT trang_thai FROM tm_don_hang_mua_xe WHERE so_phieu = $1`,
-      [soPhieu]
+  async tuChoiDonHang(soPhieu, userId, lyDo) {
+    const result = await pool.query(
+      `
+      UPDATE tm_don_hang_mua_xe
+      SET 
+        trang_thai = $2,
+        nguoi_duyet = $3,
+        ngay_duyet = NOW(),
+        dien_giai = $4
+      WHERE so_phieu = $1
+        AND trang_thai = $5
+      RETURNING *
+      `,
+      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.GUI_DUYET]
     );
-    if (!header.rows.length) {
-      throw { status: 404, message: "Đơn hàng không tồn tại" };
-    }
-    if (header.rows[0].trang_thai !== "NHAP") {
-      throw {
-        status: 400,
-        message: "Chỉ được xóa chi tiết khi đơn ở trạng thái NHAP",
-      };
+
+    if (!result.rowCount) {
+      throw { status: 400, message: "Đơn không ở trạng thái chờ duyệt" };
     }
 
+    return result.rows[0];
+  }
+
+  /* =========================
+   * 5. Xóa chi tiết
+   * ========================= */
+
+  async deleteChiTiet(soPhieu, id) {
+    await this._checkTrangThai(soPhieu, TRANG_THAI.NHAP);
+
     const result = await pool.query(
-      `DELETE FROM tm_don_hang_mua_xe_ct WHERE ma_phieu = $1 AND id = $2 RETURNING *`,
+      `
+      DELETE FROM tm_don_hang_mua_xe_ct
+      WHERE ma_phieu = $1 AND id = $2
+      RETURNING *
+      `,
       [soPhieu, id]
     );
 
     if (!result.rowCount) {
       throw { status: 404, message: "Chi tiết không tồn tại" };
     }
-    return result.rows[0];
-  }
-
-  /* =========================
-   * 4.6. Từ chối đơn
-   * ========================= */
-  async tuChoiDonHang(soPhieu, userId, lyDo) {
-    const result = await pool.query(
-      `
-      UPDATE tm_don_hang_mua_xe
-      SET 
-        trang_thai = 'DA_HUY',
-        nguoi_duyet = $2,
-        ngay_duyet = NOW(),
-        dien_giai = $3
-      WHERE so_phieu = $1
-        AND trang_thai = 'GUI_DUYET'
-      RETURNING *
-    `,
-      [soPhieu, userId, lyDo]
-    );
-
-    if (!result.rowCount) {
-      throw { status: 400, message: "Đơn không ở trạng thái chờ duyệt để hủy" };
-    }
 
     return result.rows[0];
   }
 
   /* =========================
-   * 5. Lấy chi tiết đơn
+   * 6. Lấy chi tiết đơn
    * ========================= */
+
   async getDetail(soPhieu) {
     const header = await pool.query(
       `SELECT * FROM tm_don_hang_mua_xe WHERE so_phieu = $1`,
@@ -194,7 +232,7 @@ class DonHangMuaXeService {
     }
 
     const details = await pool.query(
-      `SELECT * FROM tm_don_hang_mua_xe_ct WHERE so_phieu = $1`,
+      `SELECT * FROM tm_don_hang_mua_xe_ct WHERE ma_phieu = $1`,
       [soPhieu]
     );
 
@@ -203,6 +241,11 @@ class DonHangMuaXeService {
       chi_tiet: details.rows,
     };
   }
+
+  /* =========================
+   * 7. Get list (pagination)
+   * ========================= */
+
   async getList(filters = {}) {
     const {
       trang_thai,
@@ -217,10 +260,6 @@ class DonHangMuaXeService {
     const conditions = [];
     const values = [];
     let idx = 1;
-
-    /* =========================
-     * WHERE conditions
-     * ========================= */
 
     if (trang_thai) {
       conditions.push(`trang_thai = $${idx++}`);
@@ -244,9 +283,9 @@ class DonHangMuaXeService {
 
     if (keyword) {
       conditions.push(`(
-      ma_phieu ILIKE $${idx}
-      OR ma_ncc ILIKE $${idx}
-    )`);
+        so_phieu ILIKE $${idx}
+        OR ma_ncc ILIKE $${idx}
+      )`);
       values.push(`%${keyword}%`);
       idx++;
     }
@@ -255,40 +294,25 @@ class DonHangMuaXeService {
       ? `WHERE ${conditions.join(" AND ")}`
       : "";
 
-    /* =========================
-     * Pagination
-     * ========================= */
-
     const safeLimit = Math.min(Number(limit) || 20, 100);
     const offset = (Number(page) - 1) * safeLimit;
 
-    /* =========================
-     * Main query
-     * ========================= */
-
     const dataQuery = `
-    SELECT *
-    FROM tm_don_hang_mua_xe
-    ${whereClause}
-    ORDER BY ngay_dat_hang DESC
-    LIMIT $${idx++}
-    OFFSET $${idx++}
-  `;
-
-    const dataValues = [...values, safeLimit, offset];
-
-    /* =========================
-     * Count query
-     * ========================= */
+      SELECT *
+      FROM tm_don_hang_mua_xe
+      ${whereClause}
+      ORDER BY ngay_dat_hang DESC
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
 
     const countQuery = `
-    SELECT COUNT(*)::int AS total
-    FROM tm_don_hang_mua_xe
-    ${whereClause}
-  `;
+      SELECT COUNT(*)::int AS total
+      FROM tm_don_hang_mua_xe
+      ${whereClause}
+    `;
 
     const [dataResult, countResult] = await Promise.all([
-      pool.query(dataQuery, dataValues),
+      pool.query(dataQuery, [...values, safeLimit, offset]),
       pool.query(countQuery, values),
     ]);
 
