@@ -25,8 +25,6 @@ const nhapXeMoiSchema = Joi.object({
   ghi_chu: Joi.string(),
 });
 const chiTietDonHang = Joi.object({
-  ma_phieu: Joi.string().required(),
-  stt: Joi.number().integer().required(),
   ma_loai_xe: Joi.string().trim().required(),
   ma_mau: Joi.string().trim().required(),
   so_luong: Joi.number().integer().required(),
