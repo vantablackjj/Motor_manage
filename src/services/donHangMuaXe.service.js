@@ -58,13 +58,24 @@ class DonHangMuaXeService {
   }
 
   async _generateNextSTT(client, soPhieu) {
+    // 1. Lock header row
+    await client.query(
+      `
+    SELECT 1
+    FROM tm_don_hang_mua_xe
+    WHERE so_phieu = $1
+    FOR UPDATE
+    `,
+      [soPhieu]
+    );
+
+    // 2. Tính STT an toàn
     const { rows } = await client.query(
       `
-      SELECT COALESCE(MAX(stt), 0) + 1 AS next_stt
-      FROM tm_don_hang_mua_xe_ct
-      WHERE ma_phieu = $1
-      FOR UPDATE
-      `,
+    SELECT COALESCE(MAX(stt), 0) + 1 AS next_stt
+    FROM tm_don_hang_mua_xe_ct
+    WHERE ma_phieu = $1
+    `,
       [soPhieu]
     );
 
