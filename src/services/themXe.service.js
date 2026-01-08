@@ -1,18 +1,17 @@
-const {pool} = require('../config/database');
+const { pool } = require("../config/database");
 
 class VehicleService {
-
   /**
    * ✅ Tạo mã xe_key - ĐÃ KHẮC PHỤC race condition
    * Sử dụng advisory lock để tránh trùng lặp trong concurrent requests
    */
   async generateXeKey(client) {
     // Lock để tránh race condition khi nhiều request cùng lúc
-    await client.query('SELECT pg_advisory_xact_lock(123456)');
+    await client.query("SELECT pg_advisory_xact_lock(123456)");
 
     const timestamp = new Date()
       .toISOString()
-      .replace(/[-:T.Z]/g, '')
+      .replace(/[-:T.Z]/g, "")
       .slice(0, 8);
 
     const result = await client.query(
@@ -27,7 +26,7 @@ class VehicleService {
       [`XE${timestamp}_%`]
     );
 
-    const nextNum = String(result.rows[0].next_num).padStart(6, '0');
+    const nextNum = String(result.rows[0].next_num).padStart(6, "0");
     return `XE${timestamp}_${nextNum}`;
   }
 
@@ -55,14 +54,14 @@ class VehicleService {
     for (const row of result.rows) {
       if (row.so_khung === soKhung) {
         errors.push({
-          field: 'so_khung',
-          message: `Số khung đã tồn tại (${row.xe_key})`
+          field: "so_khung",
+          message: `Số khung đã tồn tại (${row.xe_key})`,
         });
       }
       if (row.so_may === soMay) {
         errors.push({
-          field: 'so_may',
-          message: `Số máy đã tồn tại (${row.xe_key})`
+          field: "so_may",
+          message: `Số máy đã tồn tại (${row.xe_key})`,
         });
       }
     }
@@ -78,16 +77,24 @@ class VehicleService {
     const client = await pool.connect();
 
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       // 1. Validation cơ bản
-      if (!data.so_khung || !data.so_may || !data.ma_loai_xe || !data.ma_kho_hien_tai) {
+      if (
+        !data.so_khung ||
+        !data.so_may ||
+        !data.ma_loai_xe ||
+        !data.ma_kho_hien_tai
+      ) {
         throw {
           status: 400,
-          message: 'Thiếu thông tin bắt buộc',
+          message: "Thiếu thông tin bắt buộc",
           errors: [
-            { field: 'required', message: 'Số khung, số máy, loại xe và kho là bắt buộc' }
-          ]
+            {
+              field: "required",
+              message: "Số khung, số máy, loại xe và kho là bắt buộc",
+            },
+          ],
         };
       }
 
@@ -98,9 +105,13 @@ class VehicleService {
         null,
         client // ✅ Pass client để dùng chung transaction
       );
-      
+
       if (duplicateErrors.length) {
-        throw { status: 409, message: 'Dữ liệu trùng lặp', errors: duplicateErrors };
+        throw {
+          status: 409,
+          message: "Dữ liệu trùng lặp",
+          errors: duplicateErrors,
+        };
       }
 
       // 3. Check loại xe
@@ -114,7 +125,7 @@ class VehicleService {
       );
 
       if (!loaiXeRes.rows.length) {
-        throw { status: 404, message: 'Loại xe không tồn tại' };
+        throw { status: 404, message: "Loại xe không tồn tại" };
       }
 
       // 4. Check kho
@@ -128,7 +139,7 @@ class VehicleService {
       );
 
       if (!khoRes.rows.length) {
-        throw { status: 404, message: 'Kho không tồn tại' };
+        throw { status: 404, message: "Kho không tồn tại" };
       }
 
       // 5. Check màu (nếu có)
@@ -149,7 +160,7 @@ class VehicleService {
         if (!mauRes.rows.length) {
           throw {
             status: 404,
-            message: 'Màu không hợp lệ cho loại xe này'
+            message: "Màu không hợp lệ cho loại xe này",
           };
         }
       }
@@ -159,13 +170,13 @@ class VehicleService {
       if (!giaNhap || giaNhap <= 0) {
         throw {
           status: 400,
-          message: 'Giá nhập phải lớn hơn 0',
-          errors: [{ field: 'gia_nhap', message: 'Giá nhập không hợp lệ' }]
+          message: "Giá nhập phải lớn hơn 0",
+          errors: [{ field: "gia_nhap", message: "Giá nhập không hợp lệ" }],
         };
       }
 
       // 7. Validate ngày nhập
-      const ngayNhap = data.ngay_nhap || new Date().toISOString().split('T')[0];
+      const ngayNhap = data.ngay_nhap || new Date().toISOString().split("T")[0];
 
       // 8. Tạo xe_key với lock
       const xeKey = await this.generateXeKey(client);
@@ -195,8 +206,8 @@ class VehicleService {
           data.ma_kho_hien_tai,
           ngayNhap,
           giaNhap,
-          'TON_KHO',
-          data.ghi_chu || null
+          "TON_KHO",
+          data.ghi_chu || null,
         ]
       );
 
@@ -215,22 +226,23 @@ class VehicleService {
           data.ma_kho_hien_tai,
           giaNhap,
           userId,
-          `Nhập kho xe ${loaiXeRes.rows[0].ten_loai} - ${data.so_khung.trim().toUpperCase()}`
+          `Nhập kho xe ${loaiXeRes.rows[0].ten_loai} - ${data.so_khung
+            .trim()
+            .toUpperCase()}`,
         ]
       );
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
 
       // ✅ Trả về dữ liệu đầy đủ
       const fullData = await this.getXeDetail(xeKey);
       return {
         success: true,
         data: fullData,
-        message: 'Nhập xe thành công'
+        message: "Nhập xe thành công",
       };
-
     } catch (err) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw err;
     } finally {
       client.release();
@@ -245,16 +257,17 @@ class VehicleService {
    * - Trạng thái 'GUI_DUYET' không phù hợp (xe đã về kho rồi)
    * - Loại giao dịch 'NHAP_CHO_DUYET' không có trong ENUM
    * - Thiếu field nguoi_tao trong table
-   */async nhapXeTuDonHang(maPhieu, chiTietId, data, userId) {
-  const client = await pool.connect();
+   */ async nhapXeTuDonHang(maPhieu, chiTietId, data, userId) {
+    const client = await pool.connect();
 
-  try {
-    await client.query('BEGIN');
+    try {
+      await client.query("BEGIN");
 
-    /* =====================================================
-     * 1. Lấy chi tiết đơn hàng + đơn hàng
-     * ===================================================== */
-    const ctRes = await client.query(`
+      /* =====================================================
+       * 1. Lấy chi tiết đơn hàng + đơn hàng
+       * ===================================================== */
+      const ctRes = await client.query(
+        `
       SELECT 
         ct.id,
         ct.ma_phieu,
@@ -276,88 +289,86 @@ class VehicleService {
         ON ct.ma_loai_xe = xl.ma_loai
       WHERE ct.ma_phieu = $1
         AND ct.id = $2
-    `, [maPhieu, chiTietId]);
+    `,
+        [maPhieu, chiTietId]
+      );
 
-    if (ctRes.rowCount === 0) {
-      throw {
-        status: 404,
-        message: 'Chi tiết đơn hàng không tồn tại'
-      };
-    }
+      if (ctRes.rowCount === 0) {
+        throw {
+          status: 404,
+          message: "Chi tiết đơn hàng không tồn tại",
+        };
+      }
 
-    const chiTiet = ctRes.rows[0];
+      const chiTiet = ctRes.rows[0];
 
-    /* =====================================================
-     * 2. Validate trạng thái đơn hàng
-     * ===================================================== */
-    if (chiTiet.trang_thai !== 'DA_DUYET') {
-      throw {
-        status: 400,
-        message: `Đơn hàng chưa được duyệt. Trạng thái hiện tại: ${chiTiet.trang_thai}`
-      };
-    }
+      /* =====================================================
+       * 2. Validate trạng thái đơn hàng
+       * ===================================================== */
+      if (chiTiet.trang_thai !== "DA_DUYET") {
+        throw {
+          status: 400,
+          message: `Đơn hàng chưa được duyệt. Trạng thái hiện tại: ${chiTiet.trang_thai}`,
+        };
+      }
 
-    if (chiTiet.da_nhap_kho) {
-      throw {
-        status: 400,
-        message: `Chi tiết đơn hàng đã nhập kho với mã xe: ${chiTiet.xe_key}`
-      };
-    }
+      if (chiTiet.da_nhap_kho) {
+        throw {
+          status: 400,
+          message: `Chi tiết đơn hàng đã nhập kho với mã xe: ${chiTiet.xe_key}`,
+        };
+      }
 
-    /* =====================================================
-     * 3. Validate dữ liệu nhập
-     * ===================================================== */
-    if (!data.so_khung || !data.so_may) {
-      throw {
-        status: 400,
-        message: 'Thiếu số khung hoặc số máy',
-        errors: [
-          { field: 'so_khung', message: 'Số khung là bắt buộc' },
-          { field: 'so_may', message: 'Số máy là bắt buộc' }
-        ]
-      };
-    }
+      /* =====================================================
+       * 3. Validate dữ liệu nhập
+       * ===================================================== */
+      if (!data.so_khung || !data.so_may) {
+        throw {
+          status: 400,
+          message: "Thiếu số khung hoặc số máy",
+          errors: [
+            { field: "so_khung", message: "Số khung là bắt buộc" },
+            { field: "so_may", message: "Số máy là bắt buộc" },
+          ],
+        };
+      }
 
-    const soKhung = data.so_khung.trim().toUpperCase();
-    const soMay   = data.so_may.trim().toUpperCase();
+      const soKhung = data.so_khung.trim().toUpperCase();
+      const soMay = data.so_may.trim().toUpperCase();
 
-    /* =====================================================
-     * 4. Kiểm tra trùng số khung / số máy
-     * ===================================================== */
-    const dupErrors = await this.checkDuplicate(
-      soKhung,
-      soMay,
-      null,
-      client
-    );
+      /* =====================================================
+       * 4. Kiểm tra trùng số khung / số máy
+       * ===================================================== */
+      const dupErrors = await this.checkDuplicate(soKhung, soMay, null, client);
 
-    if (dupErrors.length > 0) {
-      throw {
-        status: 409,
-        message: 'Số khung hoặc số máy đã tồn tại',
-        errors: dupErrors
-      };
-    }
+      if (dupErrors.length > 0) {
+        throw {
+          status: 409,
+          message: "Số khung hoặc số máy đã tồn tại",
+          errors: dupErrors,
+        };
+      }
 
-    /* =====================================================
-     * 5. Chuẩn hóa dữ liệu
-     * ===================================================== */
-    const xeKey    = await this.generateXeKey(client);
-    const giaNhap  = data.gia_nhap || chiTiet.don_gia;
-    const ngayNhap = data.ngay_nhap || new Date().toISOString().split('T')[0];
-    const maMau    = data.ma_mau || chiTiet.ma_mau;
+      /* =====================================================
+       * 5. Chuẩn hóa dữ liệu
+       * ===================================================== */
+      const xeKey = await this.generateXeKey(client);
+      const giaNhap = data.gia_nhap || chiTiet.don_gia;
+      const ngayNhap = data.ngay_nhap || new Date().toISOString().split("T")[0];
+      const maMau = data.ma_mau || chiTiet.ma_mau;
 
-    if (!giaNhap || giaNhap <= 0) {
-      throw {
-        status: 400,
-        message: 'Giá nhập không hợp lệ'
-      };
-    }
+      if (!giaNhap || giaNhap <= 0) {
+        throw {
+          status: 400,
+          message: "Giá nhập không hợp lệ",
+        };
+      }
 
-    /* =====================================================
-     * 6. Insert xe thực tế
-     * ===================================================== */
-    await client.query(`
+      /* =====================================================
+       * 6. Insert xe thực tế
+       * ===================================================== */
+      await client.query(
+        `
       INSERT INTO tm_xe_thuc_te (
         xe_key, ma_loai_xe, ma_mau,
         so_khung, so_may,
@@ -372,22 +383,25 @@ class VehicleService {
         $9,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
-    `, [
-      xeKey,
-      chiTiet.ma_loai_xe,
-      maMau,
-      soKhung,
-      soMay,
-      chiTiet.ma_kho_nhap,
-      ngayNhap,
-      giaNhap,
-      `Nhập từ đơn hàng ${chiTiet.so_phieu} (CT#${chiTiet.id})`
-    ]);
+    `,
+        [
+          xeKey,
+          chiTiet.ma_loai_xe,
+          maMau,
+          soKhung,
+          soMay,
+          chiTiet.ma_kho_nhap,
+          ngayNhap,
+          giaNhap,
+          `Nhập từ đơn hàng ${chiTiet.so_phieu} (CT#${chiTiet.id})`,
+        ]
+      );
 
-    /* =====================================================
-     * 7. Cập nhật chi tiết đơn hàng
-     * ===================================================== */
-    await client.query(`
+      /* =====================================================
+       * 7. Cập nhật chi tiết đơn hàng
+       * ===================================================== */
+      await client.query(
+        `
       UPDATE tm_don_hang_mua_xe_ct
       SET 
         xe_key = $1,
@@ -395,17 +409,15 @@ class VehicleService {
         so_may = $3,
         da_nhap_kho = true
       WHERE id = $4
-    `, [
-      xeKey,
-      soKhung,
-      soMay,
-      chiTiet.id
-    ]);
+    `,
+        [xeKey, soKhung, soMay, chiTiet.id]
+      );
 
-    /* =====================================================
-     * 8. Ghi lịch sử xe
-     * ===================================================== */
-    await client.query(`
+      /* =====================================================
+       * 8. Ghi lịch sử xe
+       * ===================================================== */
+      await client.query(
+        `
       INSERT INTO tm_xe_lich_su (
         xe_key, loai_giao_dich, so_chung_tu,
         ngay_giao_dich, ma_kho_nhap,
@@ -415,38 +427,39 @@ class VehicleService {
         $3,$4,
         $5,$6,$7
       )
-    `, [
-      xeKey,
-      chiTiet.so_phieu,
-      ngayNhap,
-      chiTiet.ma_kho_nhap,
-      giaNhap,
-      userId,
-      `Nhập xe ${chiTiet.ten_loai} từ đơn hàng ${chiTiet.so_phieu}`
-    ]);
+    `,
+        [
+          xeKey,
+          chiTiet.so_phieu,
+          ngayNhap,
+          chiTiet.ma_kho_nhap,
+          giaNhap,
+          userId,
+          `Nhập xe ${chiTiet.ten_loai} từ đơn hàng ${chiTiet.so_phieu}`,
+        ]
+      );
 
-    /* =====================================================
-     * 9. Commit
-     * ===================================================== */
-    await client.query('COMMIT');
+      /* =====================================================
+       * 9. Commit
+       * ===================================================== */
+      await client.query("COMMIT");
 
-    return {
-      success: true,
-      message: 'Nhập xe từ đơn hàng thành công',
-      data: await this.getXeDetail(xeKey)
-    };
-
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+      return {
+        success: true,
+        message: "Nhập xe từ đơn hàng thành công",
+        data: await this.getXeDetail(xeKey),
+      };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
-  
-}
 
-async getXeDetail(xeKey) {
-  const result = await pool.query(`
+  async getXeDetail(xeKey) {
+    const result = await pool.query(
+      `
     SELECT 
       x.xe_key,
       x.ma_loai_xe,
@@ -467,18 +480,19 @@ async getXeDetail(xeKey) {
     LEFT JOIN tm_mau_xe m ON x.ma_mau = m.ma_mau
     LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
     WHERE x.xe_key = $1
-  `, [xeKey]);
+  `,
+      [xeKey]
+    );
 
-  return result.rows[0] || null;
-}
-
-  
+    return result.rows[0] || null;
+  }
 
   /**
    * ✅ Lấy lịch sử giao dịch xe
    */
   async getXeHistory(xeKey) {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT 
         ls.*,
         k_xuat.ten_kho as ten_kho_xuat,
@@ -488,7 +502,9 @@ async getXeDetail(xeKey) {
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
       WHERE ls.xe_key = $1
       ORDER BY ls.ngay_giao_dich DESC
-    `, [xeKey]);
+    `,
+      [xeKey]
+    );
 
     return result.rows;
   }
@@ -497,7 +513,7 @@ async getXeDetail(xeKey) {
    * ✅ Lấy danh sách xe trong kho
    */
   async getXeInKho(maKho, filters = {}) {
-    const conditions = ['x.ma_kho_hien_tai = $1', 'x.status = true'];
+    const conditions = ["x.ma_kho_hien_tai = $1", "x.status = true"];
     const params = [maKho];
     let paramIndex = 2;
 
@@ -542,7 +558,7 @@ async getXeDetail(xeKey) {
       LEFT JOIN sys_nhan_hieu nh ON xl.ma_nh = nh.ma_nh
       LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
       INNER JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
-      WHERE ${conditions.join(' AND ')}
+      WHERE ${conditions.join(" AND ")}
       ORDER BY x.ngay_nhap DESC
       LIMIT ${Math.min(parseInt(filters.limit) || 50, 100)}
       OFFSET ${parseInt(filters.offset) || 0}
@@ -556,7 +572,7 @@ async getXeDetail(xeKey) {
    * ✅ Đếm tổng số xe trong kho
    */
   async countXeInKho(maKho, filters = {}) {
-    const conditions = ['ma_kho_hien_tai = $1', 'status = true'];
+    const conditions = ["ma_kho_hien_tai = $1", "status = true"];
     const params = [maKho];
     let paramIndex = 2;
 
@@ -573,14 +589,14 @@ async getXeDetail(xeKey) {
     }
 
     const result = await pool.query(
-      `SELECT COUNT(*) as total FROM tm_xe_thuc_te WHERE ${conditions.join(' AND ')}`,
+      `SELECT COUNT(*) as total FROM tm_xe_thuc_te WHERE ${conditions.join(
+        " AND "
+      )}`,
       params
     );
 
     return parseInt(result.rows[0].total);
   }
-
-  
 }
 
 module.exports = new VehicleService();

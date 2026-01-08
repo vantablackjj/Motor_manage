@@ -1,6 +1,7 @@
 const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
 const { withTransaction } = require("../ultils/transaction");
+const VehicleService = require("./themXe.service");
 
 class DonHangMuaXeService {
   /* =========================
@@ -422,6 +423,47 @@ class DonHangMuaXeService {
         total_pages: Math.ceil(countResult.rows[0].total / safeLimit),
       },
     };
+  }
+
+  /* =========================
+   * 8. Nhập kho xe
+   * ========================= */
+  async nhapKhoXe(maPhieu, danhSachXe, userId) {
+    const results = {
+      success: [],
+      errors: [],
+    };
+
+    // Kiểm tra trạng thái đơn hàng trước khi chạy loop để tiết kiệm resource
+    const trangThai = await this._checkTrangThai(maPhieu, null, pool);
+    if (trangThai !== TRANG_THAI.DA_DUYET) {
+      throw {
+        status: 400,
+        message: "Đơn hàng phải được duyệt trước khi nhập kho",
+      };
+    }
+
+    for (const item of danhSachXe) {
+      try {
+        const result = await VehicleService.nhapXeTuDonHang(
+          maPhieu,
+          item.id, // ID cua chi tiet don hang
+          item, // Data chua so_khung, so_may
+          userId
+        );
+        results.success.push({
+          id: item.id,
+          xe_key: result.data.xe_key,
+        });
+      } catch (err) {
+        results.errors.push({
+          id: item.id,
+          message: err.message,
+        });
+      }
+    }
+
+    return results;
   }
 }
 
