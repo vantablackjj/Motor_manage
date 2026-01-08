@@ -3,35 +3,52 @@ const { TRANG_THAI } = require("../config/constants");
 const PhuTung = require("../models/PhuTung");
 
 class DonHangMuaService {
+  // Helper: Sinh mã phiếu tự động (POP + YYYYMMDD + Sequence)
+  async _generateSoPhieu(client) {
+    const { rows } = await client.query(`
+      SELECT 
+        'POP' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_po')::text, 6, '0')
+        AS so_phieu
+    `);
+    return rows[0].so_phieu;
+  }
+
   // Tạo đơn hàng mua mới
   async taoDonHang(data) {
-    const {
-      ma_phieu,
-      ngay_dat_hang,
-      ma_kho_nhap,
-      ma_ncc,
-      nguoi_tao,
-      dien_giai,
-    } = data;
+    const { ngay_dat_hang, ma_kho_nhap, ma_ncc, nguoi_tao, dien_giai } = data;
 
-    const result = await pool.query(
-      `INSERT INTO tm_don_hang_mua (
-        so_phieu, ngay_dat_hang, ma_kho_nhap, ma_ncc,
-        nguoi_tao, trang_thai, dien_giai
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *`,
-      [
-        ma_phieu,
-        ngay_dat_hang,
-        ma_kho_nhap,
-        ma_ncc,
-        nguoi_tao,
-        TRANG_THAI.NHAP,
-        dien_giai,
-      ]
-    );
+    // Use a transaction to ensure safe code generation
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    return result.rows[0];
+      const so_phieu = await this._generateSoPhieu(client);
+
+      const result = await client.query(
+        `INSERT INTO tm_don_hang_mua (
+          so_phieu, ngay_dat_hang, ma_kho_nhap, ma_ncc,
+          nguoi_tao, trang_thai, dien_giai
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *`,
+        [
+          so_phieu,
+          ngay_dat_hang,
+          ma_kho_nhap,
+          ma_ncc,
+          nguoi_tao,
+          TRANG_THAI.NHAP,
+          dien_giai,
+        ]
+      );
+
+      await client.query("COMMIT");
+      return result.rows[0];
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   // Thêm phụ tùng vào đơn

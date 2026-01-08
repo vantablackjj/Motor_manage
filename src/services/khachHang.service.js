@@ -25,11 +25,11 @@ class KhachHangService {
   }
 
   /* ======================
-   * Lấy theo ID
+   * Lấy theo Mã KH (ma_kh)
    * ====================== */
-  static async getById(id) {
-    const result = await query(`SELECT * FROM tm_khach_hang WHERE id = $1`, [
-      id,
+  static async getById(maKh) {
+    const result = await query(`SELECT * FROM tm_khach_hang WHERE ma_kh = $1`, [
+      maKh,
     ]);
     return result.rows[0];
   }
@@ -95,16 +95,16 @@ class KhachHangService {
   /* ======================
    * Cập nhật khách hàng
    * ====================== */
-  static async update(id, data) {
-    const current = await this.getById(id);
+  static async update(maKh, data) {
+    const current = await this.getById(maKh);
     if (!current) {
       throw new Error("Khách hàng không tồn tại");
     }
 
     // Nếu set mặc định → reset các KH khác
     if (data.status === true) {
-      await query(`UPDATE tm_khach_hang SET status = false WHERE id <> $1`, [
-        id,
+      await query(`UPDATE tm_khach_hang SET status = false WHERE ma_kh <> $1`, [
+        maKh,
       ]);
     }
 
@@ -120,7 +120,7 @@ class KhachHangService {
         ho_khau   = $6,
         la_ncc    = $7,
         status    = $8
-      WHERE id = $9
+      WHERE ma_kh = $9
       RETURNING *
       `,
       [
@@ -132,7 +132,7 @@ class KhachHangService {
         data.ho_khau || null,
         data.la_ncc ?? current.la_ncc,
         data.status ?? current.status,
-        id,
+        maKh,
       ]
     );
 
@@ -140,13 +140,13 @@ class KhachHangService {
   }
 
   /* ======================
-   * Xóa (hard delete)
+   * Xóa (soft delete)
    * ====================== */
-  static async delete(id) {
+  static async delete(maKh) {
     // Soft delete: update status to false instead of hard delete
     const result = await query(
-      `UPDATE tm_khach_hang SET status = false WHERE id = $1 RETURNING *`,
-      [id]
+      `UPDATE tm_khach_hang SET status = false WHERE ma_kh = $1 RETURNING *`,
+      [maKh]
     );
     return result.rows[0];
   }

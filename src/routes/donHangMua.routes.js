@@ -9,7 +9,6 @@ const { ROLES } = require("../config/constants");
 
 // Validation schemas
 const taoDonHangSchema = Joi.object({
-  ma_phieu: Joi.string().required().max(50),
   ngay_dat_hang: Joi.date().required(),
   ma_kho_nhap: Joi.string().required().max(50),
   ma_ncc: Joi.string().required().max(50),
