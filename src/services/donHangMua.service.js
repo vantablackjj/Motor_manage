@@ -82,7 +82,19 @@ class DonHangMuaService {
       const stt = sttResult.rows[0].next_stt;
 
       // Insert chi tiết
-      const { ma_pt, ten_pt, don_vi_tinh, so_luong, don_gia } = chi_tiet;
+      let { ma_pt, ten_pt, don_vi_tinh, so_luong, don_gia } = chi_tiet;
+
+      // Lookup part info to ensure accuracy
+      const partRes = await client.query(
+        "SELECT ten_pt, don_vi_tinh FROM tm_phu_tung WHERE ma_pt = $1",
+        [ma_pt]
+      );
+
+      if (partRes.rows[0]) {
+        ten_pt = partRes.rows[0].ten_pt;
+        don_vi_tinh = partRes.rows[0].don_vi_tinh;
+      }
+
       const thanh_tien = so_luong * don_gia;
 
       await client.query(

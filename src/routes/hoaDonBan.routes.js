@@ -16,24 +16,23 @@ const { ROLES } = require("../config/constants");
 
 // Tạo hóa đơn (CHỈ HEADER)
 const createHoaDonSchema = Joi.object({
-  so_hd: Joi.string().required(),
   ngay_ban: Joi.date().required(),
   ma_kho_xuat: Joi.string().required(),
   ma_kh: Joi.string().required(),
-  ghi_chu: Joi.string().allow(null, "")
+  ghi_chu: Joi.string().allow(null, ""),
 });
 
 // Thêm xe vào hóa đơn
 const themXeSchema = Joi.object({
   xe_key: Joi.string().required(),
-  don_gia: Joi.number().positive().required()
+  don_gia: Joi.number().positive().required(),
 });
 
 // Thêm phụ tùng
 const themPhuTungSchema = Joi.object({
   ma_pt: Joi.string().required(),
   so_luong: Joi.number().integer().min(1).required(),
-  don_gia: Joi.number().positive().required()
+  don_gia: Joi.number().positive().required(),
 });
 
 /* =====================================================
@@ -53,7 +52,7 @@ router.post(
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.username
+        nguoi_tao: req.user.username,
       };
 
       const result = await hoaDonBanService.taoHoaDon(data);
@@ -68,35 +67,27 @@ router.post(
  * GET /hoa-don-ban
  * Danh sách hóa đơn
  */
-router.get(
-  "/",
-  authenticate,
-  async (req, res) => {
-    try {
-      const result = await hoaDonBanService.getDanhSach(req.query);
-      return sendSuccess(res, result, "Lấy danh sách hóa đơn thành công");
-    } catch (err) {
-      return sendError(res, err.message);
-    }
+router.get("/", authenticate, async (req, res) => {
+  try {
+    const result = await hoaDonBanService.getDanhSach(req.query);
+    return sendSuccess(res, result, "Lấy danh sách hóa đơn thành công");
+  } catch (err) {
+    return sendError(res, err.message);
   }
-);
+});
 
 /**
  * GET /hoa-don-ban/:so_hd
  * Chi tiết hóa đơn
  */
-router.get(
-  "/:so_hd",
-  authenticate,
-  async (req, res) => {
-    try {
-      const result = await hoaDonBanService.getById(req.params.so_hd);
-      return sendSuccess(res, result, "Lấy hóa đơn thành công");
-    } catch (err) {
-      return sendError(res, err.message);
-    }
+router.get("/:so_hd", authenticate, async (req, res) => {
+  try {
+    const result = await hoaDonBanService.getById(req.params.so_hd);
+    return sendSuccess(res, result, "Lấy hóa đơn thành công");
+  } catch (err) {
+    return sendError(res, err.message);
   }
-);
+});
 
 /**
  * POST /hoa-don-ban/:so_hd/xe
@@ -112,11 +103,7 @@ router.post(
       const { so_hd } = req.params;
       const { xe_key, don_gia } = req.body;
 
-      const result = await hoaDonBanService.themXe(
-        so_hd,
-        xe_key,
-        don_gia
-      );
+      const result = await hoaDonBanService.themXe(so_hd, xe_key, don_gia);
 
       return sendSuccess(res, result, "Thêm xe vào hóa đơn thành công");
     } catch (err) {
@@ -138,10 +125,7 @@ router.post(
     try {
       const { so_hd } = req.params;
 
-      const result = await hoaDonBanService.themPhuTung(
-        so_hd,
-        req.body
-      );
+      const result = await hoaDonBanService.themPhuTung(so_hd, req.body);
 
       return sendSuccess(res, result, "Thêm phụ tùng vào hóa đơn thành công");
     } catch (err) {
@@ -258,10 +242,7 @@ router.delete(
     try {
       const { so_hd, stt } = req.params;
 
-      const result = await hoaDonBanService.xoaChiTiet(
-        so_hd,
-        Number(stt)
-      );
+      const result = await hoaDonBanService.xoaChiTiet(so_hd, Number(stt));
 
       return sendSuccess(
         res,
@@ -273,6 +254,5 @@ router.delete(
     }
   }
 );
-
 
 module.exports = router;
