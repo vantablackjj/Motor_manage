@@ -4,13 +4,18 @@ class KhachHangService {
   /* ======================
    * Lấy danh sách khách hàng
    * ====================== */
-  static async getAll({ status } = {}) {
+  static async getAll({ status, la_ncc } = {}) {
     let sql = `SELECT * FROM tm_khach_hang WHERE 1=1`;
     const params = [];
 
     if (typeof status === "boolean") {
       params.push(status);
       sql += ` AND status = $${params.length}`;
+    }
+
+    if (typeof la_ncc === "boolean") {
+      params.push(la_ncc);
+      sql += ` AND la_ncc = $${params.length}`;
     }
 
     sql += ` ORDER BY ho_ten`;
@@ -138,8 +143,9 @@ class KhachHangService {
    * Xóa (hard delete)
    * ====================== */
   static async delete(id) {
+    // Soft delete: update status to false instead of hard delete
     const result = await query(
-      `DELETE FROM tm_khach_hang WHERE id = $1 RETURNING *`,
+      `UPDATE tm_khach_hang SET status = false WHERE id = $1 RETURNING *`,
       [id]
     );
     return result.rows[0];
