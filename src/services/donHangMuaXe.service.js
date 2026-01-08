@@ -124,6 +124,118 @@ class DonHangMuaXeService {
   }
 
   /* =========================
+   * 1.1 Tạo đơn mua KÈM CHI TIẾT (ATOMIC)
+   * ========================= */
+
+  async createDonHangWithDetails(data, userId) {
+    // Validate header
+    this._validateCreateHeader(data);
+
+    // Validate chi_tiet array
+    if (
+      !data.chi_tiet ||
+      !Array.isArray(data.chi_tiet) ||
+      data.chi_tiet.length === 0
+    ) {
+      throw { status: 400, message: "Chi tiết đơn hàng không được để trống" };
+    }
+
+    // Validate each detail item
+    for (const item of data.chi_tiet) {
+      this._validateCreateDetail(item);
+    }
+
+    return withTransaction(pool, async (client) => {
+      // 1. Generate so_phieu
+      const soPhieu = await this._generateSoPhieu(client);
+
+      // 2. Insert order header
+      const headerResult = await client.query(
+        `
+        INSERT INTO tm_don_hang_mua_xe (
+          so_phieu,
+          ngay_dat_hang,
+          ma_kho_nhap,
+          ma_ncc,
+          tong_tien,
+          trang_thai,
+          nguoi_tao,
+          ngay_tao
+        ) VALUES (
+          $1,
+          CURRENT_DATE,
+          $2,
+          $3,
+          0,
+          $4,
+          $5,
+          NOW()
+        )
+        RETURNING *
+        `,
+        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId]
+      );
+
+      const header = headerResult.rows[0];
+
+      // 3. Insert all detail items
+      const chiTietResults = [];
+      let tongTien = 0;
+
+      for (let i = 0; i < data.chi_tiet.length; i++) {
+        const item = data.chi_tiet[i];
+        const stt = i + 1;
+        const thanhTien = Number(item.so_luong) * Number(item.don_gia);
+        tongTien += thanhTien;
+
+        const detailResult = await client.query(
+          `
+          INSERT INTO tm_don_hang_mua_xe_ct (
+            ma_phieu,
+            stt,
+            ma_loai_xe,
+            ma_mau,
+            so_luong,
+            don_gia,
+            thanh_tien,
+            da_nhap_kho
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,false)
+          RETURNING *
+          `,
+          [
+            soPhieu,
+            stt,
+            item.ma_loai_xe,
+            item.ma_mau || null,
+            item.so_luong,
+            item.don_gia,
+            thanhTien,
+          ]
+        );
+
+        chiTietResults.push(detailResult.rows[0]);
+      }
+
+      // 4. Update tong_tien in header
+      await client.query(
+        `
+        UPDATE tm_don_hang_mua_xe
+        SET tong_tien = $2
+        WHERE so_phieu = $1
+        `,
+        [soPhieu, tongTien]
+      );
+
+      // 5. Return complete order with details
+      return {
+        ...header,
+        tong_tien: tongTien,
+        chi_tiet: chiTietResults,
+      };
+    });
+  }
+
+  /* =========================
    * 2. Thêm chi tiết đơn
    * ========================= */
 

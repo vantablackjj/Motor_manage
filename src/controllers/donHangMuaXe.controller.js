@@ -41,6 +41,23 @@ class DonHangMuaXeController {
   }
 
   /**
+   * ✅ 2.1 Tạo đơn mua KÈM CHI TIẾT (ATOMIC) - FIX RACE CONDITION
+   */
+  async createWithDetails(req, res, next) {
+    try {
+      const username = req.user.username;
+      const data = await DonHangMuaXeService.createDonHangWithDetails(
+        req.body,
+        username
+      );
+
+      sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * ✅ 3. Xem chi tiết đơn - GIỮ NGUYÊN
    */
   async detail(req, res, next) {

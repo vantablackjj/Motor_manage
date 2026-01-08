@@ -24,17 +24,25 @@ const nhapXeMoiSchema = Joi.object({
   dien_giai: Joi.string(),
   ghi_chu: Joi.string(),
 });
+
 const chiTietDonHang = Joi.object({
   ma_loai_xe: Joi.string().trim().required(),
-  ma_mau: Joi.string().trim().required(),
-  so_luong: Joi.number().integer().required(),
-  don_gia: Joi.number().positive().optional(),
+  ma_mau: Joi.string().trim().optional().allow(null, ""),
+  so_luong: Joi.number().integer().min(1).required(),
+  don_gia: Joi.number().min(0).required(),
   thanh_tien: Joi.number().optional(),
   xe_key: Joi.string().max(50).optional(),
   so_khung: Joi.string().max(50).optional(),
   so_may: Joi.string().max(100).optional(),
   da_nhap_kho: Joi.boolean().optional(),
 });
+
+const createWithDetailsSchema = Joi.object({
+  ma_kho_nhap: Joi.string().required(),
+  ma_ncc: Joi.string().required(),
+  chi_tiet: Joi.array().items(chiTietDonHang).min(1).required(),
+});
+
 router.use(authenticate);
 
 /**
@@ -47,7 +55,7 @@ router.get(
 );
 
 /**
- * 2. Tạo đơn mua
+ * 2. Tạo đơn mua (header only - legacy)
  */
 router.post(
   "/",
@@ -55,6 +63,17 @@ router.post(
   validate(nhapXeMoiSchema),
   validate(nhapXeMoiSchema),
   controller.create
+);
+
+/**
+ * 2.1 Tạo đơn mua KÈM CHI TIẾT (ATOMIC) - FIX RACE CONDITION
+ * ⚠️ MUST be before /:ma_phieu routes to avoid route conflicts
+ */
+router.post(
+  "/create-with-details",
+  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  validate(createWithDetailsSchema),
+  controller.createWithDetails
 );
 
 /**
