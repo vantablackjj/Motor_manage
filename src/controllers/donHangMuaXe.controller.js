@@ -162,7 +162,7 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const username = req.user.username;
-      const danhSachXe = req.body.danh_sach_xe; // Array of vehicles
+      const danhSachXe = req.body.danh_sach_xe || req.body.vehicles; // Array of vehicles
 
       if (
         !danhSachXe ||
