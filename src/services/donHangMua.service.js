@@ -243,7 +243,7 @@ class DonHangMuaService {
       // Tạo phiếu chi tiền
       await client.query(
         `INSERT INTO tm_thu_chi (
-          ma_phieu, ngay_giao_dich, loai, ma_kho, ma_kh,
+          so_phieu, ngay_giao_dich, loai, ma_kho, ma_kh,
           so_tien, trang_thai, nguoi_tao, nguoi_duyet, ngay_duyet,
           lien_ket_phieu, dien_giai
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, CURRENT_TIMESTAMP, $9, $10)`,
