@@ -528,7 +528,7 @@ class VehicleService {
       x.ngay_tao
     FROM tm_xe_thuc_te x
     LEFT JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-    LEFT JOIN tm_mau_xe m ON x.ma_mau = m.ma_mau
+    LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
     LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
     WHERE x.xe_key = $1
   `,
