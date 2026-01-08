@@ -264,16 +264,18 @@ class VehicleService {
       await client.query("BEGIN");
 
       /* =====================================================
-       * 1. Lấy chi tiết đơn hàng + đơn hàng
+       * 1. Lấy chi tiết đơn hàng + đơn hàng (CÓ LOCK)
        * ===================================================== */
       const ctRes = await client.query(
         `
       SELECT 
         ct.id,
         ct.ma_phieu,
+        ct.stt,
         ct.ma_loai_xe,
         ct.ma_mau,
         ct.don_gia,
+        ct.so_luong,
         ct.da_nhap_kho,
         ct.xe_key,
 
@@ -289,6 +291,7 @@ class VehicleService {
         ON ct.ma_loai_xe = xl.ma_loai
       WHERE ct.ma_phieu = $1
         AND ct.id = $2
+      FOR UPDATE OF ct
     `,
         [maPhieu, chiTietId]
       );
@@ -300,7 +303,54 @@ class VehicleService {
         };
       }
 
-      const chiTiet = ctRes.rows[0];
+      let chiTiet = ctRes.rows[0];
+
+      /* =====================================================
+       * 1.1 XỬ LÝ TÁCH DÒNG (SPLIT) NẾU SỐ LƯỢNG > 1
+       * ===================================================== */
+      if (chiTiet.so_luong > 1) {
+        // 1. Giảm số lượng dòng hiện tại
+        await client.query(
+          `UPDATE tm_don_hang_mua_xe_ct SET so_luong = so_luong - 1 WHERE id = $1`,
+          [chiTiet.id]
+        );
+
+        // 2. Tìm STT lớn nhất để tạo dòng mới
+        const sttRes = await client.query(
+          `SELECT COALESCE(MAX(stt), 0) + 1 as next_stt FROM tm_don_hang_mua_xe_ct WHERE ma_phieu = $1`,
+          [maPhieu]
+        );
+        const nextStt = sttRes.rows[0].next_stt;
+
+        // 3. Tạo dòng mới với số lượng = 1 (Dòng này sẽ được nhập xe)
+        const newCtRes = await client.query(
+          `
+          INSERT INTO tm_don_hang_mua_xe_ct (
+            ma_phieu, stt, ma_loai_xe, ma_mau, 
+            so_luong, don_gia, thanh_tien, da_nhap_kho
+          ) VALUES ($1, $2, $3, $4, 1, $5, $6, false)
+          RETURNING *
+          `,
+          [
+            chiTiet.ma_phieu,
+            nextStt,
+            chiTiet.ma_loai_xe,
+            chiTiet.ma_mau,
+            chiTiet.don_gia,
+            chiTiet.don_gia, // thanh_tien = don_gia * 1
+          ]
+        );
+
+        // 4. Update biến chiTiet để trỏ vào dòng mới vừa tạo
+        const newChiTiet = newCtRes.rows[0];
+        // Merge thông tin từ bảng dh/xl của dòng cũ vào
+        chiTiet = {
+          ...chiTiet,
+          ...newChiTiet,
+          id: newChiTiet.id,
+          so_luong: 1,
+        };
+      }
 
       /* =====================================================
        * 2. Validate trạng thái đơn hàng
@@ -357,7 +407,8 @@ class VehicleService {
       const ngayNhap = data.ngay_nhap || new Date().toISOString().split("T")[0];
       const maMau = data.ma_mau || chiTiet.ma_mau;
 
-      if (!giaNhap || giaNhap <= 0) {
+      if (!giaNhap || giaNhap < 0) {
+        // Cho phép giá nhập = 0
         throw {
           status: 400,
           message: "Giá nhập không hợp lệ",
