@@ -676,16 +676,45 @@ class HoaDonBanService {
       client.release();
     }
   }
-
   async getById(so_hd) {
-    const result = await pool.query(
-      `
-            select * from tm_hoa_don_ban
-            where so_hd = $1
-            `,
+    if (!so_hd || typeof so_hd !== "string") {
+      throw new Error("so_hd không hợp lệ");
+    }
+
+    so_hd = so_hd.trim();
+
+    console.log("getById so_hd =", so_hd);
+
+    const headerResult = await pool.query(
+      `SELECT * FROM tm_hoa_don_ban WHERE so_hd = $1`,
       [so_hd]
     );
-    return result.rows[0];
+
+    if (headerResult.rows.length === 0) {
+      throw new Error(`Không tìm thấy hóa đơn: ${so_hd}`);
+    }
+
+    const xeResult = await pool.query(
+      `SELECT stt, xe_key, don_gia, thanh_tien
+     FROM tm_hoa_don_ban_ct
+     WHERE ma_hd = $1 AND loai_hang = 'XE'
+     ORDER BY stt`,
+      [so_hd]
+    );
+
+    const ptResult = await pool.query(
+      `SELECT stt, ma_pt, so_luong, don_gia, thanh_tien
+     FROM tm_hoa_don_ban_ct
+     WHERE ma_hd = $1 AND loai_hang = 'PHU_TUNG'
+     ORDER BY stt`,
+      [so_hd]
+    );
+
+    return {
+      ...headerResult.rows[0],
+      chi_tiet_xe: xeResult.rows,
+      chi_tiet_pt: ptResult.rows,
+    };
   }
 }
 

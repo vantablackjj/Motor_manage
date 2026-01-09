@@ -83,6 +83,7 @@ router.get("/", authenticate, async (req, res) => {
 router.get("/:so_hd", authenticate, async (req, res) => {
   try {
     const result = await hoaDonBanService.getById(req.params.so_hd);
+
     return sendSuccess(res, result, "Lấy hóa đơn thành công");
   } catch (err) {
     return sendError(res, err.message);
