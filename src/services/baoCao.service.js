@@ -40,7 +40,7 @@ class BaoCaoService {
     let sql = `
       SELECT 
         tk.ma_pt, pt.ten_pt, pt.don_vi_tinh, pt.nhom_pt,
-        tk.so_luong_ton, tk.so_luong_khoa,
+        tk.so_luong_ton, tk.so_luong_khoa, tk.so_luong_toi_thieu,
         k.ten_kho
       FROM tm_phu_tung_ton_kho tk
       JOIN tm_phu_tung pt ON tk.ma_pt = pt.ma_pt
@@ -55,6 +55,9 @@ class BaoCaoService {
     if (nhom_pt) {
       params.push(nhom_pt);
       sql += ` AND pt.nhom_pt = $${params.length}`;
+    }
+    if (canh_bao === "true" || canh_bao === true) {
+      sql += ` AND tk.so_luong_ton <= tk.so_luong_toi_thieu`;
     }
     const { rows } = await pool.query(sql, params);
     return rows;
@@ -543,7 +546,7 @@ class BaoCaoService {
       SELECT COUNT(*) as total 
       FROM tm_phu_tung_ton_kho tk 
       JOIN tm_phu_tung pt ON tk.ma_pt = pt.ma_pt 
-      WHERE tk.so_luong_ton <= pt.ton_toit_thieu
+      WHERE tk.so_luong_ton <= tk.so_luong_toi_thieu
     `;
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_kho`;
     const sqlCustomerDebt = `
