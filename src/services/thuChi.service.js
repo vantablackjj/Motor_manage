@@ -244,29 +244,11 @@ class ThuChiService {
     const result = await pool.query(
       `
       SELECT
-        id,
-        so_phieu,
-        loai,
-        so_tien,
-        dien_giai,
-        trang_thai,
-        ma_kho,
-        ma_kh,
-        ngay_giao_dich,
-        nguoi_tao,
-        ngay_tao,
-        nguoi_gui,
-        ngay_gui,
-        nguoi_duyet,
-        ngay_duyet,
-        nguoi_huy,
-        ngay_huy,
-        ly_do_huy,
-        lien_ket_phieu
+        *
       FROM tm_thu_chi
-      WHERE so_phieu = $1
+      WHERE TRIM(so_phieu) = $1
     `,
-      [so_phieu]
+      [so_phieu?.trim()]
     );
 
     return result.rows[0] || null;

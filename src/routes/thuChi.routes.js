@@ -3,10 +3,9 @@ const router = express.Router();
 const { authenticate } = require("../middleware/auth");
 const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { send, sendError } = require("../services/chuyenKho.service");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
-const { sendSuccess } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../ultils/respone");
 
 const thuChiService = require("../services/thuChi.service");
 
@@ -32,11 +31,19 @@ router.get("/", authenticate, async (req, res, next) => {
 router.get("/:so_phieu", authenticate, async (req, res, next) => {
   try {
     const { so_phieu } = req.params;
+    console.log(
+      `[ThuChi] GET details for so_phieu: "${so_phieu}" (length: ${so_phieu?.length})`
+    );
     const data = await thuChiService.getChiTiet(so_phieu);
-    sendSuccess(res, data, "success", 201);
+    console.log(
+      `[ThuChi] Result for "${so_phieu}":`,
+      data ? "FOUND" : "NOT FOUND"
+    );
     if (!data) {
-      return sendError(res, "so_phieu khong ton tai", 401);
+      return sendError(res, "Số phiếu không tồn tại", 404);
     }
+
+    return sendSuccess(res, data, "success");
   } catch (error) {
     next(error);
   }
