@@ -21,7 +21,8 @@ const user = require("./user.routes");
 const phuTungKhoa = require("./phuTungKhoa.routes");
 const congNoRoutes = require("./congNo.routes");
 const donHangMuaXeRoutes = require("./donHangMuaXe.routes");
-
+const bulkImportRoutes = require("./bulkImport.routes");
+const baoCaoRoutes = require("./baoCao.routes");
 // Mount routes
 router.use("/auth", authRoutes);
 router.use("/kho", khoRoutes);
@@ -43,5 +44,6 @@ router.use("/users", user);
 router.use("/phu-tung-khoa", phuTungKhoa);
 router.use("/cong-no", congNoRoutes);
 router.use("/don-hang-mua-xe", donHangMuaXeRoutes);
-
+router.use("/import", bulkImportRoutes);
+router.use("/bao-cao", baoCaoRoutes);
 module.exports = router;
