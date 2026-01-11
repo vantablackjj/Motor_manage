@@ -716,6 +716,24 @@ class HoaDonBanService {
       chi_tiet_pt: ptResult.rows,
     };
   }
+  // Lấy chi tiết hóa đơn cho export
+  static async getAllDetails(filters = {}) {
+    let sql = `
+      SELECT 
+        ct.*, 
+        h.ngay_ban as ngay_lap,
+        h.ma_kho_xuat,
+        pt.ten_pt,
+        pt.don_vi_tinh
+      FROM tm_hoa_don_ban_ct ct
+      INNER JOIN tm_hoa_don_ban h ON ct.ma_hd = h.so_hd
+      LEFT JOIN tm_phu_tung pt ON ct.ma_pt = pt.ma_pt
+      WHERE 1=1
+    `;
+    const params = [];
+    const result = await pool.query(sql, params);
+    return result.rows;
+  }
 }
 
 module.exports = new HoaDonBanService();

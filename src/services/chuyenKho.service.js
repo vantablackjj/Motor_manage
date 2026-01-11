@@ -777,6 +777,39 @@ class ChuyenKhoService {
       client.release();
     }
   }
+  // Export Chuyển kho xe
+  static async getAllTransferXe(filters = {}) {
+    const sql = `
+      SELECT 
+        ctx.*, 
+        ck.ngay_chuyen_kho as ngay_tao,
+        ck.ma_kho_xuat as tu_ma_kho,
+        ck.ma_kho_nhap as den_ma_kho,
+        u.ho_ten as nguoi_tao_ten
+      FROM tm_chuyen_kho_xe ctx
+      INNER JOIN tm_chuyen_kho ck ON ctx.ma_phieu = ck.so_phieu
+      LEFT JOIN sys_user u ON ck.nguoi_tao = u.id
+    `;
+    const result = await pool.query(sql);
+    return result.rows;
+  }
+
+  // Export Chuyển kho phụ tùng
+  static async getAllTransferPT(filters = {}) {
+    const sql = `
+      SELECT 
+        ctp.*, 
+        ck.ngay_chuyen_kho as ngay_tao,
+        ck.ma_kho_xuat as tu_ma_kho,
+        ck.ma_kho_nhap as den_ma_kho,
+        pt.ten_pt
+      FROM tm_chuyen_kho_phu_tung ctp
+      INNER JOIN tm_chuyen_kho ck ON ctp.ma_phieu = ck.so_phieu
+      LEFT JOIN tm_phu_tung pt ON ctp.ma_pt = pt.ma_pt
+    `;
+    const result = await pool.query(sql);
+    return result.rows;
+  }
 }
 
 module.exports = new ChuyenKhoService();
