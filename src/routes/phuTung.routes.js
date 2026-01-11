@@ -79,6 +79,17 @@ router.get("/", authenticate, async (req, res, next) => {
     next(error);
   }
 });
+
+router.get("/:ma_pt", authenticate, async (req, res, next) => {
+  try {
+    const { ma_pt } = req.params;
+    const data = await PhuTung.getOne(ma_pt);
+    sendSuccess(res, data, "Lấy thông tin phụ tùng thành công");
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:ma_pt/lich-su", authenticate, async (req, res, next) => {
   try {
     const { ma_pt } = req.params;
@@ -86,7 +97,8 @@ router.get("/:ma_pt/lich-su", authenticate, async (req, res, next) => {
     sendSuccess(res, data, "Lấy lịch sử phụ tùng thành công");
   } catch (error) {
     next(error);
-  }});
+  }
+});
 // GET /api/phu-tung/ton-kho/:ma_kho - Tồn kho phụ tùng theo kho
 router.get(
   "/ton-kho/:ma_kho",
@@ -115,14 +127,14 @@ router.put(
   validate(createPhuTungSchema),
   async (req, res, next) => {
     try {
-      const {ma_pt} = req.params;
+      const { ma_pt } = req.params;
       const data = await PhuTung.update(ma_pt, req.body);
 
       if (!data) {
         return sendError(res, "Kho không tồn tại", 404);
       }
       sendSuccess(res, data, "Cập nhật phụ tùng thành công");
-    }catch (error) {
+    } catch (error) {
       next(error);
     }
   }
@@ -145,7 +157,6 @@ router.post(
     }
   }
 );
-
 
 // POST /api/phu-tung - Tạo phụ tùng mới
 router.post(
@@ -191,7 +202,7 @@ router.post(
     try {
       await PhuTung.lock({
         ...req.body,
-        nguoi_thuc_hien: req.user.username
+        nguoi_thuc_hien: req.user.username,
       });
 
       sendSuccess(res, null, "Khóa tồn kho phụ tùng thành công");
@@ -214,7 +225,5 @@ router.post(
     }
   }
 );
-
-
 
 module.exports = router;

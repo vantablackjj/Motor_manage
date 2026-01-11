@@ -1,7 +1,6 @@
-const { query, pool } = require('../config/database');
+const { query, pool } = require("../config/database");
 
 class PhuTung {
-
   // ===== Lấy tất cả phụ tùng =====
   static async getAll(filters = {}) {
     let sql = `
@@ -25,13 +24,13 @@ class PhuTung {
       sql += ` AND (pt.ten_pt ILIKE $${params.length} OR pt.ma_pt ILIKE $${params.length})`;
     }
 
-    sql += ' ORDER BY pt.nhom_pt, pt.ten_pt';
+    sql += " ORDER BY pt.nhom_pt, pt.ten_pt";
 
     const result = await query(sql, params);
     return result.rows;
   }
 
-  //lich su 
+  //lich su
   static async getLichSu(ma_pt) {
     const sql = `
       SELECT * from tm_phu_tung_lich_su
@@ -42,7 +41,19 @@ class PhuTung {
     return result.rows;
   }
 
+  static async getOne(ma_pt) {
+    const sql = `
+      SELECT 
+        pt.id, pt.ma_pt, pt.ten_pt, pt.don_vi_tinh, pt.nhom_pt,
+        pt.gia_nhap, pt.gia_ban, pt.vat, pt.status, pt.ghi_chu,
+        pt.ngay_tao
+      FROM tm_phu_tung pt
+      WHERE pt.ma_pt = $1 AND pt.status = TRUE
+    `;
 
+    const result = await query(sql, [ma_pt]);
+    return result.rows[0];
+  }
   // ===== Tồn kho =====
   static async getTonKho(ma_kho, filters = {}) {
     let sql = `
@@ -66,7 +77,7 @@ class PhuTung {
 
     if (filters.trang_thai_ton) {
       return result.rows.filter(
-        row => row.trang_thai_ton === filters.trang_thai_ton
+        (row) => row.trang_thai_ton === filters.trang_thai_ton
       );
     }
 
@@ -75,7 +86,8 @@ class PhuTung {
 
   // ===== Update =====
   static async update(ma_pt, data) {
-    const { ten_pt, don_vi_tinh, nhom_pt, gia_nhap, gia_ban, vat, ghi_chu } = data;
+    const { ten_pt, don_vi_tinh, nhom_pt, gia_nhap, gia_ban, vat, ghi_chu } =
+      data;
 
     const result = await query(
       `
@@ -96,11 +108,17 @@ class PhuTung {
     const client = await pool.connect();
 
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       const {
-        ma_pt, ten_pt, don_vi_tinh, nhom_pt,
-        gia_nhap, gia_ban, vat, ghi_chu
+        ma_pt,
+        ten_pt,
+        don_vi_tinh,
+        nhom_pt,
+        gia_nhap,
+        gia_ban,
+        vat,
+        ghi_chu,
       } = data;
 
       const result = await client.query(
@@ -126,137 +144,132 @@ class PhuTung {
         [ma_pt]
       );
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
       return result.rows[0];
-
     } catch (err) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw err;
     } finally {
       client.release();
     }
   }
 
- // Khóa phụ tùng
+  // Khóa phụ tùng
   static async lock(ma_pt, ma_kho, ma_phieu, loai_phieu, so_luong, ly_do) {
-  const client = await pool.connect();
+    const client = await pool.connect();
 
-  try {
-    await client.query('BEGIN');
+    try {
+      await client.query("BEGIN");
 
-    // 1. Khóa dòng tồn kho vật lý
-    const tonKhoRes = await client.query(
-      `
+      // 1. Khóa dòng tồn kho vật lý
+      const tonKhoRes = await client.query(
+        `
       SELECT so_luong_ton, so_luong_khoa
       FROM tm_phu_tung_ton_kho
       WHERE ma_pt = $1 AND ma_kho = $2
       FOR UPDATE
       `,
-      [ma_pt, ma_kho]
-    );
-
-    if (tonKhoRes.rowCount === 0) {
-      throw new Error(`Phụ tùng ${ma_pt} chưa tồn tại trong kho ${ma_kho}`);
-    }
-
-    const { so_luong_ton, so_luong_khoa } = tonKhoRes.rows[0];
-    const kha_dung = so_luong_ton - so_luong_khoa;
-
-    if (kha_dung < so_luong) {
-      throw new Error(
-        `Tồn kho không đủ. Khả dụng: ${kha_dung}, yêu cầu: ${so_luong}`
+        [ma_pt, ma_kho]
       );
-    }
 
-    // 2. Insert khóa tồn
-    await client.query(
-      `
+      if (tonKhoRes.rowCount === 0) {
+        throw new Error(`Phụ tùng ${ma_pt} chưa tồn tại trong kho ${ma_kho}`);
+      }
+
+      const { so_luong_ton, so_luong_khoa } = tonKhoRes.rows[0];
+      const kha_dung = so_luong_ton - so_luong_khoa;
+
+      if (kha_dung < so_luong) {
+        throw new Error(
+          `Tồn kho không đủ. Khả dụng: ${kha_dung}, yêu cầu: ${so_luong}`
+        );
+      }
+
+      // 2. Insert khóa tồn
+      await client.query(
+        `
       INSERT INTO tm_phu_tung_khoa (
         ma_pt, ma_kho, so_phieu, loai_phieu, so_luong_khoa, ly_do
       )
       VALUES ($1, $2, $3, $4, $5, $6)
       `,
-      [ma_pt, ma_kho, ma_phieu, loai_phieu, so_luong, ly_do]
-    );
+        [ma_pt, ma_kho, ma_phieu, loai_phieu, so_luong, ly_do]
+      );
 
-    // 3. Update tổng khóa
-    await client.query(
-      `
+      // 3. Update tổng khóa
+      await client.query(
+        `
       UPDATE tm_phu_tung_ton_kho
       SET so_luong_khoa = so_luong_khoa + $1,
           ngay_cap_nhat = CURRENT_TIMESTAMP
       WHERE ma_pt = $2 AND ma_kho = $3
       `,
-      [so_luong, ma_pt, ma_kho]
-    );
+        [so_luong, ma_pt, ma_kho]
+      );
 
-    await client.query('COMMIT');
-    return true;
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
-}
-static async unlock(ma_phieu) {
-  const client = await pool.connect();
+  static async unlock(ma_phieu) {
+    const client = await pool.connect();
 
-  try {
-    await client.query('BEGIN');
+    try {
+      await client.query("BEGIN");
 
-    const khoaRes = await client.query(
-      `
+      const khoaRes = await client.query(
+        `
       SELECT ma_pt, ma_kho, so_luong_khoa
       FROM tm_phu_tung_khoa
       WHERE so_phieu = $1
       FOR UPDATE
       `,
-      [ma_phieu]
-    );
+        [ma_phieu]
+      );
 
-    for (const k of khoaRes.rows) {
-      await client.query(
-        `
+      for (const k of khoaRes.rows) {
+        await client.query(
+          `
         UPDATE tm_phu_tung_ton_kho
         SET so_luong_khoa = so_luong_khoa - $1,
             ngay_cap_nhat = CURRENT_TIMESTAMP
         WHERE ma_pt = $2 AND ma_kho = $3
         `,
-        [k.so_luong_khoa, k.ma_pt, k.ma_kho]
-      );
+          [k.so_luong_khoa, k.ma_pt, k.ma_kho]
+        );
+      }
+
+      await client.query(`DELETE FROM tm_phu_tung_khoa WHERE so_phieu = $1`, [
+        ma_phieu,
+      ]);
+
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await client.query(
-      `DELETE FROM tm_phu_tung_khoa WHERE so_phieu = $1`,
-      [ma_phieu]
-    );
-
-    await client.query('COMMIT');
-    return true;
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
   }
-}
-// service
-static async softDelete(ma_pt) {
-  const result = await query(
-    `
+  // service
+  static async softDelete(ma_pt) {
+    const result = await query(
+      `
     UPDATE tm_phu_tung
     SET status = FALSE, ngay_cap_nhat = CURRENT_TIMESTAMP
     WHERE ma_pt = $1 AND status = TRUE
     RETURNING *
     `,
-    [ma_pt]
-  );
-  return result.rows[0];
-}
-
+      [ma_pt]
+    );
+    return result.rows[0];
+  }
 }
 
 module.exports = PhuTung;
