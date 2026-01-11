@@ -25,20 +25,21 @@ const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ext !== ".xlsx" && ext !== ".xls") {
-      return cb(new Error("Chỉ chấp nhận file Excel (.xlsx, .xls)"));
+    if (ext !== ".xlsx" && ext !== ".xls" && ext !== ".csv") {
+      return cb(
+        new Error("Chỉ chấp nhận file Excel (.xlsx, .xls) hoặc CSV (.csv)")
+      );
     }
     cb(null, true);
   },
 });
 
 /**
- * @route   POST /api/import/khach-hang
- * @desc    Import khách hàng từ Excel
- * @access  Private (ADMIN)
+ * @route   POST /api/import/customer
+ * @desc    Import khách hàng
  */
 router.post(
-  "/khach-hang",
+  "/customer",
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
@@ -46,16 +47,147 @@ router.post(
 );
 
 /**
- * @route   POST /api/import/phu-tung
- * @desc    Import phụ tùng từ Excel
- * @access  Private (ADMIN)
+ * @route   POST /api/import/part
+ * @desc    Import phụ tùng
  */
 router.post(
-  "/phu-tung",
+  "/part",
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
   BulkImportController.importPhuTung
+);
+
+/**
+ * @route   POST /api/import/origin
+ * @desc    Import nơi sản xuất
+ */
+router.post(
+  "/origin",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importNoiSx
+);
+
+/**
+ * @route   POST /api/import/brand
+ * @desc    Import nhãn hiệu
+ */
+router.post(
+  "/brand",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importBrand
+);
+
+/**
+ * @route   POST /api/import/color
+ * @desc    Import màu sắc
+ */
+router.post(
+  "/color",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importColor
+);
+
+/**
+ * @route   POST /api/import/warehouse
+ * @desc    Import kho
+ */
+router.post(
+  "/warehouse",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importWarehouse
+);
+
+/**
+ * @route   POST /api/import/vehicle-type
+ * @desc    Import loại xe
+ */
+router.post(
+  "/vehicle-type",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importVehicleType
+);
+
+/**
+ * @route   POST /api/import/xe
+ * @desc    Import xe thực tế
+ */
+router.post(
+  "/xe",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importXe
+);
+
+/**
+ * @route   POST /api/import/thu-chi
+ * @desc    Import thu chi
+ */
+router.post(
+  "/thu-chi",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importThuChi
+);
+
+/**
+ * @route   POST /api/import/nhap-kho
+ * @desc    Import nhập kho
+ */
+router.post(
+  "/nhap-kho",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importNhapKho
+);
+
+/**
+ * @route   POST /api/import/xuat-kho
+ * @desc    Import xuất kho
+ */
+router.post(
+  "/xuat-kho",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importXuatKho
+);
+
+/**
+ * @route   POST /api/import/transfer-xe
+ * @desc    Import chuyển kho xe
+ */
+router.post(
+  "/transfer-xe",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importTransferXe
+);
+
+/**
+ * @route   POST /api/import/transfer-pt
+ * @desc    Import chuyển kho phụ tùng
+ */
+router.post(
+  "/transfer-pt",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importTransferPT
 );
 
 module.exports = router;

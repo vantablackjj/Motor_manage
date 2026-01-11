@@ -11,6 +11,14 @@ const errorHandler = (err, req, res, next) => {
     user: req.user?.id,
   });
 
+  // Multer errors
+  if (err.name === "MulterError") {
+    return sendError(res, `Upload error: ${err.message}`, 400, {
+      code: err.code,
+      field: err.field,
+    });
+  }
+
   // PostgreSQL errors
   if (err.code) {
     switch (err.code) {
