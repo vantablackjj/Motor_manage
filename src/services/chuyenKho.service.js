@@ -778,7 +778,7 @@ class ChuyenKhoService {
     }
   }
   // Export Chuyển kho xe
-  static async getAllTransferXe(filters = {}) {
+  async getAllTransferXe(filters = {}) {
     const sql = `
       SELECT 
         ctx.*, 
@@ -795,7 +795,7 @@ class ChuyenKhoService {
   }
 
   // Export Chuyển kho phụ tùng
-  static async getAllTransferPT(filters = {}) {
+  async getAllTransferPT(filters = {}) {
     const sql = `
       SELECT 
         ctp.*, 

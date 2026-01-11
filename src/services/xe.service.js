@@ -320,6 +320,37 @@ class Xe {
 
     return errors;
   }
+  // Lấy dữ liệu xe cho export
+  static async getAllForExport(filters = {}) {
+    let sql = `
+      SELECT 
+        x.*, xl.ten_loai, m.ten_mau, k.ten_kho
+      FROM tm_xe_thuc_te x
+      INNER JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
+      LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
+      LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
+      WHERE x.status = TRUE
+    `;
+    const params = [];
+    let idx = 1;
+
+    if (filters.ma_kho) {
+      sql += ` AND x.ma_kho_hien_tai = $${idx++}`;
+      params.push(filters.ma_kho);
+    }
+    if (filters.ma_loai_xe) {
+      sql += ` AND x.ma_loai_xe = $${idx++}`;
+      params.push(filters.ma_loai_xe);
+    }
+    if (filters.trang_thai) {
+      sql += ` AND x.trang_thai = $${idx++}`;
+      params.push(filters.trang_thai);
+    }
+
+    sql += " ORDER BY x.ngay_nhap DESC";
+    const result = await query(sql, params);
+    return result.rows;
+  }
 }
 
 module.exports = Xe;

@@ -10,6 +10,8 @@ const ThuChiService = require("../services/thuChi.service");
 const DonHangMuaService = require("../services/donHangMua.service");
 const HoaDonBanService = require("../services/hoaDonBan.service");
 const ChuyenKhoService = require("../services/chuyenKho.service");
+const XeService = require("../services/xe.service");
+const DonHangMuaXeService = require("../services/donHangMuaXe.service");
 const logger = require("../ultils/logger");
 
 class BulkExportController {
@@ -273,6 +275,55 @@ class BulkExportController {
         data,
         columns,
         "Chuyen_Kho_Phu_Tung.xlsx"
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async exportXeTonKho(req, res, next) {
+    try {
+      const data = await XeService.getAllForExport(req.query);
+      const columns = [
+        { header: "Xe Key", key: "xe_key", width: 25 },
+        { header: "Số Khung", key: "so_khung", width: 20 },
+        { header: "Số Máy", key: "so_may", width: 20 },
+        { header: "Tên Loại Xe", key: "ten_loai", width: 25 },
+        { header: "Tên Màu", key: "ten_mau", width: 20 },
+        { header: "Kho Hiện Tại", key: "ten_kho", width: 20 },
+        { header: "Trạng Thái", key: "trang_thai", width: 15 },
+        { header: "Giá Nhập", key: "gia_nhap", width: 15 },
+        { header: "Ngày Nhập", key: "ngay_nhap", width: 20 },
+      ];
+      await BulkExportService.exportToExcel(
+        res,
+        data,
+        columns,
+        "Ton_Kho_Xe.xlsx"
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async exportNhapKhoXe(req, res, next) {
+    try {
+      const data = await DonHangMuaXeService.getAllDetails(req.query);
+      const columns = [
+        { header: "Mã Phiếu", key: "ma_phieu", width: 20 },
+        { header: "Ngày Nhập", key: "ngay_lap", width: 20 },
+        { header: "Nhà Cung Cấp", key: "ma_ncc", width: 15 },
+        { header: "Tên Loại Xe", key: "ten_loai", width: 30 },
+        { header: "Màu Sắc", key: "ten_mau", width: 20 },
+        { header: "Số Lượng", key: "so_luong", width: 12 },
+        { header: "Đơn Giá", key: "don_gia", width: 15 },
+        { header: "Thành Tiền", key: "thanh_tien", width: 15 },
+      ];
+      await BulkExportService.exportToExcel(
+        res,
+        data,
+        columns,
+        "Lich_Su_Nhap_Kho_Xe.xlsx"
       );
     } catch (error) {
       next(error);

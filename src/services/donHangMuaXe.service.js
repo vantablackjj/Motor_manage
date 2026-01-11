@@ -577,6 +577,26 @@ class DonHangMuaXeService {
 
     return results;
   }
+  // Lấy chi tiết đơn hàng cho export
+  async getAllDetails(filters = {}) {
+    let sql = `
+      SELECT 
+        ct.*, 
+        h.ngay_dat_hang as ngay_lap,
+        h.ma_kho_nhap,
+        h.ma_ncc,
+        xl.ten_loai,
+        m.ten_mau
+      FROM tm_don_hang_mua_xe_ct ct
+      INNER JOIN tm_don_hang_mua_xe h ON ct.ma_phieu = h.so_phieu
+      LEFT JOIN tm_xe_loai xl ON ct.ma_loai_xe = xl.ma_loai
+      LEFT JOIN sys_mau m ON ct.ma_mau = m.ma_mau
+      WHERE 1=1
+    `;
+    const params = [];
+    const result = await pool.query(sql, params);
+    return result.rows;
+  }
 }
 
 module.exports = new DonHangMuaXeService();

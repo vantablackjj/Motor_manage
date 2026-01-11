@@ -717,7 +717,7 @@ class HoaDonBanService {
     };
   }
   // Lấy chi tiết hóa đơn cho export
-  static async getAllDetails(filters = {}) {
+  async getAllDetails(filters = {}) {
     let sql = `
       SELECT 
         ct.*, 

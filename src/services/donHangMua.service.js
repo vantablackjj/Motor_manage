@@ -366,7 +366,7 @@ class DonHangMuaService {
     };
   }
   // Lấy chi tiết đơn hàng cho export
-  static async getAllDetails(filters = {}) {
+  async getAllDetails(filters = {}) {
     let sql = `
       SELECT 
         ct.*, 

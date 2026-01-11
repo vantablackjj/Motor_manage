@@ -15,10 +15,12 @@ router.get("/origin", BulkExportController.exportOrigins);
 router.get("/vehicle-type", BulkExportController.exportVehicleTypes);
 router.get("/customer", BulkExportController.exportCustomers);
 router.get("/part", BulkExportController.exportParts);
+router.get("/xe-ton-kho", BulkExportController.exportXeTonKho);
 
 // --- TRANSACTIONS ---
 router.get("/thu-chi", BulkExportController.exportThuChi);
 router.get("/nhap-kho", BulkExportController.exportNhapKho);
+router.get("/nhap-kho-xe", BulkExportController.exportNhapKhoXe);
 router.get("/xuat-kho", BulkExportController.exportXuatKho);
 router.get("/transfer-xe", BulkExportController.exportTransferXe);
 router.get("/transfer-pt", BulkExportController.exportTransferPT);
