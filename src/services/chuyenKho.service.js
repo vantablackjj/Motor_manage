@@ -788,7 +788,7 @@ class ChuyenKhoService {
         u.ho_ten as nguoi_tao_ten
       FROM tm_chuyen_kho_xe ctx
       INNER JOIN tm_chuyen_kho ck ON ctx.ma_phieu = ck.so_phieu
-      LEFT JOIN sys_user u ON ck.nguoi_tao = u.id
+      LEFT JOIN sys_user u ON ck.nguoi_tao = u.id::text
     `;
     const result = await pool.query(sql);
     return result.rows;
