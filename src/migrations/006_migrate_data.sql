@@ -6,6 +6,35 @@
 -- WARNING: Review carefully before running!
 -- =====================================================
 
+-- 0. ENSURE UNIQUE CONSTRAINTS (Prevent ON CONFLICT errors)
+DO $$
+BEGIN
+    -- dm_nhom_hang(ma_nhom)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'dm_nhom_hang' AND constraint_type = 'UNIQUE' AND constraint_name = 'dm_nhom_hang_ma_nhom_key'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = 'dm_nhom_hang'::regclass AND i.indisunique AND a.attname = 'ma_nhom'
+    ) THEN
+        ALTER TABLE dm_nhom_hang ADD CONSTRAINT dm_nhom_hang_ma_nhom_key UNIQUE (ma_nhom);
+    END IF;
+
+    -- sys_role(ten_quyen)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'sys_role' AND constraint_type = 'UNIQUE' AND constraint_name = 'sys_role_ten_quyen_key'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = 'sys_role'::regclass AND i.indisunique AND a.attname = 'ten_quyen'
+    ) THEN
+        ALTER TABLE sys_role ADD CONSTRAINT sys_role_ten_quyen_key UNIQUE (ten_quyen);
+    END IF;
+EXCEPTION
+    WHEN others THEN
+        RAISE NOTICE 'Could not add unique constraints, migration will continue with fallback pattern';
+END $$;
+
 -- 1. MIGRATE KHÁCH HÀNG → DM_DOI_TAC
 DO $$
 BEGIN
@@ -30,12 +59,14 @@ END $$;
 
 -- 3. CREATE DEFAULT PRODUCT GROUPS
 INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, status)
-VALUES 
+SELECT v.ma_nhom, v.ten_nhom, v.ma_nhom_cha, v.status
+FROM (VALUES 
     ('XE', 'Xe máy', NULL, TRUE),
     ('PT', 'Phụ tùng', NULL, TRUE),
     ('LAPTOP', 'Laptop', NULL, TRUE),
     ('DIEN_THOAI', 'Điện thoại', NULL, TRUE)
-ON CONFLICT (ma_nhom) DO NOTHING;
+) AS v(ma_nhom, ten_nhom, ma_nhom_cha, status)
+WHERE NOT EXISTS (SELECT 1 FROM dm_nhom_hang WHERE dm_nhom_hang.ma_nhom = v.ma_nhom);
 
 -- 4. MIGRATE PHỤ TÙNG → TM_HANG_HOA (BATCH)
 DO $$
@@ -115,12 +146,14 @@ END $$;
 
 -- 7. CREATE DEFAULT ROLES
 INSERT INTO sys_role (ten_quyen, mo_ta, permissions, status)
-VALUES 
+SELECT v.ten_quyen, v.mo_ta, v.permissions, v.status
+FROM (VALUES 
     ('ADMIN', 'Quản trị viên', '{"view_gia_von": true, "edit_don_hang": true, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
     ('KHO', 'Nhân viên kho', '{"view_gia_von": false, "edit_don_hang": false, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE),
     ('KE_TOAN', 'Kế toán', '{"view_gia_von": true, "edit_don_hang": false, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
     ('SALE', 'Nhân viên bán hàng', '{"view_gia_von": false, "edit_don_hang": true, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE)
-ON CONFLICT (ten_quyen) DO NOTHING;
+) AS v(ten_quyen, mo_ta, permissions, status)
+WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE sys_role.ten_quyen = v.ten_quyen);
 
 -- Assign default role to existing users
 UPDATE sys_user 

@@ -9,13 +9,27 @@
 -- BƯỚC 1: TẠO ROOT CATEGORIES
 -- =====================================================
 
-INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, thong_so_bat_buoc, status, ghi_chu)
-VALUES 
-    ('XE', 'Xe máy', NULL, '{"so_khung": true, "so_may": true}'::jsonb, true, 'Root category - Vehicles'),
-    ('PT', 'Phụ tùng', NULL, '{}'::jsonb, true, 'Root category - Spare Parts')
-ON CONFLICT (ma_nhom) DO UPDATE SET
-    thong_so_bat_buoc = EXCLUDED.thong_so_bat_buoc,
-    ghi_chu = EXCLUDED.ghi_chu;
+DO $$
+BEGIN
+    -- Insert if not exist
+    INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, thong_so_bat_buoc, status, ghi_chu)
+    SELECT v.ma_nhom, v.ten_nhom, v.ma_nhom_cha, v.thong_so_bat_buoc, v.status, v.ghi_chu
+    FROM (VALUES 
+        ('XE', 'Xe máy', NULL, '{"so_khung": true, "so_may": true}'::jsonb, true, 'Root category - Vehicles'),
+        ('PT', 'Phụ tùng', NULL, '{}'::jsonb, true, 'Root category - Spare Parts')
+    ) AS v(ma_nhom, ten_nhom, ma_nhom_cha, thong_so_bat_buoc, status, ghi_chu)
+    WHERE NOT EXISTS (SELECT 1 FROM dm_nhom_hang WHERE ma_nhom = v.ma_nhom);
+
+    -- Update existing
+    UPDATE dm_nhom_hang
+    SET thong_so_bat_buoc = v.thong_so_bat_buoc,
+        ghi_chu = v.ghi_chu
+    FROM (VALUES 
+        ('XE', '{"so_khung": true, "so_may": true}'::jsonb, 'Root category - Vehicles'),
+        ('PT', '{}'::jsonb, 'Root category - Spare Parts')
+    ) AS v(ma_nhom, thong_so_bat_buoc, ghi_chu)
+    WHERE dm_nhom_hang.ma_nhom = v.ma_nhom;
+END $$;
 
 -- =====================================================
 -- BƯỚC 2: MIGRATE BRANDS (sys_nhan_hieu → dm_nhom_hang)
