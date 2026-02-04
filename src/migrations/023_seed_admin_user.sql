@@ -9,7 +9,7 @@ DO $$
 DECLARE
     admin_role_id INTEGER;
     -- Password hash for 'admin123456' (bcrypt 10 rounds)
-    admin_password_hash VARCHAR(255) := '$2a$10$DTqtXrvDplJxTjaVWE7G07bZ2sEWMgvzuR7G9mq0XH8H0.E'; 
+    admin_password_hash VARCHAR(255) := '$2a$10$am59dKq6VVwll7P3Ia4Qv.6lS2HR.931UO7cGEkQucd4EsWQUqM6'; 
 BEGIN
     -- 1. Ensure ADMIN role exists and get its ID
     -- Note: Migration 006 already creates default roles, but we ensure it here too
