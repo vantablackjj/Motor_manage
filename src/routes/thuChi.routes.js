@@ -16,7 +16,10 @@ const thuChiSchema = Joi.object({
   ma_kh: Joi.string().required(),
   so_tien: Joi.number().positive().required(),
   loai: Joi.string().valid("THU", "CHI").required(),
-  dien_giai: Joi.string().allow("", null),
+  hinh_thuc: Joi.string()
+    .valid("TIEN_MAT", "CHUYEN_KHOAN", "THE")
+    .default("TIEN_MAT"),
+  dien_giai: Joi.string().allow("", null).optional(),
 });
 
 router.get("/", authenticate, async (req, res, next) => {
@@ -32,12 +35,12 @@ router.get("/:so_phieu", authenticate, async (req, res, next) => {
   try {
     const { so_phieu } = req.params;
     console.log(
-      `[ThuChi] GET details for so_phieu: "${so_phieu}" (length: ${so_phieu?.length})`
+      `[ThuChi] GET details for so_phieu: "${so_phieu}" (length: ${so_phieu?.length})`,
     );
     const data = await thuChiService.getChiTiet(so_phieu);
     console.log(
       `[ThuChi] Result for "${so_phieu}":`,
-      data ? "FOUND" : "NOT FOUND"
+      data ? "FOUND" : "NOT FOUND",
     );
     if (!data) {
       return sendError(res, "Số phiếu không tồn tại", 404);
@@ -57,20 +60,20 @@ router.post(
     ROLES.ADMIN,
     ROLES.NHAN_VIEN,
     ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.QUAN_LY_CHI_NHANH
+    ROLES.QUAN_LY_CHI_NHANH,
   ),
   async (req, res, next) => {
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.username,
+        nguoi_tao: req.user.id,
       };
       const result = await thuChiService.taoPhieu(data);
       sendSuccess(res, result, "Success", 201);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.post(
@@ -81,13 +84,13 @@ router.post(
     try {
       const { so_phieu } = req.params;
 
-      const result = await thuChiService.guiDuyet(so_phieu, req.user.username);
+      const result = await thuChiService.guiDuyet(so_phieu, req.user.id);
 
       sendSuccess(res, result, "Success", 201);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.post(
@@ -97,12 +100,12 @@ router.post(
   async (req, res, next) => {
     try {
       const { so_phieu } = req.params;
-      const result = await thuChiService.pheDuyet(so_phieu, req.user.username);
+      const result = await thuChiService.pheDuyet(so_phieu, req.user.id);
       sendSuccess(res, result, "success", 201);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 router.post(
   "/:so_phieu/huy",
@@ -112,15 +115,11 @@ router.post(
     try {
       const { ly_do } = req.body;
       const { so_phieu } = req.params;
-      const result = await thuChiService.huyPhieu(
-        so_phieu,
-        req.user.username,
-        ly_do
-      );
+      const result = await thuChiService.huyPhieu(so_phieu, req.user.id, ly_do);
       sendSuccess(res, result, "Hủy phiếu thành công");
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 module.exports = router;

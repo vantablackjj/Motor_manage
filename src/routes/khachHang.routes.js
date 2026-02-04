@@ -5,7 +5,7 @@ const express = require("express");
 const router = express.Router();
 
 const brandSchema = Joi.object({
-  ma_kh: Joi.string().required().max(50),
+  ma_kh: Joi.string().max(50),
   ho_ten: Joi.string().required().max(200),
   dia_chi: Joi.string().max(300).allow(null, ""),
   dien_thoai: Joi.string().max(15).allow(null, ""),
@@ -35,7 +35,7 @@ router.post(
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.NHAN_VIEN_BAN_HANG),
   validate(brandSchema),
-  controller.create
+  controller.create,
 );
 
 router.put(
@@ -43,14 +43,14 @@ router.put(
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.NHAN_VIEN_BAN_HANG),
   validate(brandSchema),
-  controller.update
+  controller.update,
 );
 
 router.delete(
   "/:ma_kh",
   authenticate,
   checkRole(ROLES.ADMIN),
-  controller.remove
+  controller.remove,
 );
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const { pool } = require("../config/database");
+const CongNoService = require("./congNo.service");
 
 class VehicleService {
   /**
@@ -17,13 +18,13 @@ class VehicleService {
     const result = await client.query(
       `
       SELECT COALESCE(
-        MAX(CAST(SUBSTRING(xe_key, 12) AS INTEGER)),
+        MAX(CAST(SUBSTRING(ma_serial, 12) AS INTEGER)),
         0
       ) + 1 AS next_num
-      FROM tm_xe_thuc_te
-      WHERE xe_key LIKE $1
+      FROM tm_hang_hoa_serial
+      WHERE ma_serial LIKE $1
       `,
-      [`XE${timestamp}_%`]
+      [`XE${timestamp}_%`],
     );
 
     const nextNum = String(result.rows[0].next_num).padStart(6, "0");
@@ -37,10 +38,10 @@ class VehicleService {
     const db = client || pool;
     const params = [soKhung, soMay];
     let sql = `
-      SELECT so_khung, so_may, xe_key
-      FROM tm_xe_thuc_te
-      WHERE status = true
-        AND (so_khung = $1 OR so_may = $2)
+      SELECT serial_identifier as so_khung, (thuoc_tinh_rieng->>'so_may') as so_may, ma_serial as xe_key
+      FROM tm_hang_hoa_serial
+      WHERE locked = false
+        AND (serial_identifier = $1 OR (thuoc_tinh_rieng->>'so_may') = $2)
     `;
 
     if (excludeId) {
@@ -71,7 +72,6 @@ class VehicleService {
 
   /**
    * ✅ NHẬP XE MỚI - ĐÃ CẢI TIẾN
-  
    */
   async nhapXeMoi(data, userId) {
     const client = await pool.connect();
@@ -98,12 +98,12 @@ class VehicleService {
         };
       }
 
-      // 2. Check duplicate TRONG transaction để tránh race condition
+      // 2. Check duplicate
       const duplicateErrors = await this.checkDuplicate(
         data.so_khung.trim().toUpperCase(),
         data.so_may.trim().toUpperCase(),
         null,
-        client // ✅ Pass client để dùng chung transaction
+        client,
       );
 
       if (duplicateErrors.length) {
@@ -114,14 +114,14 @@ class VehicleService {
         };
       }
 
-      // 3. Check loại xe
+      // 3. Check loại xe (tm_hang_hoa)
       const loaiXeRes = await client.query(
         `
-        SELECT ma_loai, ten_loai, gia_nhap AS gia_mac_dinh
-        FROM tm_xe_loai
-        WHERE ma_loai = $1 AND status = true
+        SELECT ma_hang_hoa as ma_loai, ten_hang_hoa as ten_loai, gia_von_mac_dinh AS gia_mac_dinh
+        FROM tm_hang_hoa
+        WHERE ma_hang_hoa = $1 AND loai_quan_ly = 'SERIAL' AND status = true
         `,
-        [data.ma_loai_xe]
+        [data.ma_loai_xe],
       );
 
       if (!loaiXeRes.rows.length) {
@@ -135,33 +135,49 @@ class VehicleService {
         FROM sys_kho
         WHERE ma_kho = $1 AND status = true
         `,
-        [data.ma_kho_hien_tai]
+        [data.ma_kho_hien_tai],
       );
 
       if (!khoRes.rows.length) {
         throw { status: 404, message: "Kho không tồn tại" };
       }
 
-      // 5. Check màu (nếu có)
+      // 5. Check màu (dm_xe_mau & dm_mau) - Optional validation
       if (data.ma_mau) {
+        // First check if color exists in dm_mau
+        const mauExistsRes = await client.query(
+          `SELECT 1 FROM dm_mau WHERE ma_mau = $1 AND status = true`,
+          [data.ma_mau],
+        );
+
+        if (!mauExistsRes.rows.length) {
+          throw {
+            status: 404,
+            message: "Màu không tồn tại trong hệ thống",
+          };
+        }
+
+        // Optional: Check if color is assigned to this vehicle type
+        // If not assigned, we'll still allow it (just log a warning)
         const mauRes = await client.query(
           `
           SELECT 1
-          FROM tm_xe_mau xm
-          INNER JOIN sys_mau m ON xm.ma_mau = m.ma_mau
+          FROM dm_xe_mau xm
           WHERE xm.ma_loai_xe = $1 
             AND xm.ma_mau = $2 
             AND xm.status = true
-            AND m.status = true
           `,
-          [data.ma_loai_xe, data.ma_mau]
+          [data.ma_loai_xe, data.ma_mau],
         );
 
+        // If color not assigned to vehicle type, auto-assign it
         if (!mauRes.rows.length) {
-          throw {
-            status: 404,
-            message: "Màu không hợp lệ cho loại xe này",
-          };
+          await client.query(
+            `INSERT INTO dm_xe_mau (ma_loai_xe, ma_mau, status, created_at)
+             VALUES ($1, $2, true, NOW())
+             ON CONFLICT (ma_loai_xe, ma_mau) DO UPDATE SET status = true`,
+            [data.ma_loai_xe, data.ma_mau],
+          );
         }
       }
 
@@ -181,18 +197,18 @@ class VehicleService {
       // 8. Tạo xe_key với lock
       const xeKey = await this.generateXeKey(client);
 
-      // 9. Insert xe với RETURNING *
+      // 9. Insert xe (tm_hang_hoa_serial)
       const xeResult = await client.query(
         `
-        INSERT INTO tm_xe_thuc_te (
-          xe_key, ma_loai_xe, ma_mau,
-          so_khung, so_may,
-          ma_kho_hien_tai, ngay_nhap,
-          gia_nhap, trang_thai,
-          status, da_ban, ghi_chu,
-          ngay_tao, ngay_cap_nhat
+        INSERT INTO tm_hang_hoa_serial (
+          ma_serial, ma_hang_hoa, serial_identifier,
+          ma_kho_hien_tai, ngay_nhap_kho, 
+          gia_von, trang_thai,
+          locked, ghi_chu,
+          thuoc_tinh_rieng,
+          created_at, updated_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,true,false,$10,
+          $1,$2,$3,$4,$5,$6,$7,false,$8,$9,
           CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         RETURNING *
@@ -200,28 +216,31 @@ class VehicleService {
         [
           xeKey,
           data.ma_loai_xe,
-          data.ma_mau || null,
           data.so_khung.trim().toUpperCase(),
-          data.so_may.trim().toUpperCase(),
           data.ma_kho_hien_tai,
           ngayNhap,
           giaNhap,
           "TON_KHO",
           data.ghi_chu || null,
-        ]
+          JSON.stringify({
+            so_may: data.so_may.trim().toUpperCase(),
+            ma_mau: data.ma_mau || null,
+          }),
+        ],
       );
 
       // 10. Ghi lịch sử
       await client.query(
         `
-        INSERT INTO tm_xe_lich_su (
-          xe_key, loai_giao_dich,
+        INSERT INTO tm_hang_hoa_lich_su (
+          ma_serial, ma_hang_hoa, loai_giao_dich,
           ngay_giao_dich, ma_kho_nhap,
-          gia_tri, nguoi_thuc_hien, dien_giai
-        ) VALUES ($1,'NHAP_KHO',$2,$3,$4,$5,$6)
+          don_gia, nguoi_thuc_hien, dien_giai
+        ) VALUES ($1,$2,'NHAP_KHO',$3,$4,$5,$6,$7)
         `,
         [
           xeKey,
+          data.ma_loai_xe,
           ngayNhap,
           data.ma_kho_hien_tai,
           giaNhap,
@@ -229,12 +248,11 @@ class VehicleService {
           `Nhập kho xe ${loaiXeRes.rows[0].ten_loai} - ${data.so_khung
             .trim()
             .toUpperCase()}`,
-        ]
+        ],
       );
 
       await client.query("COMMIT");
 
-      // ✅ Trả về dữ liệu đầy đủ
       const fullData = await this.getXeDetail(xeKey);
       return {
         success: true,
@@ -249,15 +267,7 @@ class VehicleService {
     }
   }
 
-  /**
-   * ✅ NHẬP XE TỪ ĐƠN HÀNG - ĐÃ KHẮC PHỤC HOÀN TOÀN
-   * Vấn đề cũ:
-   * - Không link với chi tiết đơn hàng (tm_don_hang_mua_xe_ct)
-   * - Dùng string search ghi_chu để update (rất nguy hiểm!)
-   * - Trạng thái 'GUI_DUYET' không phù hợp (xe đã về kho rồi)
-   * - Loại giao dịch 'NHAP_CHO_DUYET' không có trong ENUM
-   * - Thiếu field nguoi_tao trong table
-   */ async nhapXeTuDonHang(maPhieu, chiTietId, data, userId) {
+  async nhapXeTuDonHang(maPhieu, chiTietId, data, userId) {
     const client = await pool.connect();
 
     try {
@@ -270,30 +280,29 @@ class VehicleService {
         `
       SELECT 
         ct.id,
-        ct.ma_phieu,
+        ct.so_don_hang as ma_phieu,
         ct.stt,
-        ct.ma_loai_xe,
-        ct.ma_mau,
+        ct.ma_hang_hoa as ma_loai_xe,
+        ct.yeu_cau_dac_biet->>'ma_mau' as ma_mau,
         ct.don_gia,
-        ct.so_luong,
-        ct.da_nhap_kho,
-        ct.xe_key,
+        ct.so_luong_dat as so_luong,
+        ct.so_luong_da_giao,
 
-        dh.so_phieu,
-        dh.ma_kho_nhap,
+        dh.so_don_hang as so_phieu,
+        dh.ma_ben_nhap as ma_kho_nhap,
         dh.trang_thai,
 
-        xl.ten_loai
-      FROM tm_don_hang_mua_xe_ct ct
-      JOIN tm_don_hang_mua_xe dh
-        ON ct.ma_phieu = dh.so_phieu
-      JOIN tm_xe_loai xl
-        ON ct.ma_loai_xe = xl.ma_loai
-      WHERE ct.ma_phieu = $1
+        xl.ten_hang_hoa as ten_loai
+      FROM tm_don_hang_chi_tiet ct
+      JOIN tm_don_hang dh
+        ON ct.so_don_hang = dh.so_don_hang
+      JOIN tm_hang_hoa xl
+        ON ct.ma_hang_hoa = xl.ma_hang_hoa
+      WHERE (dh.so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN dh.id = $1::int ELSE FALSE END))
         AND ct.id = $2
       FOR UPDATE OF ct
     `,
-        [maPhieu, chiTietId]
+        [maPhieu, chiTietId],
       );
 
       if (ctRes.rowCount === 0) {
@@ -305,56 +314,14 @@ class VehicleService {
 
       let chiTiet = ctRes.rows[0];
 
-      /* =====================================================
-       * 1.1 XỬ LÝ TÁCH DÒNG (SPLIT) NẾU SỐ LƯỢNG > 1
-       * ===================================================== */
-      if (chiTiet.so_luong > 1) {
-        // 1. Giảm số lượng dòng hiện tại
-        await client.query(
-          `UPDATE tm_don_hang_mua_xe_ct SET so_luong = so_luong - 1 WHERE id = $1`,
-          [chiTiet.id]
-        );
-
-        // 2. Tìm STT lớn nhất để tạo dòng mới
-        const sttRes = await client.query(
-          `SELECT COALESCE(MAX(stt), 0) + 1 as next_stt FROM tm_don_hang_mua_xe_ct WHERE ma_phieu = $1`,
-          [maPhieu]
-        );
-        const nextStt = sttRes.rows[0].next_stt;
-
-        // 3. Tạo dòng mới với số lượng = 1 (Dòng này sẽ được nhập xe)
-        const newCtRes = await client.query(
-          `
-          INSERT INTO tm_don_hang_mua_xe_ct (
-            ma_phieu, stt, ma_loai_xe, ma_mau, 
-            so_luong, don_gia, thanh_tien, da_nhap_kho
-          ) VALUES ($1, $2, $3, $4, 1, $5, $6, false)
-          RETURNING *
-          `,
-          [
-            chiTiet.ma_phieu,
-            nextStt,
-            chiTiet.ma_loai_xe,
-            chiTiet.ma_mau,
-            chiTiet.don_gia,
-            chiTiet.don_gia, // thanh_tien = don_gia * 1
-          ]
-        );
-
-        // 4. Update biến chiTiet để trỏ vào dòng mới vừa tạo
-        const newChiTiet = newCtRes.rows[0];
-        // Merge thông tin từ bảng dh/xl của dòng cũ vào
-        chiTiet = {
-          ...chiTiet,
-          ...newChiTiet,
-          id: newChiTiet.id,
-          so_luong: 1,
+      // New logic: Check quantity received instead of splitting rows
+      if (chiTiet.so_luong_da_giao >= chiTiet.so_luong) {
+        throw {
+          status: 400,
+          message: "Chi tiết này đã nhập đủ số lượng",
         };
       }
 
-      /* =====================================================
-       * 2. Validate trạng thái đơn hàng
-       * ===================================================== */
       if (chiTiet.trang_thai !== "DA_DUYET") {
         throw {
           status: 400,
@@ -362,17 +329,10 @@ class VehicleService {
         };
       }
 
-      if (chiTiet.da_nhap_kho) {
-        throw {
-          status: 400,
-          message: `Chi tiết đơn hàng đã nhập kho với mã xe: ${chiTiet.xe_key}`,
-        };
-      }
+      const so_khung = data.so_khung || data.soKhung;
+      const so_may = data.so_may || data.soMay;
 
-      /* =====================================================
-       * 3. Validate dữ liệu nhập
-       * ===================================================== */
-      if (!data.so_khung || !data.so_may) {
+      if (!so_khung || !so_may) {
         throw {
           status: 400,
           message: "Thiếu số khung hoặc số máy",
@@ -383,12 +343,9 @@ class VehicleService {
         };
       }
 
-      const soKhung = data.so_khung.trim().toUpperCase();
-      const soMay = data.so_may.trim().toUpperCase();
+      const soKhung = so_khung.trim().toUpperCase();
+      const soMay = so_may.trim().toUpperCase();
 
-      /* =====================================================
-       * 4. Kiểm tra trùng số khung / số máy
-       * ===================================================== */
       const dupErrors = await this.checkDuplicate(soKhung, soMay, null, client);
 
       if (dupErrors.length > 0) {
@@ -399,100 +356,90 @@ class VehicleService {
         };
       }
 
-      /* =====================================================
-       * 5. Chuẩn hóa dữ liệu
-       * ===================================================== */
       const xeKey = await this.generateXeKey(client);
       const giaNhap = data.gia_nhap || chiTiet.don_gia;
       const ngayNhap = data.ngay_nhap || new Date().toISOString().split("T")[0];
       const maMau = data.ma_mau || chiTiet.ma_mau;
 
-      if (!giaNhap || giaNhap < 0) {
-        // Cho phép giá nhập = 0
-        throw {
-          status: 400,
-          message: "Giá nhập không hợp lệ",
-        };
-      }
-
-      /* =====================================================
-       * 6. Insert xe thực tế
-       * ===================================================== */
       await client.query(
         `
-      INSERT INTO tm_xe_thuc_te (
-        xe_key, ma_loai_xe, ma_mau,
-        so_khung, so_may,
-        ma_kho_hien_tai,
-        ngay_nhap, gia_nhap,
-        trang_thai, status, da_ban,
-        ghi_chu,
-        ngay_tao, ngay_cap_nhat
+      INSERT INTO tm_hang_hoa_serial (
+        ma_serial, ma_hang_hoa, serial_identifier,
+        ma_kho_hien_tai, ngay_nhap_kho, 
+        gia_von, trang_thai, locked,
+        ghi_chu, thuoc_tinh_rieng,
+        created_at, updated_at
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,
-        'TON_KHO',true,false,
-        $9,
+        $1,$2,$3,$4,$5,$6,'TON_KHO',false,$7,$8,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
     `,
         [
           xeKey,
           chiTiet.ma_loai_xe,
-          maMau,
           soKhung,
-          soMay,
           chiTiet.ma_kho_nhap,
           ngayNhap,
           giaNhap,
           `Nhập từ đơn hàng ${chiTiet.so_phieu} (CT#${chiTiet.id})`,
-        ]
+          JSON.stringify({ so_may: soMay, ma_mau: maMau }),
+        ],
       );
 
-      /* =====================================================
-       * 7. Cập nhật chi tiết đơn hàng
-       * ===================================================== */
+      // Update quantity delivered
       await client.query(
         `
-      UPDATE tm_don_hang_mua_xe_ct
+      UPDATE tm_don_hang_chi_tiet
       SET 
-        xe_key = $1,
-        so_khung = $2,
-        so_may = $3,
-        da_nhap_kho = true
-      WHERE id = $4
+        so_luong_da_giao = so_luong_da_giao + 1
+      WHERE id = $1
     `,
-        [xeKey, soKhung, soMay, chiTiet.id]
+        [chiTiet.id],
       );
 
-      /* =====================================================
-       * 8. Ghi lịch sử xe
-       * ===================================================== */
       await client.query(
         `
-      INSERT INTO tm_xe_lich_su (
-        xe_key, loai_giao_dich, so_chung_tu,
+      INSERT INTO tm_hang_hoa_lich_su (
+        ma_serial, ma_hang_hoa, loai_giao_dich, so_chung_tu,
         ngay_giao_dich, ma_kho_nhap,
-        gia_tri, nguoi_thuc_hien, dien_giai
+        don_gia, nguoi_thuc_hien, dien_giai
       ) VALUES (
-        $1,'NHAP_KHO',$2,
-        $3,$4,
-        $5,$6,$7
+        $1,$2,'NHAP_KHO',$3,
+        $4,$5,
+        $6,$7,$8
       )
     `,
         [
           xeKey,
+          chiTiet.ma_loai_xe,
           chiTiet.so_phieu,
           ngayNhap,
           chiTiet.ma_kho_nhap,
           giaNhap,
           userId,
           `Nhập xe ${chiTiet.ten_loai} từ đơn hàng ${chiTiet.so_phieu}`,
-        ]
+        ],
       );
 
       /* =====================================================
-       * 9. Commit
+       * 4. Ghi nhận công nợ đối tác (PHẢI TRẢ)
        * ===================================================== */
+      const dhRes = await client.query(
+        "SELECT ma_ben_xuat as ma_ncc FROM tm_don_hang WHERE so_don_hang = $1",
+        [chiTiet.so_phieu],
+      );
+
+      if (dhRes.rows.length) {
+        await CongNoService.recordDoiTacDebt(client, {
+          ma_doi_tac: dhRes.rows[0].ma_ncc,
+          loai_cong_no: "PHAI_TRA",
+          so_hoa_don: chiTiet.so_phieu,
+          ngay_phat_sinh: ngayNhap,
+          so_tien: giaNhap,
+          ghi_chu: `Nhập xe ${chiTiet.ma_loai_xe} (Khung: ${soKhung}) từ đơn ${chiTiet.so_phieu}`,
+        });
+      }
+
       await client.query("COMMIT");
 
       return {
@@ -512,27 +459,26 @@ class VehicleService {
     const result = await pool.query(
       `
     SELECT 
-      x.xe_key,
-      x.ma_loai_xe,
-      xl.ten_loai,
-      x.ma_mau,
+      x.ma_serial as xe_key,
+      x.ma_hang_hoa as ma_loai_xe,
+      xl.ten_hang_hoa as ten_loai,
+      x.thuoc_tinh_rieng->>'ma_mau' as ma_mau,
       m.ten_mau,
-      x.so_khung,
-      x.so_may,
+      x.serial_identifier as so_khung,
+      x.thuoc_tinh_rieng->>'so_may' as so_may,
       x.ma_kho_hien_tai,
       k.ten_kho,
-      x.ngay_nhap,
-      x.gia_nhap,
+      x.ngay_nhap_kho as ngay_nhap,
+      x.gia_von as gia_nhap,
       x.trang_thai,
-      x.da_ban,
-      x.ngay_tao
-    FROM tm_xe_thuc_te x
-    LEFT JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-    LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
+      x.created_at
+    FROM tm_hang_hoa_serial x
+    LEFT JOIN tm_hang_hoa xl ON x.ma_hang_hoa = xl.ma_hang_hoa
+    LEFT JOIN dm_mau m ON x.thuoc_tinh_rieng->>'ma_mau' = m.ma_mau
     LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
-    WHERE x.xe_key = $1
+    WHERE x.ma_serial = $1
   `,
-      [xeKey]
+      [xeKey],
     );
 
     return result.rows[0] || null;
@@ -548,13 +494,13 @@ class VehicleService {
         ls.*,
         k_xuat.ten_kho as ten_kho_xuat,
         k_nhap.ten_kho as ten_kho_nhap
-      FROM tm_xe_lich_su ls
+      FROM tm_hang_hoa_lich_su ls
       LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
-      WHERE ls.xe_key = $1
+      WHERE ls.ma_serial = $1
       ORDER BY ls.ngay_giao_dich DESC
     `,
-      [xeKey]
+      [xeKey],
     );
 
     return result.rows;
@@ -564,7 +510,7 @@ class VehicleService {
    * ✅ Lấy danh sách xe trong kho
    */
   async getXeInKho(maKho, filters = {}) {
-    const conditions = ["x.ma_kho_hien_tai = $1", "x.status = true"];
+    const conditions = ["x.ma_kho_hien_tai = $1", "x.locked = false"];
     const params = [maKho];
     let paramIndex = 2;
 
@@ -575,42 +521,38 @@ class VehicleService {
     }
 
     if (filters.ma_loai_xe) {
-      conditions.push(`x.ma_loai_xe = $${paramIndex}`);
+      conditions.push(`x.ma_hang_hoa = $${paramIndex}`);
       params.push(filters.ma_loai_xe);
       paramIndex++;
     }
 
     if (filters.search) {
       conditions.push(`(
-        x.so_khung ILIKE $${paramIndex} 
-        OR x.so_may ILIKE $${paramIndex} 
-        OR xl.ten_loai ILIKE $${paramIndex}
-        OR x.xe_key ILIKE $${paramIndex}
+        x.serial_identifier ILIKE $${paramIndex} 
+        OR x.thuoc_tinh_rieng->>'so_may' ILIKE $${paramIndex} 
+        OR xl.ten_hang_hoa ILIKE $${paramIndex}
+        OR x.ma_serial ILIKE $${paramIndex}
       )`);
       params.push(`%${filters.search}%`);
       paramIndex++;
     }
 
-    if (filters.da_ban !== undefined) {
-      conditions.push(`x.da_ban = $${paramIndex}`);
-      params.push(filters.da_ban);
-      paramIndex++;
-    }
-
     const query = `
       SELECT 
-        x.*,
-        xl.ten_loai, xl.ma_nh,
-        nh.ten_nh,
+        x.ma_serial as xe_key, x.ma_hang_hoa as ma_loai_xe, x.serial_identifier as so_khung,
+        x.thuoc_tinh_rieng->>'so_may' as so_may, x.gia_von as gia_nhap, x.trang_thai,
+        x.ngay_nhap_kho as ngay_nhap,
+        xl.ten_hang_hoa as ten_loai, xl.ma_nhom_hang as ma_nh,
+        nh.ten_nhom as ten_nh,
         m.ten_mau,
         k.ten_kho
-      FROM tm_xe_thuc_te x
-      INNER JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-      LEFT JOIN sys_nhan_hieu nh ON xl.ma_nh = nh.ma_nh
-      LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
+      FROM tm_hang_hoa_serial x
+      INNER JOIN tm_hang_hoa xl ON x.ma_hang_hoa = xl.ma_hang_hoa
+      LEFT JOIN dm_nhom_hang nh ON xl.ma_nhom_hang = nh.ma_nhom
+      LEFT JOIN dm_mau m ON x.thuoc_tinh_rieng->>'ma_mau' = m.ma_mau
       INNER JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
       WHERE ${conditions.join(" AND ")}
-      ORDER BY x.ngay_nhap DESC
+      ORDER BY x.ngay_nhap_kho DESC
       LIMIT ${Math.min(parseInt(filters.limit) || 50, 100)}
       OFFSET ${parseInt(filters.offset) || 0}
     `;
@@ -623,7 +565,7 @@ class VehicleService {
    * ✅ Đếm tổng số xe trong kho
    */
   async countXeInKho(maKho, filters = {}) {
-    const conditions = ["ma_kho_hien_tai = $1", "status = true"];
+    const conditions = ["ma_kho_hien_tai = $1", "locked = false"];
     const params = [maKho];
     let paramIndex = 2;
 
@@ -634,16 +576,16 @@ class VehicleService {
     }
 
     if (filters.ma_loai_xe) {
-      conditions.push(`ma_loai_xe = $${paramIndex}`);
+      conditions.push(`ma_hang_hoa = $${paramIndex}`);
       params.push(filters.ma_loai_xe);
       paramIndex++;
     }
 
     const result = await pool.query(
-      `SELECT COUNT(*) as total FROM tm_xe_thuc_te WHERE ${conditions.join(
-        " AND "
+      `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE ${conditions.join(
+        " AND ",
       )}`,
-      params
+      params,
     );
 
     return parseInt(result.rows[0].total);

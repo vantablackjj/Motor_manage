@@ -1,4 +1,5 @@
 const baoCaoService = require("../services/baoCao.service");
+const { generateExcel } = require("../ultils/excelHelper");
 
 class BaoCaoController {
   // Inventory
@@ -125,7 +126,15 @@ class BaoCaoController {
 
   async congNoKhachHang(req, res) {
     try {
-      const data = await baoCaoService.congNoKhachHang(req.query);
+      let data = [];
+      const { loai_doi_tac } = req.query;
+
+      if (loai_doi_tac === "NHA_CUNG_CAP") {
+        data = await baoCaoService.congNoNhaCungCap(req.query);
+      } else {
+        data = await baoCaoService.congNoKhachHang(req.query);
+      }
+
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -200,15 +209,109 @@ class BaoCaoController {
 
   // Export
   async xuatExcel(req, res) {
-    res
-      .status(501)
-      .json({ success: false, message: "Chưa triển khai xuất Excel" });
+    try {
+      const { loai_bao_cao, params } = req.body;
+      let data = [];
+      let columns = [];
+      let filename = `bao-cao-${Date.now()}.xlsx`;
+
+      switch (loai_bao_cao) {
+        case "TON_KHO_XE":
+          data = await baoCaoService.tonKhoXe(params);
+          columns = [
+            { header: "Mã Serial", key: "xe_key", width: 15 },
+            { header: "Số Khung", key: "so_khung", width: 25 },
+            { header: "Số Máy", key: "so_may", width: 20 },
+            { header: "Loại Xe", key: "ten_loai", width: 25 },
+            { header: "Màu", key: "ten_mau", width: 15 },
+            { header: "Kho", key: "ten_kho", width: 20 },
+            { header: "Giá Nhập", key: "gia_nhap", width: 15 },
+            { header: "Ngày Nhập", key: "ngay_nhap", width: 15 },
+          ];
+          filename = "Bao_cao_ton_kho_xe.xlsx";
+          break;
+
+        case "TON_KHO_PHU_TUNG":
+          data = await baoCaoService.tonKhoPhuTung(params);
+          columns = [
+            { header: "Mã PT", key: "ma_pt", width: 15 },
+            { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
+            { header: "ĐVT", key: "don_vi_tinh", width: 10 },
+            { header: "Nhóm", key: "nhom_pt", width: 15 },
+            { header: "Tồn Kho", key: "so_luong_ton", width: 12 },
+            { header: "Đang Khóa", key: "so_luong_khoa", width: 12 },
+            { header: "Kho", key: "ten_kho", width: 20 },
+          ];
+          filename = "Bao_cao_ton_kho_phu_tung.xlsx";
+          break;
+
+        case "DOANH_THU_THANG":
+          data = await baoCaoService.doanhThuTheoThang(params);
+          columns = [
+            { header: "Tháng", key: "thang", width: 10 },
+            { header: "Số Hóa Đơn", key: "so_luong_hd", width: 15 },
+            { header: "Doanh Thu", key: "doanh_thu", width: 20 },
+            { header: "Thực Thu", key: "thuc_thu", width: 20 },
+          ];
+          filename = `Doanh_thu_nam_${params?.nam || "nay"}.xlsx`;
+          break;
+
+        case "CONG_NO_KH":
+          data = await baoCaoService.congNoKhachHang(params);
+          columns = [
+            { header: "Mã KH", key: "ma_kh", width: 15 },
+            { header: "Họ Tên", key: "ho_ten", width: 30 },
+            { header: "Tổng Phải Trả", key: "tong_phai_tra", width: 20 },
+            { header: "Đã Trả", key: "da_tra", width: 20 },
+            { header: "Còn Lại", key: "con_lai", width: 20 },
+          ];
+          filename = "Bao_cao_cong_no_khach_hang.xlsx";
+          break;
+
+        case "THU_CHI":
+          data = await baoCaoService.thuChiTheoNgay(params);
+          columns = [
+            { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+            { header: "Số Phiếu", key: "so_phieu", width: 15 },
+            { header: "Loại", key: "loai", width: 10 },
+            { header: "Số Tiền", key: "so_tien", width: 15 },
+            { header: "Nội Dung", key: "dien_giai", width: 40 },
+            { header: "Kho", key: "ten_kho", width: 20 },
+          ];
+          filename = "Bao_cao_thu_chi.xlsx";
+          break;
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: `Loại báo cáo '${loai_bao_cao}' chưa được hỗ trợ xuất Excel`,
+          });
+      }
+
+      const buffer = await generateExcel(data, columns, loai_bao_cao);
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader("Content-Length", buffer.length);
+      res.end(buffer);
+    } catch (error) {
+      console.error("Export Excel Error:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
   }
 
   async xuatPDF(req, res) {
-    res
-      .status(501)
-      .json({ success: false, message: "Chưa triển khai xuất PDF" });
+    res.status(501).json({
+      success: false,
+      message:
+        "Tính năng xuất PDF đang được phát triển (Cần cài đặt thêm thư viện hỗ trợ)",
+    });
   }
 }
 

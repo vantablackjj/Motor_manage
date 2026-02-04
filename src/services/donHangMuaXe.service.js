@@ -26,15 +26,20 @@ class DonHangMuaXeService {
 
   async _checkTrangThai(soPhieu, expectedStatus, client) {
     const result = await client.query(
-      `SELECT trang_thai FROM tm_don_hang_mua_xe WHERE so_phieu = $1`,
-      [soPhieu]
+      `SELECT trang_thai FROM tm_don_hang 
+       WHERE so_don_hang = $1 
+          OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)`,
+      [soPhieu],
     );
 
     if (!result.rows.length) {
       throw { status: 404, message: "Đơn hàng không tồn tại" };
     }
 
+    // Map legacy status if needed or strict check
+    // Note: GUI_DUYET is removed from new schema, mapping logic might be needed
     if (expectedStatus && result.rows[0].trang_thai !== expectedStatus) {
+      // Allow DA_DUYET check if current is NHAP (simulated flow)
       throw {
         status: 400,
         message: `Đơn không ở trạng thái ${expectedStatus}`,
@@ -63,21 +68,21 @@ class DonHangMuaXeService {
     await client.query(
       `
     SELECT 1
-    FROM tm_don_hang_mua_xe
-    WHERE so_phieu = $1
+    FROM tm_don_hang
+    WHERE so_don_hang = $1
     FOR UPDATE
     `,
-      [soPhieu]
+      [soPhieu],
     );
 
     // 2. Tính STT an toàn
     const { rows } = await client.query(
       `
     SELECT COALESCE(MAX(stt), 0) + 1 AS next_stt
-    FROM tm_don_hang_mua_xe_ct
-    WHERE ma_phieu = $1
+    FROM tm_don_hang_chi_tiet
+    WHERE so_don_hang = $1
     `,
-      [soPhieu]
+      [soPhieu],
     );
 
     return rows[0].next_stt;
@@ -95,28 +100,34 @@ class DonHangMuaXeService {
 
       const result = await client.query(
         `
-        INSERT INTO tm_don_hang_mua_xe (
-          so_phieu,
+        INSERT INTO tm_don_hang (
+          so_don_hang,
           ngay_dat_hang,
-          ma_kho_nhap,
-          ma_ncc,
-          tong_tien,
+          ma_ben_nhap,
+          loai_ben_nhap,
+          ma_ben_xuat,
+          loai_ben_xuat,
+          tong_gia_tri,
           trang_thai,
           nguoi_tao,
-          ngay_tao
+          loai_don_hang,
+          created_at
         ) VALUES (
           $1,
           CURRENT_DATE,
           $2,
+          'KHO',
           $3,
+          'DOI_TAC',
           0,
           $4,
           $5,
+          'MUA_XE',
           NOW()
         )
         RETURNING *
         `,
-        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId]
+        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId],
       );
 
       return result.rows[0];
@@ -152,28 +163,34 @@ class DonHangMuaXeService {
       // 2. Insert order header
       const headerResult = await client.query(
         `
-        INSERT INTO tm_don_hang_mua_xe (
-          so_phieu,
+        INSERT INTO tm_don_hang (
+          so_don_hang,
           ngay_dat_hang,
-          ma_kho_nhap,
-          ma_ncc,
-          tong_tien,
+          ma_ben_nhap,
+          loai_ben_nhap,
+          ma_ben_xuat,
+          loai_ben_xuat,
+          tong_gia_tri,
           trang_thai,
           nguoi_tao,
-          ngay_tao
+          loai_don_hang,
+          created_at
         ) VALUES (
           $1,
           CURRENT_DATE,
           $2,
+          'KHO',
           $3,
+          'DOI_TAC',
           0,
           $4,
           $5,
+          'MUA_XE',
           NOW()
         )
         RETURNING *
         `,
-        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId]
+        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId],
       );
 
       const header = headerResult.rows[0];
@@ -188,29 +205,31 @@ class DonHangMuaXeService {
         const thanhTien = Number(item.so_luong) * Number(item.don_gia);
         tongTien += thanhTien;
 
+        const yeuCauDacBiet = item.ma_mau
+          ? JSON.stringify({ ma_mau: item.ma_mau })
+          : "{}";
+
+        // NOTE: thanh_tien is GENERATED STORED column in new schema, do not insert it
         const detailResult = await client.query(
           `
-          INSERT INTO tm_don_hang_mua_xe_ct (
-            ma_phieu,
-            stt,
-            ma_loai_xe,
-            ma_mau,
-            so_luong,
-            don_gia,
-            thanh_tien,
-            da_nhap_kho
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,false)
-          RETURNING *
-          `,
+            INSERT INTO tm_don_hang_chi_tiet (
+              so_don_hang,
+              stt,
+              ma_hang_hoa,
+              yeu_cau_dac_biet,
+              so_luong_dat,
+              don_gia
+            ) VALUES ($1,$2,$3,$4::jsonb,$5,$6)
+            RETURNING *
+            `,
           [
             soPhieu,
             stt,
             item.ma_loai_xe,
-            item.ma_mau || null,
+            yeuCauDacBiet,
             item.so_luong,
             item.don_gia,
-            thanhTien,
-          ]
+          ],
         );
 
         chiTietResults.push(detailResult.rows[0]);
@@ -219,16 +238,17 @@ class DonHangMuaXeService {
       // 4. Update tong_tien in header
       await client.query(
         `
-        UPDATE tm_don_hang_mua_xe
-        SET tong_tien = $2
-        WHERE so_phieu = $1
+        UPDATE tm_don_hang
+        SET tong_gia_tri = $2
+        WHERE so_don_hang = $1
         `,
-        [soPhieu, tongTien]
+        [soPhieu, tongTien],
       );
 
       // 5. Return complete order with details
       return {
         ...header,
+        tong_gia_tri: tongTien, // Update value for consistency
         tong_tien: tongTien,
         chi_tiet: chiTietResults,
       };
@@ -248,43 +268,44 @@ class DonHangMuaXeService {
       const stt = await this._generateNextSTT(client, soPhieu);
       const thanhTien = Number(data.so_luong) * Number(data.don_gia);
 
+      const yeuCauDacBiet = data.ma_mau
+        ? JSON.stringify({ ma_mau: data.ma_mau })
+        : "{}";
+
       const result = await client.query(
         `
-        INSERT INTO tm_don_hang_mua_xe_ct (
-          ma_phieu,
+        INSERT INTO tm_don_hang_chi_tiet (
+          so_don_hang,
           stt,
-          ma_loai_xe,
-          ma_mau,
-          so_luong,
-          don_gia,
-          thanh_tien,
-          da_nhap_kho
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,false)
+          ma_hang_hoa,
+          yeu_cau_dac_biet,
+          so_luong_dat,
+          don_gia
+        ) VALUES ($1,$2,$3,$4::jsonb,$5,$6)
         RETURNING *
         `,
         [
           soPhieu,
           stt,
           data.ma_loai_xe,
-          data.ma_mau || null,
+          yeuCauDacBiet,
           data.so_luong,
           data.don_gia,
-          thanhTien,
-        ]
+        ],
       );
 
       // cập nhật tổng tiền header
       await client.query(
         `
-        UPDATE tm_don_hang_mua_xe
-        SET tong_tien = (
+        UPDATE tm_don_hang
+        SET tong_gia_tri = (
           SELECT COALESCE(SUM(thanh_tien), 0)
-          FROM tm_don_hang_mua_xe_ct
-          WHERE ma_phieu = $1
+          FROM tm_don_hang_chi_tiet
+          WHERE so_don_hang = $1
         )
-        WHERE so_phieu = $1
+        WHERE so_don_hang = $1
         `,
-        [soPhieu]
+        [soPhieu],
       );
 
       return result.rows[0];
@@ -301,11 +322,11 @@ class DonHangMuaXeService {
 
       const result = await client.query(
         `
-        DELETE FROM tm_don_hang_mua_xe_ct
-        WHERE ma_phieu = $1 AND stt = $2
+        DELETE FROM tm_don_hang_chi_tiet
+        WHERE so_don_hang = $1 AND stt = $2
         RETURNING *
         `,
-        [soPhieu, stt]
+        [soPhieu, stt],
       );
 
       if (!result.rowCount) {
@@ -314,15 +335,15 @@ class DonHangMuaXeService {
 
       await client.query(
         `
-        UPDATE tm_don_hang_mua_xe
-        SET tong_tien = (
+        UPDATE tm_don_hang
+        SET tong_gia_tri = (
           SELECT COALESCE(SUM(thanh_tien), 0)
-          FROM tm_don_hang_mua_xe_ct
-          WHERE ma_phieu = $1
+          FROM tm_don_hang_chi_tiet
+          WHERE so_don_hang = $1
         )
-        WHERE so_phieu = $1
+        WHERE so_don_hang = $1
         `,
-        [soPhieu]
+        [soPhieu],
       );
 
       return result.rows[0];
@@ -336,20 +357,25 @@ class DonHangMuaXeService {
   async submitDonHang(soPhieu, userId) {
     const result = await pool.query(
       `
-      UPDATE tm_don_hang_mua_xe
+      UPDATE tm_don_hang
       SET 
-        trang_thai = $2,
-        nguoi_gui = $3,
-        ngay_gui = NOW()
-      WHERE so_phieu = $1
-        AND trang_thai = $4
+        trang_thai = $2::enum_trang_thai_don_hang,
+        nguoi_gui = $4,
+        ngay_gui = NOW(),
+        nguoi_duyet = NULL, -- Reset approver if re-submitting
+        ngay_duyet = NULL
+      WHERE so_don_hang = $1
+        AND trang_thai = $3::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.GUI_DUYET, userId, TRANG_THAI.NHAP]
+      [soPhieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP, userId],
     );
 
     if (!result.rowCount) {
-      throw { status: 400, message: "Không thể gửi duyệt đơn" };
+      throw {
+        status: 400,
+        message: "Không thể gửi duyệt đơn (Đơn phải ở trạng thái NHAP)",
+      };
     }
 
     return result.rows[0];
@@ -360,41 +386,46 @@ class DonHangMuaXeService {
    * ========================= */
 
   async duyetDonHang(soPhieu, userId) {
+    // Approve: GUI_DUYET -> DA_DUYET
     const result = await pool.query(
       `
-      UPDATE tm_don_hang_mua_xe
+      UPDATE tm_don_hang
       SET 
-        trang_thai = $2,
+        trang_thai = $2::enum_trang_thai_don_hang,
         nguoi_duyet = $3,
         ngay_duyet = NOW()
-      WHERE so_phieu = $1
-        AND trang_thai = $4
+      WHERE so_don_hang = $1
+        AND trang_thai = $4::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.GUI_DUYET]
+      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.GUI_DUYET],
     );
 
     if (!result.rowCount) {
-      throw { status: 400, message: "Đơn chưa ở trạng thái chờ duyệt" };
+      throw {
+        status: 400,
+        message: "Đơn chưa ở trạng thái chờ duyệt (GUI_DUYET)",
+      };
     }
 
     return result.rows[0];
   }
 
   async tuChoiDonHang(soPhieu, userId, lyDo) {
+    // Reject: GUI_DUYET -> DA_HUY
     const result = await pool.query(
       `
-      UPDATE tm_don_hang_mua_xe
+      UPDATE tm_don_hang
       SET 
-        trang_thai = $2,
+        trang_thai = $2::enum_trang_thai_don_hang,
         nguoi_duyet = $3,
         ngay_duyet = NOW(),
-        dien_giai = $4
-      WHERE so_phieu = $1
-        AND trang_thai = $5
+        ghi_chu = $4
+      WHERE so_don_hang = $1
+        AND trang_thai = $5::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.GUI_DUYET]
+      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.GUI_DUYET],
     );
 
     if (!result.rowCount) {
@@ -404,16 +435,16 @@ class DonHangMuaXeService {
     return result.rows[0];
   }
 
-  async deleteChiTiet(soPhieu, id) {
-    await this._checkTrangThai(soPhieu, TRANG_THAI.NHAP);
+  async deleteChiTietById(soPhieu, id) {
+    await this._checkTrangThai(soPhieu, TRANG_THAI.NHAP, pool);
 
     const result = await pool.query(
       `
-      DELETE FROM tm_don_hang_mua_xe_ct
-      WHERE ma_phieu = $1 AND id = $2
+      DELETE FROM tm_don_hang_chi_tiet
+      WHERE so_don_hang = $1 AND id = $2
       RETURNING *
       `,
-      [soPhieu, id]
+      [soPhieu, id],
     );
 
     if (!result.rowCount) {
@@ -427,29 +458,120 @@ class DonHangMuaXeService {
    * 6. Lấy chi tiết đơn
    * ========================= */
 
+  /* =========================
+   * 6. Lấy chi tiết đơn
+   * ========================= */
+
   async getDetail(soPhieu) {
+    // 1. Get Header (Aliases to match user requested format)
     const header = await pool.query(
-      `SELECT * FROM tm_don_hang_mua_xe WHERE so_phieu = $1`,
-      [soPhieu]
+      `
+      SELECT 
+        h.id,
+        h.so_don_hang as so_phieu,
+        h.ngay_dat_hang,
+        h.ma_ben_nhap as ma_kho_nhap,
+        k.ten_kho,
+        h.ma_ben_xuat as ma_ncc,
+        dt.ten_doi_tac as ten_ncc,
+        h.tong_gia_tri as tong_tien,
+        h.trang_thai,
+        h.created_at as ngay_tao,
+        u_tao.ho_ten as ten_nguoi_tao,
+        h.nguoi_tao,
+        h.ngay_gui as ngay_gui_duyet,
+        u_gui.ho_ten as ten_nguoi_gui,
+        h.nguoi_gui,
+        h.ngay_duyet,
+        u_duyet.ho_ten as ten_nguoi_duyet,
+        h.nguoi_duyet,
+        h.ghi_chu as dien_giai,
+        h.ghi_chu -- duplicate for note field
+      FROM tm_don_hang h
+      LEFT JOIN sys_kho k ON h.ma_ben_nhap = k.ma_kho
+      LEFT JOIN dm_doi_tac dt ON h.ma_ben_xuat = dt.ma_doi_tac
+      LEFT JOIN sys_user u_tao ON (CASE WHEN h.nguoi_tao ~ '^[0-9]+$' THEN h.nguoi_tao::integer ELSE NULL END) = u_tao.id
+      LEFT JOIN sys_user u_gui ON h.nguoi_gui = u_gui.id
+      LEFT JOIN sys_user u_duyet ON (CASE WHEN h.nguoi_duyet ~ '^[0-9]+$' THEN h.nguoi_duyet::integer ELSE NULL END) = u_duyet.id
+      WHERE h.so_don_hang = $1 
+         OR (CASE WHEN $1 ~ '^\\d+$' THEN h.id = $1::int ELSE FALSE END)
+      `,
+      [soPhieu],
     );
 
     if (!header.rows.length) {
       throw { status: 404, message: "Đơn hàng không tồn tại" };
     }
 
+    const soPhieuDB = header.rows[0].so_phieu; // This is actually so_don_hang from SELECT
+
+    // 2. Get Details (Join with product and color master data)
     const details = await pool.query(
       `
-      SELECT *
-      FROM tm_don_hang_mua_xe_ct
-      WHERE ma_phieu = $1
-      ORDER BY stt
+      SELECT 
+        d.id,
+        d.so_don_hang as ma_phieu,
+        d.stt,
+        d.ma_hang_hoa as ma_loai_xe,
+        h.ten_hang_hoa as ten_loai_xe,
+        d.yeu_cau_dac_biet->>'ma_mau' as ma_mau,
+        m.ten_mau,
+        d.so_luong_dat as so_luong,
+        d.don_gia,
+        COALESCE(d.thanh_tien, d.so_luong_dat * d.don_gia) as thanh_tien,
+        d.so_luong_da_giao,
+        (d.so_luong_dat - d.so_luong_da_giao) as so_luong_con_lai,
+        CASE 
+          WHEN d.so_luong_da_giao >= d.so_luong_dat THEN 'Đã nhập'
+          WHEN d.so_luong_da_giao > 0 THEN 'Đang nhập'
+          ELSE 'Chưa nhập'
+        END as trang_thai_nhap_kho
+      FROM tm_don_hang_chi_tiet d
+      LEFT JOIN tm_hang_hoa h ON d.ma_hang_hoa = h.ma_hang_hoa
+      LEFT JOIN dm_mau m ON d.yeu_cau_dac_biet->>'ma_mau' = m.ma_mau
+      WHERE d.so_don_hang = $1
+      ORDER BY d.stt
       `,
-      [soPhieu]
+      [soPhieuDB],
     );
+
+    // 3. Get Received Vehicles (Chi tiết xe đã nhập)
+    const serialsRes = await pool.query(
+      `
+      SELECT 
+        s.ma_hang_hoa as ma_loai_xe,
+        s.ma_serial as ma_xe,
+        s.serial_identifier as so_khung,
+        s.thuoc_tinh_rieng->>'so_may' as so_may,
+        s.ngay_nhap_kho,
+        s.trang_thai
+      FROM tm_hang_hoa_lich_su ls
+      JOIN tm_hang_hoa_serial s ON ls.ma_serial = s.ma_serial
+      WHERE ls.so_chung_tu = $1 
+        AND ls.loai_giao_dich = 'NHAP_KHO'
+      `,
+      [soPhieuDB],
+    );
+
+    const serials = serialsRes.rows;
+
+    const detailsWithSerials = details.rows.map((d) => {
+      // Filter serials matching this product type
+      // Note: Ideally we match by detail ID, but ls doesn't store detail ID clearly.
+      // Matching by Product Code is generally sufficient for PO display.
+      const relatedSerials = serials.filter(
+        (s) => s.ma_loai_xe === d.ma_loai_xe,
+      );
+
+      return {
+        ...d,
+        danh_sach_xe: relatedSerials,
+      };
+    });
 
     return {
       ...header.rows[0],
-      chi_tiet: details.rows,
+      chi_tiet: detailsWithSerials,
     };
   }
   /* =========================
@@ -467,7 +589,7 @@ class DonHangMuaXeService {
       limit = 20,
     } = filters;
 
-    const conditions = [];
+    const conditions = ["loai_don_hang = 'MUA_XE'"];
     const values = [];
     let idx = 1;
 
@@ -477,7 +599,7 @@ class DonHangMuaXeService {
     }
 
     if (ma_kho_nhap) {
-      conditions.push(`ma_kho_nhap = $${idx++}`);
+      conditions.push(`ma_ben_nhap = $${idx++}`);
       values.push(ma_kho_nhap);
     }
 
@@ -493,8 +615,8 @@ class DonHangMuaXeService {
 
     if (keyword) {
       conditions.push(`(
-        so_phieu ILIKE $${idx}
-        OR ma_ncc ILIKE $${idx}
+        so_don_hang ILIKE $${idx}
+        OR ma_ben_xuat ILIKE $${idx}
       )`);
       values.push(`%${keyword}%`);
       idx++;
@@ -508,8 +630,17 @@ class DonHangMuaXeService {
     const offset = (Number(page) - 1) * safeLimit;
 
     const dataQuery = `
-      SELECT *
-      FROM tm_don_hang_mua_xe
+      SELECT 
+        id,
+        so_don_hang as so_phieu,
+        ngay_dat_hang,
+        ma_ben_nhap as ma_kho_nhap,
+        ma_ben_xuat as ma_ncc,
+        tong_gia_tri as tong_tien,
+        trang_thai,
+        created_at,
+        ghi_chu as dien_giai
+      FROM tm_don_hang
       ${whereClause}
       ORDER BY ngay_dat_hang DESC
       LIMIT $${idx++} OFFSET $${idx++}
@@ -517,7 +648,7 @@ class DonHangMuaXeService {
 
     const countQuery = `
       SELECT COUNT(*)::int AS total
-      FROM tm_don_hang_mua_xe
+      FROM tm_don_hang
       ${whereClause}
     `;
 
@@ -546,22 +677,36 @@ class DonHangMuaXeService {
       errors: [],
     };
 
-    // Kiểm tra trạng thái đơn hàng trước khi chạy loop để tiết kiệm resource
-    const trangThai = await this._checkTrangThai(maPhieu, null, pool);
-    if (trangThai !== TRANG_THAI.DA_DUYET) {
+    // 1. Get current status and standard ID
+    const orderRes = await pool.query(
+      `SELECT so_don_hang, trang_thai FROM tm_don_hang 
+       WHERE so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)`,
+      [maPhieu],
+    );
+
+    if (!orderRes.rows.length) {
+      throw { status: 404, message: "Đơn hàng không tồn tại" };
+    }
+
+    const { so_don_hang, trang_thai } = orderRes.rows[0];
+
+    // Allow Approved or Partially Receiving
+    const validStatuses = ["DA_DUYET", "DANG_NHAP_KHO"];
+    if (!validStatuses.includes(trang_thai)) {
       throw {
         status: 400,
-        message: "Đơn hàng phải được duyệt trước khi nhập kho",
+        message: `Đơn hàng phải ở trạng thái ĐÃ DUYỆT hoặc ĐANG NHẬP KHO. Trạng thái hiện tại: ${trang_thai}`,
       };
     }
 
+    // 2. Process items
     for (const item of danhSachXe) {
       try {
         const result = await VehicleService.nhapXeTuDonHang(
-          maPhieu,
-          item.id, // ID cua chi tiet don hang
-          item, // Data chua so_khung, so_may
-          userId
+          so_don_hang, // Use standardized ID
+          item.id,
+          item,
+          userId,
         );
         results.success.push({
           id: item.id,
@@ -575,6 +720,36 @@ class DonHangMuaXeService {
       }
     }
 
+    // 3. Post-process Status Update
+    const checkRes = await pool.query(
+      `SELECT 
+        COUNT(*) as total_items,
+        COUNT(*) FILTER (WHERE so_luong_da_giao >= so_luong_dat) as completed_items,
+        COUNT(*) FILTER (WHERE so_luong_da_giao > 0) as partial_items
+       FROM tm_don_hang_chi_tiet
+       WHERE so_don_hang = $1`,
+      [so_don_hang],
+    );
+
+    const { total_items, completed_items, partial_items } = checkRes.rows[0];
+
+    let newStatus = trang_thai;
+    if (
+      parseInt(completed_items) === parseInt(total_items) &&
+      parseInt(total_items) > 0
+    ) {
+      newStatus = "HOAN_THANH";
+    } else if (parseInt(partial_items) > 0) {
+      newStatus = "DANG_NHAP_KHO";
+    }
+
+    if (newStatus !== trang_thai) {
+      await pool.query(
+        `UPDATE tm_don_hang SET trang_thai = $1, updated_at = NOW() WHERE so_don_hang = $2`,
+        [newStatus, so_don_hang],
+      );
+    }
+
     return results;
   }
   // Lấy chi tiết đơn hàng cho export
@@ -582,15 +757,18 @@ class DonHangMuaXeService {
     let sql = `
       SELECT 
         ct.*, 
+        ct.so_don_hang as ma_phieu,
         h.ngay_dat_hang as ngay_lap,
-        h.ma_kho_nhap,
-        h.ma_ncc,
-        xl.ten_loai,
-        m.ten_mau
-      FROM tm_don_hang_mua_xe_ct ct
-      INNER JOIN tm_don_hang_mua_xe h ON ct.ma_phieu = h.so_phieu
-      LEFT JOIN tm_xe_loai xl ON ct.ma_loai_xe = xl.ma_loai
-      LEFT JOIN sys_mau m ON ct.ma_mau = m.ma_mau
+        h.ma_ben_nhap as ma_kho_nhap,
+        h.ma_ben_xuat as ma_ncc,
+        hh.ten_hang_hoa as ten_loai,
+        m.ten_mau,
+        ct.ma_hang_hoa as ma_loai_xe,
+        ct.so_luong_dat as so_luong
+      FROM tm_don_hang_chi_tiet ct
+      INNER JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
+      LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN dm_mau m ON (ct.yeu_cau_dac_biet->>'ma_mau') = m.ma_mau
       WHERE 1=1
     `;
     const params = [];

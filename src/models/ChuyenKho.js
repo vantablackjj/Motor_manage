@@ -7,7 +7,7 @@ class Kho {
       SELECT 
         id, ma_kho, ten_kho, dia_chi, dien_thoai,
         mac_dinh, chinh, daily, status,
-        ngay_tao, ngay_cap_nhat
+        created_at, updated_at
       FROM sys_kho
       WHERE status = TRUE
     `;

@@ -35,10 +35,10 @@ router.post(
     ROLES.ADMIN,
     ROLES.QUAN_LY_CTY,
     ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN
+    ROLES.NHAN_VIEN,
   ),
   validate(taoDonHangSchema),
-  donHangMuaController.taoDonHang
+  donHangMuaController.taoDonHang,
 );
 
 router.post(
@@ -48,10 +48,10 @@ router.post(
     ROLES.ADMIN,
     ROLES.QUAN_LY_CTY,
     ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN
+    ROLES.NHAN_VIEN,
   ),
   validate(themPhuTungSchema),
-  donHangMuaController.themPhuTung
+  donHangMuaController.themPhuTung,
 );
 
 router.post(
@@ -61,22 +61,29 @@ router.post(
     ROLES.ADMIN,
     ROLES.QUAN_LY_CTY,
     ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN
+    ROLES.NHAN_VIEN,
   ),
-  donHangMuaController.guiDuyet
+  donHangMuaController.guiDuyet,
 );
 
 router.post(
   "/:ma_phieu/phe-duyet",
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
-  donHangMuaController.pheDuyet
+  donHangMuaController.pheDuyet,
+);
+
+router.post(
+  "/:ma_phieu/nhap-kho",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH, ROLES.KHO),
+  donHangMuaController.nhapKho,
 );
 
 router.post(
   "/:ma_phieu/huy-duyet",
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
-  donHangMuaController.huyDuyet
+  donHangMuaController.huyDuyet,
 );
 module.exports = router;

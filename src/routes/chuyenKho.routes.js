@@ -8,8 +8,6 @@ const chuyenKhoService = require("../services/chuyenKho.service");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
 
-
-
 // Validation schemas
 const taoPhieuSchema = Joi.object({
   ma_phieu: Joi.string().required().max(50),
@@ -19,9 +17,9 @@ const taoPhieuSchema = Joi.object({
   dien_giai: Joi.string().allow("", null),
 });
 const themXeSchema = Joi.object({
-  xe_key : Joi.string().required().max(50),
-  ma_kho_hien_tai:Joi.string().required().max(50),
-})
+  xe_key: Joi.string().required().max(50),
+  ma_kho_hien_tai: Joi.string().required().max(50),
+});
 const themPhuTungSchema = Joi.object({
   ma_pt: Joi.string().required().max(50),
   ten_pt: Joi.string().required().max(200),
@@ -64,6 +62,70 @@ router.get("/:ma_phieu", authenticate, async (req, res, next) => {
   }
 });
 
+/**
+ * In Phiếu Chuyển Kho (PDF)
+ */
+router.get("/:ma_phieu/in-phieu", authenticate, async (req, res, next) => {
+  try {
+    const { ma_phieu } = req.params;
+    const PdfService = require("../services/pdf.service");
+
+    const data = await chuyenKhoService.getChiTiet(ma_phieu);
+    if (!data) return res.status(404).json({ message: "Phiếu không tồn tại" });
+
+    // Map data
+    const currentData = data.phieu || data;
+    const chiTietXe = (data.chi_tiet_xe || []).map((item, idx) => ({
+      stt: idx + 1,
+      ten_hang_hoa: item.ten_xe || item.xe_key || "Xe máy",
+      don_vi_tinh: "Chiếc",
+      so_luong: 1,
+      don_gia: Number(item.don_gia || 0),
+      thanh_tien: Number(item.don_gia || 0),
+    }));
+
+    const chiTietPt = (data.chi_tiet_pt || []).map((item, idx) => ({
+      stt: idx + 1,
+      ten_hang_hoa: item.ten_pt || item.ma_pt,
+      don_vi_tinh: item.don_vi_tinh,
+      so_luong: Number(item.so_luong),
+      don_gia: Number(item.don_gia || 0),
+      thanh_tien: Number(item.so_luong) * Number(item.don_gia || 0),
+    }));
+
+    const tongTien = [...chiTietXe, ...chiTietPt].reduce(
+      (sum, item) => sum + item.thanh_tien,
+      0,
+    );
+
+    const invoiceData = {
+      so_hd: currentData.so_phieu,
+      ngay_ban: currentData.ngay_chuyen_kho || currentData.created_at,
+      loai_hoa_don: "CHUYEN_KHO",
+
+      ten_ben_xuat: currentData.ten_kho_xuat || currentData.ma_kho_xuat,
+      dia_chi_ben_xuat: currentData.dia_chi_kho_xuat || "",
+      sdt_ben_xuat: currentData.sdt_kho_xuat || "",
+
+      ten_ben_nhap: currentData.ten_kho_nhap || currentData.ma_kho_nhap,
+      dia_chi_ben_nhap: currentData.dia_chi_kho_nhap || "",
+
+      ten_nguoi_tao: currentData.ten_nguoi_tao || currentData.nguoi_tao,
+      tong_tien: tongTien,
+      ghi_chu: currentData.dien_giai,
+      thanh_toan: tongTien,
+      trang_thai: currentData.trang_thai,
+
+      chi_tiet_xe: chiTietXe,
+      chi_tiet_pt: chiTietPt,
+    };
+
+    await PdfService.generateInvoicePdf(invoiceData, res);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/chuyen-kho - Tạo phiếu mới
 router.post(
   "/",
@@ -74,20 +136,20 @@ router.post(
     try {
       const data = {
         ...req.body,
-        so_phieu:req.body.ma_phieu,
-        nguoi_tao: req.user.username,
+        so_phieu: req.body.ma_phieu,
+        nguoi_tao: req.user.id, // Use user ID instead of username
       };
-     
+
       const result = await chuyenKhoService.taoPhieu(data);
       sendSuccess(res, result, "Tạo phiếu chuyển kho thành công", 201);
     } catch (error) {
       next(error);
-    } 
-  }
+    }
+  },
 );
 
 router.post(
-  '/:ma_phieu/xe',
+  "/:ma_phieu/xe",
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
   validate(themXeSchema),
@@ -95,15 +157,15 @@ router.post(
     try {
       const { ma_phieu } = req.params;
       const result = await chuyenKhoService.themXe(ma_phieu, req.body);
-       sendSuccess(res, result, "Thêm  xe vào phiếu thành công");
+      sendSuccess(res, result, "Thêm  xe vào phiếu thành công");
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 router.post(
-  '/:so_phieu/huy',
+  "/:so_phieu/huy",
   authenticate,
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY),
   async (req, res, next) => {
@@ -115,14 +177,15 @@ router.post(
       const result = await chuyenKhoService.tuChoiDuyet(
         so_phieu,
         nguoi_huy,
-        ly_do
+        ly_do,
       );
 
       res.json(result);
     } catch (err) {
       next(err);
     }
-  });
+  },
+);
 
 // POST /api/chuyen-kho/:ma_phieu/phu-tung - Thêm phụ tùng
 router.post(
@@ -140,7 +203,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // POST /api/v1/chuyen-kho/:ma_phieu/gui-duyet - Gửi duyệt
@@ -151,15 +214,12 @@ router.post(
   async (req, res, next) => {
     try {
       const { ma_phieu } = req.params;
-      const result = await chuyenKhoService.guiDuyet(
-        ma_phieu,
-        req.user.username
-      );
+      const result = await chuyenKhoService.guiDuyet(ma_phieu, req.user.id);
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // POST /api/chuyen-kho/:ma_phieu/phe-duyet - Phê duyệt
@@ -170,17 +230,33 @@ router.post(
   async (req, res, next) => {
     try {
       const { ma_phieu } = req.params;
-      const result = await chuyenKhoService.pheDuyet(
+      const result = await chuyenKhoService.pheDuyet(ma_phieu, req.user.id);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/chuyen-kho/:ma_phieu/nhap-kho - Nhập kho (Thực hiện chuyển)
+router.post(
+  "/:ma_phieu/nhap-kho",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      const { ma_phieu } = req.params;
+      const { danh_sach_nhap } = req.body; // [{stt, so_luong_nhap, ma_serial?}]
+      const result = await chuyenKhoService.nhapKho(
         ma_phieu,
-        req.user.username
+        req.user.id,
+        danh_sach_nhap,
       );
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
-
-
 
 module.exports = router;

@@ -1,5 +1,5 @@
 // services/model.service.js
-const { query } = require('../config/database');
+const { query } = require("../config/database");
 
 class ModelService {
   // ======================
@@ -8,47 +8,41 @@ class ModelService {
   static async getAll(filters = {}) {
     let sql = `
       SELECT 
-        lx.ma_loai,
-        lx.ten_loai,
-
-        nh.ma_nh,
-        nh.ten_nh,
-
-        nsx.ma,
-        nsx.ten_noi_sx,
-
-        lh.ma_lh,
-        lh.ten_lh,
-
-        lx.gia_nhap,
-        lx.gia_ban,
-        lx.gia_thue,
-        lx.vat,
-        lx.status
-      FROM tm_xe_loai lx
-      JOIN sys_nhan_hieu nh ON lx.ma_nh = nh.ma_nh
-      JOIN sys_noi_sx nsx ON lx.noi_sx = nsx.ma
-      JOIN sys_loai_hinh lh ON lx.loai_hinh = lh.ma_lh and lh.status = true
-      WHERE 1=1
+        hh.ma_hang_hoa as ma_loai,
+        hh.ten_hang_hoa as ten_loai,
+        hh.ma_nhom_hang as ma_nh,
+        nh.ten_nhom as ten_nh,
+        hh.thong_so_ky_thuat->>'noi_sx' as ten_noi_sx,
+        hh.thong_so_ky_thuat->>'loai_hinh' as ten_lh,
+        hh.gia_von_mac_dinh as gia_nhap,
+        hh.gia_ban_mac_dinh as gia_ban,
+        COALESCE((hh.thong_so_ky_thuat->>'gia_thue')::decimal, 0) as gia_thue,
+        COALESCE((hh.thong_so_ky_thuat->>'vat')::decimal, 0) as vat,
+        hh.status
+      FROM tm_hang_hoa hh
+      LEFT JOIN dm_nhom_hang nh ON hh.ma_nhom_hang = nh.ma_nhom
+      WHERE hh.loai_quan_ly = 'SERIAL'
     `;
 
     const params = [];
     let i = 1;
 
     if (filters.ma_nh) {
-      sql += ` AND lx.ma_nh = $${i++}`;
+      sql += ` AND hh.ma_nhom_hang = $${i++}`;
       params.push(filters.ma_nh);
     }
 
     if (filters.loai_hinh) {
-      sql += ` AND lx.loai_hinh = $${i++}`;
+      sql += ` AND hh.thong_so_ky_thuat->>'loai_hinh' = $${i++}`;
       params.push(filters.loai_hinh);
     }
 
     if (filters.status !== undefined) {
-      sql += ` AND lx.status = $${i++}`;
+      sql += ` AND hh.status = $${i++}`;
       params.push(filters.status);
     }
+
+    sql += ` ORDER BY hh.ma_nhom_hang, hh.ten_hang_hoa`;
 
     const result = await query(sql, params);
     return result.rows;
@@ -59,44 +53,68 @@ class ModelService {
   // ======================
   static async getById(ma_loai) {
     const result = await query(
-      `SELECT * FROM tm_xe_loai WHERE ma_loai=$1`,
-      [ma_loai]
+      `SELECT 
+        ma_hang_hoa as ma_loai, 
+        ten_hang_hoa as ten_loai,
+        ma_nhom_hang as ma_nh,
+        gia_von_mac_dinh as gia_nhap,
+        gia_ban_mac_dinh as gia_ban,
+        thong_so_ky_thuat,
+        status
+       FROM tm_hang_hoa 
+       WHERE ma_hang_hoa = $1 AND loai_quan_ly = 'SERIAL'`,
+      [ma_loai],
     );
-    return result.rows[0];
+    if (result.rows[0]) {
+      // Flatten thong_so_ky_thuat into top level for backward compatibility if needed
+      const item = result.rows[0];
+      const specs = item.thong_so_ky_thuat || {};
+      return {
+        ...item,
+        noi_sx: specs.noi_sx,
+        loai_hinh: specs.loai_hinh,
+        gia_thue: specs.gia_thue,
+        vat: specs.vat,
+        phan_khoi: specs.phan_khoi,
+      };
+    }
+    return null;
   }
 
   // ======================
   // CREATE
   // ======================
   static async create(data) {
-    // 1. Check trùng
+    // Re-use logic from ProductCatalogService or implement locally
     const exists = await this.getById(data.ma_loai);
-    if (exists) throw new Error('Loại xe đã tồn tại');
+    if (exists) throw new Error("Loại xe đã tồn tại");
 
-    // 2. Validate FK
-    await this.validateForeignKeys(data);
+    const thong_so_ky_thuat = {
+      noi_sx: data.noi_sx,
+      loai_hinh: data.loai_hinh,
+      gia_thue: data.gia_thue || 0,
+      vat: data.vat || 0,
+      phan_khoi: data.phan_khoi,
+    };
 
-    // 3. Insert
     const result = await query(
-      `INSERT INTO tm_xe_loai (
-        ma_loai, ten_loai,
-        ma_nh, noi_sx, loai_hinh,
-        gia_nhap, gia_ban, gia_thue, vat, status
+      `INSERT INTO tm_hang_hoa (
+        ma_hang_hoa, ten_hang_hoa,
+        ma_nhom_hang, loai_quan_ly,
+        gia_von_mac_dinh, gia_ban_mac_dinh,
+        thong_so_ky_thuat, status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      VALUES ($1, $2, $3, 'SERIAL', $4, $5, $6, $7)
       RETURNING *`,
       [
         data.ma_loai,
         data.ten_loai,
         data.ma_nh,
-        data.noi_sx,
-        data.loai_hinh,
-        data.gia_nhap,
-        data.gia_ban,
-        data.gia_thue,
-        data.vat,
+        data.gia_nhap || 0,
+        data.gia_ban || 0,
+        JSON.stringify(thong_so_ky_thuat),
         data.status ?? true,
-      ]
+      ],
     );
 
     return result.rows[0];
@@ -107,78 +125,50 @@ class ModelService {
   // ======================
   static async update(ma_loai, data) {
     const exists = await this.getById(ma_loai);
-    if (!exists) throw new Error('Loại xe không tồn tại');
+    if (!exists) throw new Error("Loại xe không tồn tại");
 
-    await this.validateForeignKeys(data);
+    const currentSpecs = exists.thong_so_ky_thuat || {};
+    const thong_so_ky_thuat = {
+      ...currentSpecs,
+      noi_sx: data.noi_sx !== undefined ? data.noi_sx : currentSpecs.noi_sx,
+      loai_hinh:
+        data.loai_hinh !== undefined ? data.loai_hinh : currentSpecs.loai_hinh,
+      gia_thue:
+        data.gia_thue !== undefined ? data.gia_thue : currentSpecs.gia_thue,
+      vat: data.vat !== undefined ? data.vat : currentSpecs.vat,
+      phan_khoi:
+        data.phan_khoi !== undefined ? data.phan_khoi : currentSpecs.phan_khoi,
+    };
 
     const result = await query(
-      `UPDATE tm_xe_loai
-       SET ten_loai=$1,
-           ma_nh=$2,
-           noi_sx=$3,
-           loai_hinh=$4,
-           gia_nhap=$5,
-           gia_ban=$6,
-           gia_thue=$7,
-           vat=$8,
-           status=$9
-       WHERE ma_loai=$10
+      `UPDATE tm_hang_hoa
+       SET ten_hang_hoa = COALESCE($1, ten_hang_hoa),
+           ma_nhom_hang = COALESCE($2, ma_nhom_hang),
+           gia_von_mac_dinh = COALESCE($3, gia_von_mac_dinh),
+           gia_ban_mac_dinh = COALESCE($4, gia_ban_mac_dinh),
+           thong_so_ky_thuat = $5,
+           status = COALESCE($6, status),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE ma_hang_hoa = $7 AND loai_quan_ly = 'SERIAL'
        RETURNING *`,
       [
         data.ten_loai,
         data.ma_nh,
-        data.noi_sx,
-        data.loai_hinh,
         data.gia_nhap,
         data.gia_ban,
-        data.gia_thue,
-        data.vat,
+        JSON.stringify(thong_so_ky_thuat),
         data.status,
         ma_loai,
-      ]
+      ],
     );
 
     return result.rows[0];
   }
 
-  // ======================
-  // VALIDATE FK
-  // ======================
-  static async validateForeignKeys(data) {
-    const checks = [
-      {
-        table: 'sys_nhan_hieu',
-        column: 'ma_nh',
-        value: data.ma_nh,
-        msg: 'Nhãn hiệu không tồn tại',
-      },
-      {
-        table: 'sys_noi_sx',
-        column: 'ma',
-        value: data.noi_sx,
-        msg: 'Nơi sản xuất không tồn tại',
-      },
-      {
-        table: 'sys_loai_hinh',
-        column: 'ma_lh',
-        value: data.loai_hinh,
-        msg: 'Loại hình xe không tồn tại',
-      },
-    ];
-
-    for (const c of checks) {
-      const r = await query(
-        `SELECT 1 FROM ${c.table} WHERE ${c.column}=$1 AND status=true`,
-        [c.value]
-      );
-      if (!r.rows.length) throw new Error(c.msg);
-    }
-  }
   static async delete(ma_loai) {
-    // Có thể soft delete nếu muốn
     const result = await query(
-      `DELETE FROM tm_xe_loai WHERE ma_loai=$1 RETURNING *`,
-      [ma_loai]
+      `UPDATE tm_hang_hoa SET status = false WHERE ma_hang_hoa = $1 AND loai_quan_ly = 'SERIAL' RETURNING *`,
+      [ma_loai],
     );
     return result.rows[0];
   }

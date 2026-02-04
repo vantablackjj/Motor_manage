@@ -10,3 +10,26 @@ logs/
 
 # OS
 .DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build & Coverage
+dist/
+build/
+coverage/
+
+# Temporary & Debug Scripts
+tmp/
+temp/
+debug_*.js
+fix_*.js
+test_connection.js
+*.bak
+
+# System
+Thumbs.db
+Desktop.ini

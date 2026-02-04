@@ -1,11 +1,11 @@
-const { query } = require('../config/database');
+const { query } = require("../config/database");
 
 class InventoryService {
   // Lấy tất cả tồn kho
   static async getAll(filters = {}) {
     let sql = `
-      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
-      FROM tm_phu_tung_ton_kho
+      SELECT id, ma_kho, ma_hang_hoa as ma_pt, so_luong_ton, updated_at as updated_at
+      FROM tm_hang_hoa_ton_kho
       WHERE 1 = 1
     `;
 
@@ -17,7 +17,7 @@ class InventoryService {
     }
 
     if (filters.ma_pt) {
-      sql += ` AND ma_pt = $${params.length + 1}`;
+      sql += ` AND ma_hang_hoa = $${params.length + 1}`;
       params.push(filters.ma_pt);
     }
 
@@ -25,11 +25,11 @@ class InventoryService {
     return result.rows;
   }
 
-  // Ma KHo 
+  // Ma KHo
   static async getByID(ma_kho) {
     const sql = `
-      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
-      FROM tm_phu_tung_ton_kho
+      SELECT id, ma_kho, ma_hang_hoa as ma_pt, so_luong_ton, updated_at as updated_at
+      FROM tm_hang_hoa_ton_kho
       WHERE ma_kho = $1
     `;
     const result = await query(sql, [ma_kho]);
@@ -39,9 +39,9 @@ class InventoryService {
   // Ma PT
   static async getByPT(ma_pt) {
     const sql = `
-      SELECT id, ma_kho, ma_pt, so_luong_ton, ngay_cap_nhat
-      FROM tm_phu_tung_ton_kho
-      WHERE ma_pt = $1
+      SELECT id, ma_kho, ma_hang_hoa as ma_pt, so_luong_ton, updated_at as updated_at
+      FROM tm_hang_hoa_ton_kho
+      WHERE ma_hang_hoa = $1
     `;
     const result = await query(sql, [ma_pt]);
     return result.rows;
@@ -50,10 +50,10 @@ class InventoryService {
   // Tạo tồn kho ban đầu
   static async createInitial({ ma_kho, ma_pt, so_luong_ton }) {
     const sql = `
-      INSERT INTO tm_phu_tung_ton_kho (ma_kho, ma_pt, so_luong_ton)
+      INSERT INTO tm_hang_hoa_ton_kho (ma_kho, ma_hang_hoa, so_luong_ton)
       VALUES ($1, $2, $3)
-      ON CONFLICT (ma_kho, ma_pt)
-      DO UPDATE SET so_luong_ton = EXCLUDED.so_luong_ton, ngay_cap_nhat = NOW()
+      ON CONFLICT (ma_kho, ma_hang_hoa)
+      DO UPDATE SET so_luong_ton = EXCLUDED.so_luong_ton, updated_at = NOW()
       RETURNING *;
     `;
     const result = await query(sql, [ma_kho, ma_pt, so_luong_ton]);
@@ -63,9 +63,9 @@ class InventoryService {
   // Tăng số lượng (nhập kho)
   static async increaseStock(ma_kho, ma_pt, qty) {
     const sql = `
-      UPDATE tm_phu_tung_ton_kho
-      SET so_luong_ton = so_luong_ton + $3, ngay_cap_nhat = NOW()
-      WHERE ma_kho = $1 AND ma_pt = $2
+      UPDATE tm_hang_hoa_ton_kho
+      SET so_luong_ton = so_luong_ton + $3, updated_at = NOW()
+      WHERE ma_kho = $1 AND ma_hang_hoa = $2
       RETURNING *;
     `;
     const result = await query(sql, [ma_kho, ma_pt, qty]);
@@ -75,23 +75,23 @@ class InventoryService {
   // Giảm số lượng (xuất kho)
   static async decreaseStock(ma_kho, ma_pt, qty) {
     const checkSql = `
-      SELECT so_luong_ton FROM tm_phu_tung_ton_kho 
-      WHERE ma_kho = $1 AND ma_pt = $2
+      SELECT so_luong_ton FROM tm_hang_hoa_ton_kho 
+      WHERE ma_kho = $1 AND ma_hang_hoa = $2
     `;
     const check = await query(checkSql, [ma_kho, ma_pt]);
 
     if (check.rowCount === 0) {
-      throw new Error('Không tìm thấy tồn kho');
+      throw new Error("Không tìm thấy tồn kho");
     }
 
     if (check.rows[0].so_luong_ton < qty) {
-      throw new Error('Số lượng tồn không đủ');
+      throw new Error("Số lượng tồn không đủ");
     }
 
     const sql = `
-      UPDATE tm_phu_tung_ton_kho
-      SET so_luong_ton = so_luong_ton - $3, ngay_cap_nhat = NOW()
-      WHERE ma_kho = $1 AND ma_pt = $2
+      UPDATE tm_hang_hoa_ton_kho
+      SET so_luong_ton = so_luong_ton - $3, updated_at = NOW()
+      WHERE ma_kho = $1 AND ma_hang_hoa = $2
       RETURNING *;
     `;
 
@@ -106,9 +106,9 @@ class InventoryService {
 
     // Tăng kho đích
     const sqlInsert = `
-      INSERT INTO tm_phu_tung_ton_kho (ma_kho, ma_pt, so_luong_ton)
+      INSERT INTO tm_hang_hoa_ton_kho (ma_kho, ma_hang_hoa, so_luong_ton)
       VALUES ($1, $2, 0)
-      ON CONFLICT (ma_kho, ma_pt) DO NOTHING;
+      ON CONFLICT (ma_kho, ma_hang_hoa) DO NOTHING;
     `;
     await query(sqlInsert, [toKho, ma_pt]);
 

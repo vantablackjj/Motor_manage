@@ -55,7 +55,7 @@ const { ROLES } = require("../config/constants");
 
 // Validation schemas
 const createPhuTungSchema = Joi.object({
-  ma_pt: Joi.string().required().max(50),
+  ma_pt: Joi.string().max(50),
   ten_pt: Joi.string().required().max(200),
   don_vi_tinh: Joi.string().max(50).default("Cái"),
   nhom_pt: Joi.string().max(50).allow("", null),
@@ -63,6 +63,7 @@ const createPhuTungSchema = Joi.object({
   gia_ban: Joi.number().min(0).required(),
   vat: Joi.number().min(0).max(100).default(10),
   ghi_chu: Joi.string().allow("", null),
+  status: Joi.boolean(), // Thêm trường này để hỗ trợ khôi phục (Restore)
 });
 
 // GET /api/v1/phu-tung - Danh sách phụ tùng
@@ -71,6 +72,7 @@ router.get("/", authenticate, async (req, res, next) => {
     const filters = {
       nhom_pt: req.query.nhom_pt,
       search: req.query.search,
+      status: req.query.status, // Thêm dòng này để nhận diện status=all
     };
 
     const data = await PhuTung.getAll(filters);
@@ -116,7 +118,7 @@ router.get(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 //PUT /api/phu-tung
@@ -137,7 +139,7 @@ router.put(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.post(
@@ -155,7 +157,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // POST /api/phu-tung - Tạo phụ tùng mới
@@ -171,7 +173,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.delete(
@@ -191,7 +193,7 @@ router.delete(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.post(
@@ -209,7 +211,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.post(
@@ -223,7 +225,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 module.exports = router;

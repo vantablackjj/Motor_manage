@@ -18,7 +18,7 @@ const nhapXeMoiSchema = Joi.object({
   nguoi_gui: Joi.string(),
   nguoi_gui: Joi.string(),
   nguoi_duyet: Joi.string(),
-  ngay_tao: Joi.date(),
+  created_at: Joi.date(),
   ngay_gui: Joi.date(),
   ngay_duyet: Joi.date(),
   dien_giai: Joi.string(),
@@ -51,7 +51,7 @@ router.use(authenticate);
 router.get(
   "/",
   checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
-  controller.getList
+  controller.getList,
 );
 
 /**
@@ -62,7 +62,7 @@ router.post(
   checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
   validate(nhapXeMoiSchema),
   validate(nhapXeMoiSchema),
-  controller.create
+  controller.create,
 );
 
 /**
@@ -73,7 +73,7 @@ router.post(
   "/create-with-details",
   checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
   validate(createWithDetailsSchema),
-  controller.createWithDetails
+  controller.createWithDetails,
 );
 
 /**
@@ -82,7 +82,7 @@ router.post(
 router.delete(
   "/:ma_phieu/chi-tiet/:id",
   checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
-  controller.deleteChiTiet
+  controller.deleteChiTiet,
 );
 
 /**
@@ -92,7 +92,7 @@ router.post(
   "/:ma_phieu/chi-tiet",
   checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
   validate(chiTietDonHang),
-  controller.addChiTiet
+  controller.addChiTiet,
 );
 
 /**
@@ -101,7 +101,7 @@ router.post(
 router.post(
   "/:ma_phieu/submit",
   checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
-  controller.submit
+  controller.submit,
 );
 
 /**
@@ -110,7 +110,7 @@ router.post(
 router.post(
   "/:ma_phieu/approve",
   checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
-  controller.approve
+  controller.approve,
 );
 
 /**
@@ -119,7 +119,7 @@ router.post(
 router.post(
   "/:ma_phieu/reject",
   checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
-  controller.reject
+  controller.reject,
 );
 
 /**
@@ -128,7 +128,7 @@ router.post(
 router.get(
   "/:ma_phieu",
   checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
-  controller.detail
+  controller.detail,
 );
 
 /**
@@ -137,7 +137,64 @@ router.get(
 router.post(
   "/:ma_phieu/nhap-kho",
   checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
-  controller.nhapKho
+  controller.nhapKho,
+);
+
+/**
+ * 7. In đơn hàng (PDF)
+ */
+router.get(
+  "/:ma_phieu/in-don-hang",
+  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  async (req, res) => {
+    try {
+      const { ma_phieu } = req.params;
+      const DonHangMuaXeService = require("../services/donHangMuaXe.service");
+      const PdfService = require("../services/pdf.service");
+
+      const order = await DonHangMuaXeService.getDetail(ma_phieu);
+      if (!order)
+        return res.status(404).json({ message: "Đơn hàng không tồn tại" });
+
+      // Map to Invoice Format
+      const invoiceData = {
+        so_hd: order.ma_phieu,
+        ngay_ban: order.ngay_dat_hang || order.created_at,
+        loai_hoa_don: "MUA_HANG",
+
+        // PO uses ma_ncc and ma_kho_nhap
+        // Need names? getDetail usually returns names join (check service output or assume)
+        // If getDetail returns codes only, names will be missing.
+        // Assuming getDetail returns enriched data.
+        ten_ben_xuat: order.ten_ncc || order.ma_ncc,
+        dia_chi_ben_xuat: order.dia_chi_ncc || "",
+        sdt_ben_xuat: order.dien_thoai_ncc || "",
+
+        ten_ben_nhap: order.ten_kho_nhap || order.ma_kho_nhap,
+        dia_chi_ben_nhap: order.dia_chi_kho_nhap || "",
+
+        ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
+        tong_tien: order.tong_tien,
+        ghi_chu: order.ghi_chu,
+        thanh_toan: 0, // PO usually not paid yet in this context or partial
+        trang_thai: order.trang_thai,
+
+        chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
+          stt: idx + 1,
+          ten_hang_hoa: item.ten_xe || item.ma_loai_xe, // PO Xe
+          don_vi_tinh: "Chiếc",
+          so_luong: item.so_luong,
+          don_gia: item.don_gia,
+          thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
+        })),
+      };
+
+      await PdfService.generateInvoicePdf(invoiceData, res);
+    } catch (err) {
+      console.error(err);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
+    }
+  },
 );
 
 module.exports = router;

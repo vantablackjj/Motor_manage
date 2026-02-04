@@ -9,13 +9,13 @@ class BaoCaoService {
     const { ma_kho, ma_loai_xe, ma_mau } = filters;
     let sql = `
       SELECT 
-        x.xe_key, x.so_khung, x.so_may, x.gia_nhap, x.ngay_nhap,
-        xl.ten_loai, m.ten_mau, k.ten_kho
-      FROM tm_xe_thuc_te x
-      LEFT JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-      LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
+        x.ma_serial as xe_key, x.serial_identifier as so_khung, 
+        (x.thuoc_tinh_rieng->>'so_may') as so_may, pt.gia_von_mac_dinh as gia_nhap, x.ngay_nhap_kho as ngay_nhap,
+        pt.ten_hang_hoa as ten_loai, (x.thuoc_tinh_rieng->>'ten_mau') as ten_mau, k.ten_kho
+      FROM tm_hang_hoa_serial x
+      LEFT JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
       LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
-      WHERE x.trang_thai = 'TON_KHO' AND x.status = true
+      WHERE x.trang_thai = 'TON_KHO' AND pt.status = true
     `;
     const params = [];
     if (ma_kho) {
@@ -24,13 +24,9 @@ class BaoCaoService {
     }
     if (ma_loai_xe) {
       params.push(ma_loai_xe);
-      sql += ` AND x.ma_loai_xe = $${params.length}`;
+      sql += ` AND x.ma_hang_hoa = $${params.length}`;
     }
-    if (ma_mau) {
-      params.push(ma_mau);
-      sql += ` AND x.ma_mau = $${params.length}`;
-    }
-    sql += ` ORDER BY x.ngay_nhap DESC`;
+    sql += ` ORDER BY x.ngay_nhap_kho DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -39,13 +35,13 @@ class BaoCaoService {
     const { ma_kho, nhom_pt, canh_bao } = filters;
     let sql = `
       SELECT 
-        tk.ma_pt, pt.ten_pt, pt.don_vi_tinh, pt.nhom_pt,
+        tk.ma_hang_hoa as ma_pt, pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh, pt.ma_nhom_hang as nhom_pt,
         tk.so_luong_ton, tk.so_luong_khoa, tk.so_luong_toi_thieu,
         k.ten_kho
-      FROM tm_phu_tung_ton_kho tk
-      JOIN tm_phu_tung pt ON tk.ma_pt = pt.ma_pt
+      FROM tm_hang_hoa_ton_kho tk
+      JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON tk.ma_kho = k.ma_kho
-      WHERE 1=1
+      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
     `;
     const params = [];
     if (ma_kho) {
@@ -54,7 +50,7 @@ class BaoCaoService {
     }
     if (nhom_pt) {
       params.push(nhom_pt);
-      sql += ` AND pt.nhom_pt = $${params.length}`;
+      sql += ` AND pt.ma_nhom_hang = $${params.length}`;
     }
     if (canh_bao === "true" || canh_bao === true) {
       sql += ` AND tk.so_luong_ton <= tk.so_luong_toi_thieu`;
@@ -65,17 +61,19 @@ class BaoCaoService {
 
   async tonKhoTongHop() {
     const sqlXe = `
-      SELECT k.ten_kho, COUNT(*) as so_luong, SUM(gia_nhap) as gia_tri
-      FROM tm_xe_thuc_te x
+      SELECT k.ten_kho, COUNT(*) as so_luong, SUM(pt.gia_von_mac_dinh) as gia_tri
+      FROM tm_hang_hoa_serial x
+      JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
-      WHERE x.trang_thai = 'TON_KHO' AND x.status = true
+      WHERE x.trang_thai = 'TON_KHO'
       GROUP BY k.ten_kho
     `;
     const sqlPT = `
-      SELECT k.ten_kho, SUM(tk.so_luong_ton) as so_luong, SUM(tk.so_luong_ton * pt.gia_nhap) as gia_tri
-      FROM tm_phu_tung_ton_kho tk
-      JOIN tm_phu_tung pt ON tk.ma_pt = pt.ma_pt
+      SELECT k.ten_kho, SUM(tk.so_luong_ton) as so_luong, SUM(tk.so_luong_ton * pt.gia_von_mac_dinh) as gia_tri
+      FROM tm_hang_hoa_ton_kho tk
+      JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON tk.ma_kho = k.ma_kho
+      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
       GROUP BY k.ten_kho
     `;
     const [xeRes, ptRes] = await Promise.all([
@@ -97,17 +95,17 @@ class BaoCaoService {
     const currentYear = nam || new Date().getFullYear();
     let sql = `
       SELECT 
-        EXTRACT(MONTH FROM ngay_ban) as thang,
+        EXTRACT(MONTH FROM ngay_hoa_don) as thang,
         COUNT(id) as so_luong_hd,
         SUM(tong_tien) as doanh_thu,
-        SUM(thanh_toan) as thuc_thu
-      FROM tm_hoa_don_ban
-      WHERE EXTRACT(YEAR FROM ngay_ban) = $1 AND trang_thai = 'DA_DUYET'
+        SUM(thanh_tien) as thuc_thu
+      FROM tm_hoa_don
+      WHERE EXTRACT(YEAR FROM ngay_hoa_don) = $1 AND trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
     `;
     const params = [currentYear];
     if (ma_kho) {
       params.push(ma_kho);
-      sql += ` AND ma_kho_xuat = $2`;
+      sql += ` AND ma_ben_xuat = $2`;
     }
     sql += ` GROUP BY thang ORDER BY thang`;
     const { rows } = await pool.query(sql, params);
@@ -121,19 +119,19 @@ class BaoCaoService {
         k.ten_kho,
         COUNT(h.id) as so_luong_hd,
         SUM(h.tong_tien) as doanh_thu,
-        SUM(h.thanh_toan) as thuc_thu
-      FROM tm_hoa_don_ban h
-      JOIN sys_kho k ON h.ma_kho_xuat = k.ma_kho
-      WHERE h.trang_thai = 'DA_DUYET'
+        SUM(h.thanh_tien) as thuc_thu
+      FROM tm_hoa_don h
+      JOIN sys_kho k ON h.ma_ben_xuat = k.ma_kho
+      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_ban >= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_ban <= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
     }
     sql += ` GROUP BY k.ten_kho`;
     const { rows } = await pool.query(sql, params);
@@ -147,34 +145,34 @@ class BaoCaoService {
 
     if (loai === "XE") {
       sql = `
-        SELECT xl.ten_loai as san_pham, COUNT(*) as so_luong, SUM(ct.thanh_tien) as doanh_thu
-        FROM tm_hoa_don_ban_ct ct
-        JOIN tm_hoa_don_ban h ON ct.ma_hd = h.so_hd
-        JOIN tm_xe_thuc_te x ON ct.xe_key = x.xe_key
-        JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-        WHERE h.trang_thai = 'DA_DUYET' AND ct.loai_hang = 'XE'
+        SELECT pt.ten_hang_hoa as san_pham, COUNT(*) as so_luong, SUM(ct.thanh_tien) as doanh_thu
+        FROM tm_hoa_don_chi_tiet ct
+        JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
+        JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
+        JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND pt.ma_nhom_hang = 'XE'
       `;
     } else {
       sql = `
-        SELECT pt.ten_pt as san_pham, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu
-        FROM tm_hoa_don_ban_ct ct
-        JOIN tm_hoa_don_ban h ON ct.ma_hd = h.so_hd
-        JOIN tm_phu_tung pt ON ct.ma_pt = pt.ma_pt
-        WHERE h.trang_thai = 'DA_DUYET' AND ct.loai_hang = 'PHU_TUNG'
+        SELECT pt.ten_hang_hoa as san_pham, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu
+        FROM tm_hoa_don_chi_tiet ct
+        JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
+        JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
       `;
     }
 
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_ban >= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_ban <= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
       params.push(ma_kho);
-      sql += ` AND h.ma_kho_xuat = $${params.length}`;
+      sql += ` AND h.ma_ben_xuat = $${params.length}`;
     }
 
     sql += ` GROUP BY san_pham ORDER BY doanh_thu DESC`;
@@ -187,19 +185,19 @@ class BaoCaoService {
     let sql = `
       SELECT 
         SUM(tong_tien) as tong_doanh_thu,
-        SUM(thanh_toan) as tong_thuc_thu,
+        SUM(thanh_tien) as tong_thuc_thu,
         COUNT(id) as tong_hoa_don
-      FROM tm_hoa_don_ban
-      WHERE trang_thai = 'DA_DUYET'
+      FROM tm_hoa_don
+      WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND ngay_ban >= $${params.length}`;
+      sql += ` AND ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ngay_ban <= $${params.length}`;
+      sql += ` AND ngay_hoa_don < ($${params.length}::date + 1)`;
     }
     const { rows } = await pool.query(sql, params);
     return rows[0];
@@ -213,15 +211,25 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho, loai_giao_dich } = filters;
     let sql = `
       SELECT 
-        ls.*, k_xuat.ten_kho as kho_xuat, k_nhap.ten_kho as kho_nhap,
-        xl.ten_loai, m.ten_mau
-      FROM tm_xe_lich_su ls
+        ls.*, 
+        COALESCE(k_xuat.ten_kho, ncc_nhap.ten_doi_tac) as kho_xuat, 
+        COALESCE(k_nhap.ten_kho, kh_ban.ten_doi_tac) as kho_nhap,
+        pt.ten_hang_hoa as ten_loai, 
+        (x.thuoc_tinh_rieng->>'ten_mau') as ten_mau
+      FROM tm_hang_hoa_lich_su ls
+      -- Determines Source (Warehouse or Supplier)
       LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
+      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
+      LEFT JOIN dm_doi_tac ncc_nhap ON po.ma_ben_xuat = ncc_nhap.ma_doi_tac
+      
+      -- Determines Destination (Warehouse or Customer)
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
-      LEFT JOIN tm_xe_thuc_te x ON ls.xe_key = x.xe_key
-      LEFT JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-      LEFT JOIN sys_mau m ON x.ma_mau = m.ma_mau
-      WHERE 1=1
+      LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
+      LEFT JOIN dm_doi_tac kh_ban ON hd.ma_ben_nhap = kh_ban.ma_doi_tac
+
+      LEFT JOIN tm_hang_hoa_serial x ON ls.ma_serial = x.ma_serial
+      JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
+      WHERE pt.ma_nhom_hang = 'XE'
     `;
     const params = [];
     if (tu_ngay) {
@@ -230,7 +238,7 @@ class BaoCaoService {
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ls.ngay_giao_dich <= $${params.length}`;
+      sql += ` AND ls.ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
       params.push(ma_kho);
@@ -249,13 +257,23 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho, ma_pt } = filters;
     let sql = `
       SELECT 
-        ls.*, k_xuat.ten_kho as kho_xuat, k_nhap.ten_kho as kho_nhap,
-        pt.ten_pt, pt.don_vi_tinh
-      FROM tm_phu_tung_lich_su ls
+        ls.*, 
+        COALESCE(k_xuat.ten_kho, ncc_nhap.ten_doi_tac) as kho_xuat, 
+        COALESCE(k_nhap.ten_kho, kh_ban.ten_doi_tac) as kho_nhap,
+        pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh
+      FROM tm_hang_hoa_lich_su ls
+      -- Determines Source
       LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
+      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
+      LEFT JOIN dm_doi_tac ncc_nhap ON po.ma_ben_xuat = ncc_nhap.ma_doi_tac
+
+      -- Determines Destination
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
-      JOIN tm_phu_tung pt ON ls.ma_pt = pt.ma_pt
-      WHERE 1=1
+      LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
+      LEFT JOIN dm_doi_tac kh_ban ON hd.ma_ben_nhap = kh_ban.ma_doi_tac
+
+      JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
+      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
     `;
     const params = [];
     if (tu_ngay) {
@@ -264,7 +282,7 @@ class BaoCaoService {
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ls.ngay_giao_dich <= $${params.length}`;
+      sql += ` AND ls.ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
       params.push(ma_kho);
@@ -272,7 +290,7 @@ class BaoCaoService {
     }
     if (ma_pt) {
       params.push(ma_pt);
-      sql += ` AND ls.ma_pt = $${params.length}`;
+      sql += ` AND ls.ma_hang_hoa = $${params.length}`;
     }
     sql += ` ORDER BY ls.ngay_giao_dich DESC`;
     const { rows } = await pool.query(sql, params);
@@ -291,32 +309,34 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho_xuat, ma_kho_nhap } = filters;
     let sql = `
       SELECT 
-        ck.so_phieu, ck.ngay_chuyen_kho, ck.trang_thai,
+        ck.so_don_hang as so_phieu, ck.ngay_dat_hang as ngay_chuyen_kho, ck.trang_thai,
         kx.ten_kho as kho_xuat, kn.ten_kho as kho_nhap,
-        ck.nguoi_tao, ck.nguoi_duyet
-      FROM tm_chuyen_kho ck
-      JOIN sys_kho kx ON ck.ma_kho_xuat = kx.ma_kho
-      JOIN sys_kho kn ON ck.ma_kho_nhap = kn.ma_kho
-      WHERE 1=1
+        u.username as nguoi_tao, u_duyet.username as nguoi_duyet
+      FROM tm_don_hang ck
+      JOIN sys_kho kx ON ck.ma_ben_xuat = kx.ma_kho
+      JOIN sys_kho kn ON ck.ma_ben_nhap = kn.ma_kho
+      LEFT JOIN sys_user u ON ck.created_by = u.id
+      LEFT JOIN sys_user u_duyet ON ck.updated_by = u_duyet.id
+      WHERE ck.loai_don_hang = 'CHUYEN_KHO'
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND ck.ngay_chuyen_kho >= $${params.length}`;
+      sql += ` AND ck.ngay_dat_hang >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ck.ngay_chuyen_kho <= $${params.length}`;
+      sql += ` AND ck.ngay_dat_hang < ($${params.length}::date + 1)`;
     }
     if (ma_kho_xuat) {
       params.push(ma_kho_xuat);
-      sql += ` AND ck.ma_kho_xuat = $${params.length}`;
+      sql += ` AND ck.ma_ben_xuat = $${params.length}`;
     }
     if (ma_kho_nhap) {
       params.push(ma_kho_nhap);
-      sql += ` AND ck.ma_kho_nhap = $${params.length}`;
+      sql += ` AND ck.ma_ben_nhap = $${params.length}`;
     }
-    sql += ` ORDER BY ck.ngay_chuyen_kho DESC`;
+    sql += ` ORDER BY ck.ngay_dat_hang DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -325,35 +345,33 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho } = filters;
     let sql = `
       SELECT 
-        ck.so_phieu, ck.ngay_chuyen_kho,
+        ck.so_don_hang as so_phieu, ck.ngay_dat_hang as ngay_chuyen_kho,
         kx.ten_kho as kho_xuat, kn.ten_kho as kho_nhap,
-        COALESCE(xl.ten_loai, pt.ten_pt) as hang_hoa,
-        COALESCE(x.so_khung, '') as so_khung,
-        COALESCE(ck_pt.so_luong, 1) as so_luong
-      FROM tm_chuyen_kho ck
-      JOIN sys_kho kx ON ck.ma_kho_xuat = kx.ma_kho
-      JOIN sys_kho kn ON ck.ma_kho_nhap = kn.ma_kho
-      LEFT JOIN tm_chuyen_kho_xe ckx ON ck.so_phieu = ckx.ma_phieu
-      LEFT JOIN tm_xe_thuc_te x ON ckx.xe_key = x.xe_key
-      LEFT JOIN tm_xe_loai xl ON x.ma_loai_xe = xl.ma_loai
-      LEFT JOIN tm_chuyen_kho_phu_tung ck_pt ON ck.so_phieu = ck_pt.ma_phieu
-      LEFT JOIN tm_phu_tung pt ON ck_pt.ma_pt = pt.ma_pt
-      WHERE 1=1
+        hh.ten_hang_hoa as hang_hoa,
+        COALESCE(x.serial_identifier, '') as so_khung,
+        ck_ct.so_luong_dat as so_luong
+      FROM tm_don_hang ck
+      JOIN sys_kho kx ON ck.ma_ben_xuat = kx.ma_kho
+      JOIN sys_kho kn ON ck.ma_ben_nhap = kn.ma_kho
+      JOIN tm_don_hang_chi_tiet ck_ct ON ck.so_don_hang = ck_ct.so_don_hang
+      JOIN tm_hang_hoa hh ON ck_ct.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN tm_hang_hoa_serial x ON (ck_ct.yeu_cau_dac_biet->>'ma_serial') = x.ma_serial
+      WHERE ck.loai_don_hang = 'CHUYEN_KHO'
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND ck.ngay_chuyen_kho >= $${params.length}`;
+      sql += ` AND ck.ngay_dat_hang >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ck.ngay_chuyen_kho <= $${params.length}`;
+      sql += ` AND ck.ngay_dat_hang < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
       params.push(ma_kho);
-      sql += ` AND (ck.ma_kho_xuat = $${params.length} OR ck.ma_kho_nhap = $${params.length})`;
+      sql += ` AND (ck.ma_ben_xuat = $${params.length} OR ck.ma_ben_nhap = $${params.length})`;
     }
-    sql += ` ORDER BY ck.ngay_chuyen_kho DESC, ck.so_phieu`;
+    sql += ` ORDER BY ck.ngay_dat_hang DESC, ck.so_don_hang`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -363,13 +381,13 @@ class BaoCaoService {
   // ============================================================
 
   async congNoNoiBo(filters = {}) {
-    const { ma_kho } = filters;
+    const { ma_kho, tu_ngay, den_ngay } = filters;
     let sql = `
       SELECT 
         cn.*,
         kx.ten_kho as kho_no,
         kn.ten_kho as kho_co
-      FROM tm_cong_no_kho cn
+      FROM tm_cong_no_noi_bo cn
       JOIN sys_kho kx ON cn.ma_kho_no = kx.ma_kho
       JOIN sys_kho kn ON cn.ma_kho_co = kn.ma_kho
       WHERE cn.con_lai > 0
@@ -377,8 +395,17 @@ class BaoCaoService {
     const params = [];
     if (ma_kho) {
       params.push(ma_kho);
-      sql += ` AND (cn.ma_kho_no = $1 OR cn.ma_kho_co = $1)`;
+      sql += ` AND (cn.ma_kho_no = $${params.length} OR cn.ma_kho_co = $${params.length})`;
     }
+    if (tu_ngay) {
+      params.push(tu_ngay);
+      sql += ` AND cn.updated_at >= $${params.length}`;
+    }
+    if (den_ngay) {
+      params.push(den_ngay);
+      sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
+    }
+    sql += ` ORDER BY cn.updated_at DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -387,29 +414,76 @@ class BaoCaoService {
     const { ma_kh, tu_ngay, den_ngay } = filters;
     let sql = `
       SELECT 
-        kh.ho_ten, kh.ma_kh,
-        SUM(h.thanh_toan) as tong_phai_tra,
-        SUM(COALESCE(tc.so_tien, 0)) as da_tra,
-        SUM(h.thanh_toan - COALESCE(tc.so_tien, 0)) as con_lai
-      FROM tm_khach_hang kh
-      JOIN tm_hoa_don_ban h ON kh.ma_kh = h.ma_kh
-      LEFT JOIN tm_thu_chi tc ON h.so_hd = tc.lien_ket_phieu AND tc.trang_thai = 'DA_DUYET'
-      WHERE h.trang_thai = 'DA_DUYET'
+        kh.ten_doi_tac as ho_ten, 
+        h.ma_ben_nhap as ma_kh,
+        SUM(h.thanh_tien) as tong_phai_tra,
+        SUM(COALESCE(p.da_tra, 0)) as da_tra,
+        SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) as con_lai
+      FROM tm_hoa_don h
+      JOIN dm_doi_tac kh ON h.ma_ben_nhap = kh.ma_doi_tac
+      LEFT JOIN (
+          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
+          FROM tm_phieu_thu_chi 
+          WHERE loai_phieu = 'THU' 
+          GROUP BY ma_hoa_don
+      ) p ON h.so_hoa_don = p.ma_hoa_don
+      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
+        AND h.loai_ben_nhap = 'DOI_TAC'
+        AND kh.loai_doi_tac IN ('KHACH_HANG', 'CA_HAI')
     `;
     const params = [];
     if (ma_kh) {
       params.push(ma_kh);
-      sql += ` AND kh.ma_kh = $${params.length}`;
+      sql += ` AND kh.ma_doi_tac = $${params.length}`;
     }
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_ban >= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_ban <= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
     }
-    sql += ` GROUP BY kh.ho_ten, kh.ma_kh HAVING SUM(h.thanh_toan - COALESCE(tc.so_tien, 0)) > 0`;
+    sql += ` GROUP BY kh.ten_doi_tac, h.ma_ben_nhap HAVING SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) > 0`;
+    const { rows } = await pool.query(sql, params);
+    return rows;
+  }
+
+  async congNoNhaCungCap(filters = {}) {
+    const { ma_ncc, tu_ngay, den_ngay } = filters;
+    let sql = `
+      SELECT 
+        ncc.ten_doi_tac as ho_ten, ncc.ma_doi_tac as ma_ncc,
+        SUM(dh.thanh_tien) as tong_phai_tra,
+        SUM(COALESCE(p.da_tra, 0)) as da_tra,
+        SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) as con_lai
+      FROM dm_doi_tac ncc
+      JOIN tm_don_hang dh ON ncc.ma_doi_tac = dh.ma_ben_xuat
+      LEFT JOIN (
+          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
+          FROM tm_phieu_thu_chi 
+          WHERE loai_phieu = 'CHI' 
+          GROUP BY ma_hoa_don
+      ) p ON dh.so_don_hang = p.ma_hoa_don
+      WHERE dh.loai_don_hang IN ('MUA_XE', 'MUA_HANG') 
+        AND dh.trang_thai IN ('DA_DUYET', 'DA_NHAP_KHO', 'HOAN_THANH')
+        AND dh.loai_ben_xuat = 'DOI_TAC'
+        AND ncc.loai_doi_tac IN ('NHA_CUNG_CAP', 'CA_HAI')
+    `;
+    const params = [];
+    if (ma_ncc) {
+      params.push(ma_ncc);
+      sql += ` AND ncc.ma_doi_tac = $${params.length}`;
+    }
+    if (tu_ngay) {
+      params.push(tu_ngay);
+      sql += ` AND dh.ngay_dat_hang >= $${params.length}`;
+    }
+    if (den_ngay) {
+      params.push(den_ngay);
+      sql += ` AND dh.ngay_dat_hang < ($${params.length}::date + 1)`;
+    }
+    sql += ` GROUP BY ncc.ten_doi_tac, ncc.ma_doi_tac HAVING SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) > 0`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -422,10 +496,10 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho, loai } = filters;
     let sql = `
       SELECT 
-        ngay_giao_dich, loai, so_tien, dien_giai, k.ten_kho, so_phieu
-      FROM tm_thu_chi tc
-      JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE tc.trang_thai = 'DA_DUYET'
+        ngay_giao_dich, loai_phieu as loai, so_tien, noi_dung as dien_giai, k.ten_kho, so_phieu_tc as so_phieu
+      FROM tm_phieu_thu_chi tc
+      LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
+      WHERE 1=1
     `;
     const params = [];
     if (tu_ngay) {
@@ -434,7 +508,7 @@ class BaoCaoService {
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ngay_giao_dich <= $${params.length}`;
+      sql += ` AND ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
       params.push(ma_kho);
@@ -442,7 +516,7 @@ class BaoCaoService {
     }
     if (loai) {
       params.push(loai);
-      sql += ` AND loai = $${params.length}`;
+      sql += ` AND loai_phieu = $${params.length}`;
     }
     sql += ` ORDER BY ngay_giao_dich DESC`;
     const { rows } = await pool.query(sql, params);
@@ -454,11 +528,11 @@ class BaoCaoService {
     let sql = `
       SELECT 
         k.ten_kho,
-        SUM(CASE WHEN loai = 'THU' THEN so_tien ELSE 0 END) as tong_thu,
-        SUM(CASE WHEN loai = 'CHI' THEN so_tien ELSE 0 END) as tong_chi
-      FROM tm_thu_chi tc
-      JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE tc.trang_thai = 'DA_DUYET'
+        SUM(CASE WHEN loai_phieu = 'THU' THEN so_tien ELSE 0 END) as tong_thu,
+        SUM(CASE WHEN loai_phieu = 'CHI' THEN so_tien ELSE 0 END) as tong_chi
+      FROM tm_phieu_thu_chi tc
+      LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
+      WHERE 1=1
     `;
     const params = [];
     if (tu_ngay) {
@@ -467,7 +541,7 @@ class BaoCaoService {
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND ngay_giao_dich <= $${params.length}`;
+      sql += ` AND ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     sql += ` GROUP BY k.ten_kho`;
     const { rows } = await pool.query(sql, params);
@@ -481,23 +555,22 @@ class BaoCaoService {
   async topKhachHang(filters = {}) {
     const { tu_ngay, den_ngay, limit = 10 } = filters;
     let sql = `
-      SELECT kh.ho_ten, COUNT(h.id) as so_luong_hd, SUM(h.thanh_toan) as tong_chi_tieu
-      FROM tm_khach_hang kh
-      JOIN tm_hoa_don_ban h ON kh.ma_kh = h.ma_kh
-      WHERE h.trang_thai = 'DA_DUYET'
+      SELECT kh.ten_doi_tac as ho_ten, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as tong_chi_tieu
+      FROM dm_doi_tac kh
+      JOIN tm_hoa_don h ON kh.ma_doi_tac = h.ma_ben_nhap
+      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND kh.loai_doi_tac IN ('KHACH_HANG', 'CA_HAI')
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_ban >= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_ban <= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don <= $${params.length}`;
     }
-    sql += ` GROUP BY kh.ho_ten ORDER BY tong_chi_tieu DESC LIMIT $${
-      params.length + 1
-    }`;
+    sql += ` GROUP BY kh.ten_doi_tac ORDER BY tong_chi_tieu DESC OVERRIDE_LIMIT`;
+    sql = sql.replace("OVERRIDE_LIMIT", `LIMIT $${params.length + 1}`);
     params.push(limit);
     const { rows } = await pool.query(sql, params);
     return rows;
@@ -506,21 +579,21 @@ class BaoCaoService {
   async lichSuMuaHang(filters = {}) {
     const { ma_kh, tu_ngay, den_ngay } = filters;
     let sql = `
-      SELECT h.so_hd, h.ngay_ban, h.thanh_toan, h.trang_thai, k.ten_kho
-      FROM tm_hoa_don_ban h
-      JOIN sys_kho k ON h.ma_kho_xuat = k.ma_kho
-      WHERE h.ma_kh = $1
+      SELECT h.so_hoa_don as so_hd, h.ngay_hoa_don as ngay_ban, h.thanh_tien as thanh_toan, h.trang_thai, k.ten_kho
+      FROM tm_hoa_don h
+      JOIN sys_kho k ON h.ma_ben_xuat = k.ma_kho
+      WHERE h.ma_ben_nhap = $1 AND h.loai_hoa_don = 'BAN_HANG'
     `;
     const params = [ma_kh];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_ban >= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_ban <= $${params.length}`;
+      sql += ` AND h.ngay_hoa_don <= $${params.length}`;
     }
-    sql += ` ORDER BY h.ngay_ban DESC`;
+    sql += ` ORDER BY h.ngay_hoa_don DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -534,28 +607,44 @@ class BaoCaoService {
     const firstDayOfMonth = new Date(
       new Date().getFullYear(),
       new Date().getMonth(),
-      1
+      1,
     )
       .toISOString()
       .split("T")[0];
 
-    const sqlRevenueToday = `SELECT SUM(thanh_toan) as total FROM tm_hoa_don_ban WHERE trang_thai = 'DA_DUYET' AND ngay_ban = $1`;
-    const sqlRevenueMonth = `SELECT SUM(thanh_toan) as total FROM tm_hoa_don_ban WHERE trang_thai = 'DA_DUYET' AND ngay_ban >= $1`;
-    const sqlStockXe = `SELECT COUNT(*) as total FROM tm_xe_thuc_te WHERE trang_thai = 'TON_KHO' AND status = true`;
+    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND ngay_hoa_don = $1`;
+    const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND ngay_hoa_don >= $1`;
+    const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'`;
     const sqlLowStockPT = `
       SELECT COUNT(*) as total 
-      FROM tm_phu_tung_ton_kho tk 
-      JOIN tm_phu_tung pt ON tk.ma_pt = pt.ma_pt 
-      WHERE tk.so_luong_ton <= tk.so_luong_toi_thieu
+      FROM tm_hang_hoa_ton_kho tk 
+      JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa 
+      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL) AND tk.so_luong_ton <= tk.so_luong_toi_thieu
     `;
-    const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_kho`;
+    const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo`;
     const sqlCustomerDebt = `
-      SELECT SUM(h.thanh_toan - COALESCE(tc.so_tien, 0)) as total
-      FROM tm_hoa_don_ban h
-      LEFT JOIN tm_thu_chi tc ON h.so_hd = tc.lien_ket_phieu AND tc.trang_thai = 'DA_DUYET'
-      WHERE h.trang_thai = 'DA_DUYET'
+      SELECT SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) as total
+      FROM tm_hoa_don h
+      LEFT JOIN (
+          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
+          FROM tm_phieu_thu_chi 
+          WHERE loai_phieu = 'THU' 
+          GROUP BY ma_hoa_don
+      ) p ON h.so_hoa_don = p.ma_hoa_don
+      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
     `;
-
+    const sqlSupplierDebt = `
+      SELECT SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) as total
+      FROM tm_don_hang dh
+      LEFT JOIN (
+          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
+          FROM tm_phieu_thu_chi 
+          WHERE loai_phieu = 'CHI' 
+          GROUP BY ma_hoa_don
+      ) p ON dh.so_don_hang = p.ma_hoa_don
+      WHERE dh.loai_don_hang IN ('MUA_XE', 'MUA_HANG')
+        AND dh.trang_thai IN ('DA_DUYET', 'DA_NHAP_KHO', 'HOAN_THANH')
+    `;
     const [
       revTodayRes,
       revMonthRes,
@@ -563,6 +652,7 @@ class BaoCaoService {
       lowStockRes,
       intDebtRes,
       custDebtRes,
+      suppDebtRes,
     ] = await Promise.all([
       pool.query(sqlRevenueToday, [today]),
       pool.query(sqlRevenueMonth, [firstDayOfMonth]),
@@ -570,6 +660,7 @@ class BaoCaoService {
       pool.query(sqlLowStockPT),
       pool.query(sqlInternalDebt),
       pool.query(sqlCustomerDebt),
+      pool.query(sqlSupplierDebt),
     ]);
 
     return {
@@ -579,6 +670,7 @@ class BaoCaoService {
       low_stock_pt: Number(lowStockRes.rows[0].total || 0),
       internal_debt: Number(intDebtRes.rows[0].total || 0),
       customer_debt: Number(custDebtRes.rows[0].total || 0),
+      supplier_debt: Number(suppDebtRes.rows[0].total || 0),
     };
   }
 
@@ -590,9 +682,9 @@ class BaoCaoService {
   async bieuDoTonKho() {
     const sql = `
       SELECT k.ten_kho, COUNT(*) as so_luong
-      FROM tm_xe_thuc_te x
+      FROM tm_hang_hoa_serial x
       JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
-      WHERE x.trang_thai = 'TON_KHO' AND x.status = true
+      WHERE x.trang_thai = 'TON_KHO'
       GROUP BY k.ten_kho
     `;
     const { rows } = await pool.query(sql);

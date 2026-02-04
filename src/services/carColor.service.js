@@ -1,8 +1,6 @@
-const { query } = require('../config/database');
+const { query } = require("../config/database");
 
 class CarColorService {
-
-
   static async getAll() {
     const result = await query(
       `
@@ -10,37 +8,37 @@ class CarColorService {
   xm.ma_loai_xe,
   xm.ma_mau,
   m.ten_mau
-FROM tm_xe_mau xm
-JOIN sys_mau m 
+FROM dm_xe_mau xm
+JOIN dm_mau m 
   ON xm.ma_mau = m.ma_mau
-JOIN tm_xe_loai xl 
-  ON xl.ma_loai = xm.ma_loai_xe
-WHERE xm.status = true;
-      `)
+JOIN tm_hang_hoa hh 
+  ON hh.ma_hang_hoa = xm.ma_loai_xe
+WHERE xm.status = true AND m.status = true;
+      `,
+    );
     return result.rows;
   }
 
   // ======================
   // LẤY MÀU THEO LOẠI XE
   // ======================
-  static async getColorsByModel(ma_loai_xe,ma_mau) {
+  static async getColorsByModel(ma_loai_xe, ma_mau) {
     const result = await query(
       `
    SELECT 
   xm.ma_loai_xe,
   xm.ma_mau,
   m.ten_mau
-FROM tm_xe_mau xm
-JOIN sys_mau m 
+FROM dm_xe_mau xm
+JOIN dm_mau m 
   ON xm.ma_mau = m.ma_mau
-JOIN tm_xe_loai xl 
-  ON xl.ma_loai = xm.ma_loai_xe
-WHERE xm.ma_loai_xe = $1
-  OR xm.ma_mau = $2
-  AND xm.status = true;
-
+JOIN tm_hang_hoa hh 
+  ON hh.ma_hang_hoa = xm.ma_loai_xe
+WHERE (xm.ma_loai_xe = $1 OR xm.ma_mau = $2)
+  AND xm.status = true
+  AND m.status = true;
       `,
-      [ma_loai_xe,ma_mau]
+      [ma_loai_xe, ma_mau],
     );
 
     return result.rows;
@@ -56,28 +54,24 @@ WHERE xm.ma_loai_xe = $1
     // 2. Check trùng
     const exists = await query(
       `
-      SELECT 1 FROM tm_xe_mau
+      SELECT 1 FROM dm_xe_mau
       WHERE ma_loai_xe=$1 AND ma_mau=$2
       `,
-      [data.ma_loai_xe, data.ma_mau]
+      [data.ma_loai_xe, data.ma_mau],
     );
 
     if (exists.rows.length) {
-      throw new Error('Màu đã được gán cho loại xe này');
+      throw new Error("Màu đã được gán cho loại xe này");
     }
 
     // 3. Insert
     const result = await query(
       `
-      INSERT INTO tm_xe_mau (ma_loai_xe, ma_mau, status)
+      INSERT INTO dm_xe_mau (ma_loai_xe, ma_mau, status)
       VALUES ($1,$2,$3)
       RETURNING *
       `,
-      [
-        data.ma_loai_xe,
-        data.ma_mau,
-        data.status ?? true,
-      ]
+      [data.ma_loai_xe, data.ma_mau, data.status ?? true],
     );
 
     return result.rows[0];
@@ -89,16 +83,16 @@ WHERE xm.ma_loai_xe = $1
   static async removeColor(ma_loai_xe, ma_mau) {
     const result = await query(
       `
-      UPDATE tm_xe_mau
-      SET status=false
+      UPDATE dm_xe_mau
+      SET status=false, updated_at = CURRENT_TIMESTAMP
       WHERE ma_loai_xe=$1 AND ma_mau=$2
       RETURNING *
       `,
-      [ma_loai_xe, ma_mau]
+      [ma_loai_xe, ma_mau],
     );
 
     if (!result.rows.length) {
-      throw new Error('Không tìm thấy mapping màu xe');
+      throw new Error("Không tìm thấy mapping màu xe");
     }
 
     return result.rows[0];
@@ -110,23 +104,23 @@ WHERE xm.ma_loai_xe = $1
   static async validateForeignKeys(data) {
     const checks = [
       {
-        table: 'tm_xe_loai',
-        column: 'ma_loai',
+        table: "tm_hang_hoa",
+        column: "ma_hang_hoa",
         value: data.ma_loai_xe,
-        msg: 'Loại xe không tồn tại',
+        msg: "Loại xe không tồn tại",
       },
       {
-        table: 'sys_mau',
-        column: 'ma_mau',
+        table: "dm_mau",
+        column: "ma_mau",
         value: data.ma_mau,
-        msg: 'Màu xe không tồn tại',
+        msg: "Màu xe không tồn tại",
       },
     ];
 
     for (const c of checks) {
       const r = await query(
         `SELECT 1 FROM ${c.table} WHERE ${c.column}=$1 AND status=true`,
-        [c.value]
+        [c.value],
       );
       if (!r.rows.length) throw new Error(c.msg);
     }

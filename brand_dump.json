@@ -1,0 +1,20 @@
+[
+  {
+    "ma_nhom": "Phanh",
+    "ten_nhom": "Hệ thống Phanh",
+    "ma_nhom_cha": "PT",
+    "status": true
+  },
+  {
+    "ma_nhom": "LOP",
+    "ten_nhom": "Lop",
+    "ma_nhom_cha": "XE",
+    "status": true
+  },
+  {
+    "ma_nhom": "NH0002",
+    "ten_nhom": "TestPart_Phanh",
+    "ma_nhom_cha": "PT",
+    "status": false
+  }
+]

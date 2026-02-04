@@ -1,6 +1,7 @@
 const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
 const PhuTung = require("../models/PhuTung");
+const CongNoService = require("./congNo.service");
 
 class ChuyenKhoService {
   /* =====================================================
@@ -22,27 +23,30 @@ class ChuyenKhoService {
 
     const result = await pool.query(
       `
-      INSERT INTO tm_chuyen_kho (
-        so_phieu,
-        ngay_chuyen_kho,
-        ma_kho_xuat,
-        ma_kho_nhap,
-        nguoi_tao,
-        dien_giai,
-        trang_thai
+      INSERT INTO tm_don_hang (
+        so_don_hang,
+        ngay_dat_hang,
+        ma_ben_xuat,
+        loai_ben_xuat,
+        ma_ben_nhap,
+        loai_ben_nhap,
+        loai_don_hang,
+        trang_thai,
+        created_by,
+        ghi_chu
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      RETURNING *
+      VALUES ($1,$2,$3,'KHO',$4,'KHO','CHUYEN_KHO',$5,$6,$7)
+      RETURNING *, so_don_hang as so_phieu
       `,
       [
         so_phieu,
         ngay_chuyen_kho,
         ma_kho_xuat,
         ma_kho_nhap,
+        "NHAP",
         nguoi_tao,
         dien_giai,
-        TRANG_THAI.NHAP,
-      ]
+      ],
     );
 
     return result.rows[0];
@@ -57,15 +61,15 @@ class ChuyenKhoService {
     try {
       await client.query("BEGIN");
 
-      /* 1. Khóa phiếu */
+      /* 1. Lấy thông tin phiếu */
       const phieuRes = await client.query(
         `
-        SELECT so_phieu, ma_kho_xuat, trang_thai
-        FROM tm_chuyen_kho
-        WHERE so_phieu = $1
+        SELECT so_don_hang as so_phieu, ma_ben_xuat as ma_kho_xuat, trang_thai
+        FROM tm_don_hang
+        WHERE so_don_hang = $1
         FOR UPDATE
         `,
-        [so_phieu]
+        [so_phieu],
       );
 
       if (phieuRes.rowCount === 0) {
@@ -74,19 +78,20 @@ class ChuyenKhoService {
 
       const phieu = phieuRes.rows[0];
 
-      if (phieu.trang_thai !== TRANG_THAI.NHAP) {
-        throw new Error("Chỉ được thêm xe khi phiếu ở trạng thái NHAP");
+      if (phieu.trang_thai !== "NHAP") {
+        throw new Error("Chỉ được thêm mặt hàng khi phiếu ở trạng thái NHAP");
       }
 
-      /* 2. Khóa xe */
+      /* 2. Kiểm tra xe */
       const xeRes = await client.query(
         `
-        SELECT xe_key, ma_kho_hien_tai, trang_thai, locked,gia_nhap
-        FROM tm_xe_thuc_te
-        WHERE xe_key = $1
+        SELECT s.ma_serial, s.ma_hang_hoa, s.ma_kho_hien_tai, s.trang_thai, s.locked, 
+               COALESCE(s.gia_von, (SELECT gia_von_mac_dinh FROM tm_hang_hoa WHERE ma_hang_hoa = s.ma_hang_hoa), 0) as gia_nhap
+        FROM tm_hang_hoa_serial s
+        WHERE s.ma_serial = $1
         FOR UPDATE
         `,
-        [data.xe_key]
+        [data.xe_key],
       );
 
       if (xeRes.rowCount === 0) {
@@ -111,51 +116,46 @@ class ChuyenKhoService {
       const sttRes = await client.query(
         `
         SELECT COALESCE(MAX(stt),0) + 1 AS stt
-        FROM tm_chuyen_kho_xe
-        WHERE ma_phieu = $1
+        FROM tm_don_hang_chi_tiet
+        WHERE so_don_hang = $1
         `,
-        [so_phieu]
+        [so_phieu],
       );
 
       const stt = sttRes.rows[0].stt;
 
-      /* 4. Ghi chi tiết xe */
+      /* 4. Ghi chi tiết (unified) */
       await client.query(
         `
-        INSERT INTO tm_chuyen_kho_xe (
-          ma_phieu,
+        INSERT INTO tm_don_hang_chi_tiet (
+          so_don_hang,
           stt,
-          xe_key,
-          ma_loai_xe,
-          ma_mau,
-          so_may,
-          gia_tri_chuyen_kho,
-          trang_thai
+          ma_hang_hoa,
+          so_luong_dat,
+          don_gia,
+          yeu_cau_dac_biet
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,'CHO_XUAT')
+        VALUES ($1,$2,$3,1,$4,$5)
         `,
         [
           so_phieu,
           stt,
-          xe.xe_key,
-          data.ma_loai_xe,
-          data.ma_mau,
-          data.so_may,
+          xe.ma_hang_hoa,
           xe.gia_nhap,
-        ]
+          JSON.stringify({ ma_serial: xe.ma_serial }),
+        ],
       );
 
       /* 5. Khóa xe */
       await client.query(
         `
-        UPDATE tm_xe_thuc_te
+        UPDATE tm_hang_hoa_serial
         SET trang_thai = 'DANG_CHUYEN',
             locked = TRUE,
-            locked_reason = 'CHUYEN_KHO',
-            locked_at = NOW()
-        WHERE xe_key = $1
+            ghi_chu = COALESCE(ghi_chu, '') || E'\nĐang chuyển theo phiếu: ' || $1
+        WHERE ma_serial = $2
         `,
-        [xe.xe_key]
+        [so_phieu, xe.ma_serial],
       );
 
       await client.query("COMMIT");
@@ -179,24 +179,23 @@ class ChuyenKhoService {
 
       const phieuRes = await client.query(
         `
-        SELECT trang_thai, ma_kho_xuat
-        FROM tm_chuyen_kho
-        WHERE so_phieu = $1
+        SELECT so_don_hang as so_phieu, ma_ben_xuat as ma_kho_xuat, trang_thai
+        FROM tm_don_hang
+        WHERE so_don_hang = $1
         FOR UPDATE
         `,
-        [so_phieu]
+        [so_phieu],
       );
 
       if (phieuRes.rowCount === 0) {
         throw new Error("Phiếu không tồn tại");
       }
 
-      if (phieuRes.rows[0].trang_thai !== TRANG_THAI.NHAP) {
-        throw new Error("Không thể thêm phụ tùng khi phiếu đã gửi duyệt");
+      if (phieuRes.rows[0].trang_thai !== "NHAP") {
+        throw new Error("Không thể thêm mặt hàng khi phiếu đã gửi duyệt");
       }
 
-      const { ma_pt, ten_pt, don_vi_tinh, so_luong, don_gia } = chi_tiet;
-      const thanh_tien = so_luong * don_gia;
+      const { ma_pt, so_luong, don_gia } = chi_tiet;
 
       await PhuTung.lock(
         client,
@@ -205,40 +204,106 @@ class ChuyenKhoService {
         so_phieu,
         "CHUYEN_KHO",
         so_luong,
-        `Chuyển kho ${so_phieu}`
+        `Chuyển kho ${so_phieu}`,
       );
 
       const sttRes = await client.query(
         `
         SELECT COALESCE(MAX(stt),0)+1 AS stt
-        FROM tm_chuyen_kho_phu_tung
-        WHERE ma_phieu = $1
+        FROM tm_don_hang_chi_tiet
+        WHERE so_don_hang = $1
         `,
-        [so_phieu]
+        [so_phieu],
       );
 
       await client.query(
         `
-        INSERT INTO tm_chuyen_kho_phu_tung (
-          ma_phieu, stt, ma_pt, ten_pt,
-          don_vi_tinh, so_luong, don_gia, thanh_tien
+        INSERT INTO tm_don_hang_chi_tiet (
+          so_don_hang, stt, ma_hang_hoa, so_luong_dat, don_gia
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        VALUES ($1,$2,$3,$4,$5)
         `,
-        [
-          so_phieu,
-          sttRes.rows[0].stt,
-          ma_pt,
-          ten_pt,
-          don_vi_tinh,
-          so_luong,
-          don_gia,
-          thanh_tien,
-        ]
+        [so_phieu, sttRes.rows[0].stt, ma_pt, so_luong, don_gia],
       );
 
       await client.query("COMMIT");
       return { success: true };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /* =====================================================
+   * TỪ CHỐI / HỦY PHIẾU
+   * ===================================================== */
+  async tuChoiDuyet(so_phieu, nguoi_huy, ly_do) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      /* 1. Kiểm tra phiếu */
+      const phieuRes = await client.query(
+        "SELECT * FROM tm_don_hang WHERE so_don_hang = $1 FOR UPDATE",
+        [so_phieu],
+      );
+
+      if (phieuRes.rowCount === 0) {
+        throw new Error("Phiếu không tồn tại");
+      }
+
+      const phieu = phieuRes.rows[0];
+
+      // Check lịch sử để đảm bảo chưa xuất kho thật (hoặc cho phép hủy phiếu kẹt DA_DUYET)
+      const lichSuRes = await client.query(
+        "SELECT 1 FROM tm_hang_hoa_lich_su WHERE so_chung_tu = $1 LIMIT 1",
+        [so_phieu],
+      );
+
+      const allowed =
+        ["NHAP", "GUI_DUYET"].includes(phieu.trang_thai) ||
+        (phieu.trang_thai === "DA_DUYET" && lichSuRes.rowCount === 0);
+
+      if (!allowed) {
+        throw new Error("Không thể hủy phiếu đã hoàn thành kho");
+      }
+
+      /* 2. Unlock Phụ tùng */
+      await PhuTung.unlock(client, so_phieu);
+
+      /* 3. Unlock Xe */
+      const chiTietRes = await client.query(
+        "SELECT yeu_cau_dac_biet FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1",
+        [so_phieu],
+      );
+
+      for (const ct of chiTietRes.rows) {
+        const ma_serial = ct.yeu_cau_dac_biet?.ma_serial;
+        if (ma_serial) {
+          await client.query(
+            `UPDATE tm_hang_hoa_serial 
+                  SET locked = FALSE, 
+                      trang_thai = 'TON_KHO',
+                      ghi_chu = REPLACE(ghi_chu, E'\nĐang chuyển theo phiếu: ' || $1, '')
+                  WHERE ma_serial = $2`,
+            [so_phieu, ma_serial],
+          );
+        }
+      }
+
+      /* 4. Update trạng thái */
+      await client.query(
+        `UPDATE tm_don_hang 
+           SET trang_thai = 'DA_HUY', 
+               ghi_chu = COALESCE(ghi_chu,'') || ' | Hủy bởi: ' || $2 || ', Lý do: ' || $3
+           WHERE so_don_hang = $1`,
+        [so_phieu, nguoi_huy, ly_do],
+      );
+
+      await client.query("COMMIT");
+      return { success: true, message: "Hủy phiếu thành công" };
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -253,15 +318,15 @@ class ChuyenKhoService {
   async guiDuyet(so_phieu, nguoi_gui) {
     const result = await pool.query(
       `
-      UPDATE tm_chuyen_kho
-      SET trang_thai = $1,
+      UPDATE tm_don_hang
+      SET trang_thai = 'GUI_DUYET',
           nguoi_gui = $2,
           ngay_gui = NOW()
-      WHERE so_phieu = $3
-        AND trang_thai = $4
+      WHERE so_don_hang = $1
+        AND trang_thai = 'NHAP'
       RETURNING *
       `,
-      [TRANG_THAI.GUI_DUYET, nguoi_gui, so_phieu, TRANG_THAI.NHAP]
+      [so_phieu, nguoi_gui],
     );
 
     if (result.rowCount === 0) {
@@ -272,7 +337,7 @@ class ChuyenKhoService {
   }
 
   /* =====================================================
-   * DUYỆT CHUYỂN KHO (XE + PHỤ TÙNG)
+   * DUYỆT CHUYỂN KHO (Phát sinh phiếu kho và lịch sử)
    * ===================================================== */
   async pheDuyet(so_phieu, nguoi_duyet) {
     const client = await pool.connect();
@@ -280,17 +345,14 @@ class ChuyenKhoService {
     try {
       await client.query("BEGIN");
 
-      /* =====================================================
-       * 1. KHÓA PHIẾU VÀ KIỂM TRA
-       * ===================================================== */
       const phieuRes = await client.query(
         `
-        SELECT so_phieu, ma_kho_xuat, ma_kho_nhap, trang_thai
-        FROM tm_chuyen_kho
-        WHERE so_phieu = $1
+        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai
+        FROM tm_don_hang
+        WHERE so_don_hang = $1
         FOR UPDATE
         `,
-        [so_phieu]
+        [so_phieu],
       );
 
       if (phieuRes.rowCount === 0) {
@@ -299,248 +361,23 @@ class ChuyenKhoService {
 
       const phieu = phieuRes.rows[0];
 
-      if (phieu.trang_thai !== TRANG_THAI.GUI_DUYET) {
-        throw new Error("Phiếu chưa ở trạng thái gửi duyệt");
-      }
-
-      let tong_gia_tri_xe = 0;
-      let tong_gia_tri_pt = 0;
-
-      /* =====================================================
-       * 2. XỬ LÝ XE
-       * ===================================================== */
-      const xeRes = await client.query(
-        `
-        SELECT xe_key, gia_tri_chuyen_kho
-        FROM tm_chuyen_kho_xe
-        WHERE ma_phieu = $1
-        FOR UPDATE
-        `,
-        [so_phieu]
-      );
-
-      for (const xe of xeRes.rows) {
-        // Cộng tổng giá trị
-        tong_gia_tri_xe += Number(xe.gia_tri_chuyen_kho || 0);
-
-        // 2.1. Cập nhật xe thực tế
-        await client.query(
-          `
-          UPDATE tm_xe_thuc_te
-          SET ma_kho_hien_tai = $1,
-              trang_thai = 'TON_KHO',
-              locked = FALSE,
-              locked_reason = NULL,
-              locked_at = NULL
-          WHERE xe_key = $2
-          `,
-          [phieu.ma_kho_nhap, xe.xe_key]
-        );
-
-        // 2.2. Cập nhật trạng thái chi tiết xe
-        await client.query(
-          `
-          UPDATE tm_chuyen_kho_xe
-          SET trang_thai = 'DA_CHUYEN'
-          WHERE ma_phieu = $1 AND xe_key = $2
-          `,
-          [so_phieu, xe.xe_key]
-        );
-
-        // 2.3. Ghi lịch sử xe (Nếu cần, nhưng ERD đã có tm_xe_lich_su, ta nên insert vào đó)
-        await client.query(
-          `
-            INSERT INTO tm_xe_lich_su (
-                xe_key, loai_giao_dich, so_chung_tu, ngay_giao_dich,
-                ma_kho_xuat, ma_kho_nhap, gia_tri, nguoi_thuc_hien
-            )
-            VALUES ($1, 'CHUYEN_KHO', $2, NOW(), $3, $4, $5, $6)
-            `,
-          [
-            xe.xe_key,
-            so_phieu,
-            phieu.ma_kho_xuat,
-            phieu.ma_kho_nhap,
-            xe.gia_tri_chuyen_kho,
-            nguoi_duyet,
-          ]
+      if (phieu.trang_thai !== "GUI_DUYET") {
+        throw new Error(
+          "Chỉ được duyệt phiếu đang ở trạng thái chờ duyệt (GUI_DUYET)",
         );
       }
 
-      /* =====================================================
-       * 3. XỬ LÝ PHỤ TÙNG
-       * ===================================================== */
-      const ptRes = await client.query(
-        `
-        SELECT ma_pt, so_luong, don_gia, thanh_tien
-        FROM tm_chuyen_kho_phu_tung
-        WHERE ma_phieu = $1
-        FOR UPDATE
-        `,
-        [so_phieu]
-      );
-
-      for (const pt of ptRes.rows) {
-        // Cộng tổng giá trị
-        tong_gia_tri_pt += Number(pt.thanh_tien || 0);
-
-        /* 3.1. Trừ tồn kho kho xuất */
-        await client.query(
-          `
-          UPDATE tm_phu_tung_ton_kho
-          SET so_luong = so_luong - $1,
-              so_luong_khoa = so_luong_khoa - $1
-          WHERE ma_pt = $2 AND ma_kho = $3
-          `,
-          [pt.so_luong, pt.ma_pt, phieu.ma_kho_xuat]
-        );
-
-        /* 3.2. Cộng tồn kho kho nhập */
-        // Kiểm tra xem đã có record tồn kho chưa
-        const checkTonKho = await client.query(
-          `SELECT id FROM tm_phu_tung_ton_kho WHERE ma_pt = $1 AND ma_kho = $2`,
-          [pt.ma_pt, phieu.ma_kho_nhap]
-        );
-
-        if (checkTonKho.rowCount > 0) {
-          await client.query(
-            `UPDATE tm_phu_tung_ton_kho SET so_luong = so_luong + $1 WHERE ma_pt = $2 AND ma_kho = $3`,
-            [pt.so_luong, pt.ma_pt, phieu.ma_kho_nhap]
-          );
-        } else {
-          await client.query(
-            `INSERT INTO tm_phu_tung_ton_kho (ma_pt, ma_kho, so_luong, so_luong_khoa, so_luong_kha_dung, so_luong_toi_thieu, ngay_cap_nhat)
-                 VALUES ($1, $2, $3, 0, $3, 0, NOW())`,
-            [pt.ma_pt, phieu.ma_kho_nhap, pt.so_luong]
-          );
-        }
-
-        /* 3.3. Unlock phụ tùng (Xóa record trong tm_phu_tung_khoa) */
-        // Lưu ý: PhuTung.unlock có thể cần chỉnh sửa để phù hợp logic mới, nhưng ở đây ta gọi trực tiếp SQL cho chắc chắn
-        await client.query(
-          `DELETE FROM tm_phu_tung_khoa WHERE ma_pt = $1 AND ma_kho = $2 AND so_phieu = $3`,
-          [pt.ma_pt, phieu.ma_kho_xuat, so_phieu]
-        );
-
-        /* 3.4. Cập nhật trạng thái chi tiết phụ tùng */
-        await client.query(
-          `
-          UPDATE tm_chuyen_kho_phu_tung
-          SET trang_thai = 'DA_CHUYEN'
-          WHERE ma_phieu = $1 AND ma_pt = $2
-          `,
-          [so_phieu, pt.ma_pt]
-        );
-
-        // 3.5. Ghi lịch sử phụ tùng
-        await client.query(
-          `
-            INSERT INTO tm_phu_tung_lich_su (
-                ma_pt, loai_giao_dich, so_chung_tu, ngay_giao_dich,
-                ma_kho_xuat, ma_kho_nhap, so_luong, don_gia, thanh_tien
-            )
-            VALUES ($1, 'CHUYEN_KHO', $2, NOW(), $3, $4, $5, $6, $7)
-            `,
-          [
-            pt.ma_pt,
-            so_phieu,
-            phieu.ma_kho_xuat,
-            phieu.ma_kho_nhap,
-            pt.so_luong,
-            pt.don_gia,
-            pt.thanh_tien,
-          ]
-        );
-      }
-
-      /* =====================================================
-       * 4. TẠO PHIẾU XUẤT / NHẬP KHO & CÔNG NỢ
-       * ===================================================== */
-      const tong_gia_tri = tong_gia_tri_xe + tong_gia_tri_pt;
-
-      // Tạo mã phiếu xuất/nhập dựa trên số phiếu chuyển (Simplify)
-      const so_phieu_xuat = `PX-${so_phieu}`;
-      const so_phieu_nhap = `PN-${so_phieu}`;
-
-      // 4.1. Tạo Phiếu Xuất
       await client.query(
-        `
-          INSERT INTO tm_phieu_xuat_kho (
-              so_phieu, ngay_xuat, ma_kho, loai_phieu, 
-              so_phieu_chuyen_kho, nguoi_xuat, tong_gia_tri
-          ) VALUES ($1, NOW(), $2, 'XUAT_CHUYEN_KHO', $3, $4, $5)
-          `,
-        [so_phieu_xuat, phieu.ma_kho_xuat, so_phieu, nguoi_duyet, tong_gia_tri]
-      );
-
-      // 4.2. Tạo Phiếu Nhập
-      await client.query(
-        `
-          INSERT INTO tm_phieu_nhap_kho (
-              so_phieu, ngay_nhap, ma_kho, loai_phieu,
-              so_phieu_chuyen_kho, nguoi_nhan, tong_gia_tri
-          ) VALUES ($1, NOW(), $2, 'NHAP_CHUYEN_KHO', $3, $4, $5)
-          `,
-        [so_phieu_nhap, phieu.ma_kho_nhap, so_phieu, nguoi_duyet, tong_gia_tri]
-      );
-
-      // 4.3. Ghi nhận Công Nợ (Kho Nhập nợ Kho Xuất)
-      // Thêm chi tiết công nợ
-      await client.query(
-        `
-          INSERT INTO tm_cong_no_chi_tiet (
-              so_phieu_chuyen_kho, ma_kho_no, ma_kho_co,
-              ngay_phat_sinh, so_tien, da_thanh_toan, con_lai,
-              trang_thai, han_thanh_toan, ghi_chu
-          ) VALUES ($1, $2, $3, NOW(), $4, 0, $4, 'CHUA_TT', NULL, 'Phát sinh từ chuyển kho')
-          `,
-        [so_phieu, phieu.ma_kho_nhap, phieu.ma_kho_xuat, tong_gia_tri]
-      );
-
-      // Cập nhật tổng công nợ (tm_cong_no_kho)
-      // Upsert: Nếu chưa có thì insert, có rồi thì update
-      await client.query(
-        `
-          INSERT INTO tm_cong_no_kho (ma_kho_no, ma_kho_co, tong_no, tong_da_tra, con_lai, ngay_cap_nhat)
-          VALUES ($1, $2, $3, 0, $3, NOW())
-          ON CONFLICT (ma_kho_no, ma_kho_co)
-          DO UPDATE SET 
-              tong_no = tm_cong_no_kho.tong_no + EXCLUDED.tong_no,
-              con_lai = tm_cong_no_kho.con_lai + EXCLUDED.con_lai,
-              ngay_cap_nhat = NOW()
-          `,
-        [phieu.ma_kho_nhap, phieu.ma_kho_xuat, tong_gia_tri]
-      );
-
-      /* =====================================================
-       * 5. CẬP NHẬT TRẠNG THÁI PHIẾU CHUYỂN
-       * ===================================================== */
-      await client.query(
-        `
-        UPDATE tm_chuyen_kho
-        SET trang_thai = $1,
-            nguoi_duyet = $2,
-            ngay_duyet = NOW(),
-            so_phieu_xuat = $3,
-            so_phieu_nhap = $4
-        WHERE so_phieu = $5
-        `,
-        [
-          TRANG_THAI.DA_DUYET,
-          nguoi_duyet,
-          so_phieu_xuat,
-          so_phieu_nhap,
-          so_phieu,
-        ]
+        `UPDATE tm_don_hang 
+         SET trang_thai = 'DA_DUYET', 
+             nguoi_duyet = $2, 
+             ngay_duyet = NOW()
+         WHERE so_don_hang = $1`,
+        [so_phieu, nguoi_duyet],
       );
 
       await client.query("COMMIT");
-      return {
-        success: true,
-        message: "Duyệt chuyển kho thành công",
-        so_phieu_xuat,
-        so_phieu_nhap,
-      };
+      return { success: true, message: "Duyệt phiếu thành công" };
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -548,23 +385,24 @@ class ChuyenKhoService {
       client.release();
     }
   }
-  async tuChoiDuyet(so_phieu, nguoi_tu_choi, ly_do) {
-    const client = await pool.connect();
 
+  /* =====================================================
+   * NHẬP KHO (Thực hiện chuyển đổi hàng hóa - Hỗ trợ nhập nhiều lần)
+   * ===================================================== */
+  async nhapKho(so_phieu, nguoi_nhap, danh_sach_nhap) {
+    const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      /* =====================================================
-       * 1. KHÓA PHIẾU
-       * ===================================================== */
+      /* 1. Kiểm tra phiếu */
       const phieuRes = await client.query(
         `
-      SELECT so_phieu, ma_kho_xuat, trang_thai
-      FROM tm_chuyen_kho
-      WHERE so_phieu = $1
-      FOR UPDATE
-      `,
-        [so_phieu]
+        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai
+        FROM tm_don_hang
+        WHERE so_don_hang = $1
+        FOR UPDATE
+        `,
+        [so_phieu],
       );
 
       if (phieuRes.rowCount === 0) {
@@ -573,97 +411,210 @@ class ChuyenKhoService {
 
       const phieu = phieuRes.rows[0];
 
-      if (phieu.trang_thai !== TRANG_THAI.GUI_DUYET) {
-        throw new Error("Phiếu không ở trạng thái gửi duyệt");
+      // Cho phép nhập khi DA_DUYET (có thể nhập nhiều lần)
+      if (phieu.trang_thai !== "DA_DUYET") {
+        throw new Error("Chỉ được nhập kho phiếu đã được duyệt");
       }
 
-      /* =====================================================
-       * 2. HOÀN TÁC XE
-       * ===================================================== */
-      const xeRes = await client.query(
-        `
-      SELECT xe_key
-      FROM tm_chuyen_kho_xe
-      WHERE ma_phieu = $1
-      FOR UPDATE
-      `,
-        [so_phieu]
+      /* 2. Lấy tất cả chi tiết */
+      const chiTietRes = await client.query(
+        `SELECT * FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1 FOR UPDATE`,
+        [so_phieu],
       );
 
-      for (const xe of xeRes.rows) {
-        // 2.1. Mở khóa xe, đưa về tồn kho kho xuất
+      const chiTietMap = new Map(chiTietRes.rows.map((ct) => [ct.stt, ct]));
+
+      /* 3. Xử lý từng item trong danh sách nhập */
+      for (const item of danh_sach_nhap) {
+        const ct = chiTietMap.get(item.stt);
+        if (!ct) {
+          throw new Error(`Không tìm thấy chi tiết STT ${item.stt}`);
+        }
+
+        const so_luong_con_lai = ct.so_luong_dat - (ct.so_luong_da_giao || 0);
+
+        if (so_luong_con_lai <= 0) {
+          throw new Error(`STT ${item.stt}: Đã nhập đủ số lựợng`);
+        }
+
+        if (item.so_luong_nhap > so_luong_con_lai) {
+          throw new Error(
+            `STT ${item.stt}: Số lượng nhập (${item.so_luong_nhap}) vượt quá số lượng còn lại (${so_luong_con_lai})`,
+          );
+        }
+
+        const ma_serial = item.ma_serial || ct.yeu_cau_dac_biet?.ma_serial;
+
+        if (ma_serial) {
+          // Xử lý xe (phải nhập đúng 1 chiếc)
+          if (item.so_luong_nhap !== 1) {
+            throw new Error("Mỗi lần chỉ nhập được 1 xe");
+          }
+
+          // Kiểm tra xe
+          const xeCheck = await client.query(
+            `SELECT ma_kho_hien_tai, locked FROM tm_hang_hoa_serial WHERE ma_serial = $1`,
+            [ma_serial],
+          );
+
+          if (xeCheck.rowCount === 0) {
+            throw new Error(`Xe ${ma_serial} không tồn tại`);
+          }
+
+          if (xeCheck.rows[0].ma_kho_hien_tai !== phieu.ma_kho_xuat) {
+            throw new Error(`Xe ${ma_serial} không thuộc kho xuất`);
+          }
+
+          // Chuyển xe
+          await client.query(
+            `UPDATE tm_hang_hoa_serial
+             SET ma_kho_hien_tai = $1,
+                 trang_thai = 'TON_KHO',
+                 locked = FALSE,
+                 updated_at = NOW()
+             WHERE ma_serial = $2`,
+            [phieu.ma_kho_nhap, ma_serial],
+          );
+
+          // Ghi lịch sử
+          await client.query(
+            `INSERT INTO tm_hang_hoa_lich_su (
+                ma_hang_hoa, ma_serial, loai_giao_dich, so_chung_tu, ngay_giao_dich,
+                ma_kho_xuat, ma_kho_nhap, so_luong, don_gia, thanh_tien, nguoi_thuc_hien
+            )
+            VALUES ($1, $2, 'CHUYEN_KHO', $3, NOW(), $4, $5, -1, $6, $6, $7)`,
+            [
+              ct.ma_hang_hoa,
+              ma_serial,
+              so_phieu,
+              phieu.ma_kho_xuat,
+              phieu.ma_kho_nhap,
+              ct.don_gia,
+              nguoi_nhap,
+            ],
+          );
+        } else {
+          // Xử lý phụ tùng
+          const so_luong_nhap = item.so_luong_nhap;
+
+          // Trừ kho xuất
+          await client.query(
+            `UPDATE tm_hang_hoa_ton_kho
+             SET so_luong_ton = so_luong_ton - $1,
+                 so_luong_khoa = so_luong_khoa - $1,
+                 updated_at = NOW()
+             WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
+            [so_luong_nhap, ct.ma_hang_hoa, phieu.ma_kho_xuat],
+          );
+
+          // Cộng kho nhập
+          await client.query(
+            `INSERT INTO tm_hang_hoa_ton_kho (ma_hang_hoa, ma_kho, so_luong_ton, so_luong_khoa, so_luong_toi_thieu, updated_at)
+             VALUES ($1, $2, $3, 0, 0, NOW())
+             ON CONFLICT (ma_hang_hoa, ma_kho) DO UPDATE SET 
+             so_luong_ton = tm_hang_hoa_ton_kho.so_luong_ton + EXCLUDED.so_luong_ton,
+             updated_at = NOW()`,
+            [ct.ma_hang_hoa, phieu.ma_kho_nhap, so_luong_nhap],
+          );
+
+          // Ghi lịch sử
+          const thanh_tien = so_luong_nhap * ct.don_gia;
+          await client.query(
+            `INSERT INTO tm_hang_hoa_lich_su (
+                ma_hang_hoa, loai_giao_dich, so_chung_tu, ngay_giao_dich,
+                ma_kho_xuat, ma_kho_nhap, so_luong, don_gia, thanh_tien, nguoi_thuc_hien
+            )
+            VALUES ($1, 'CHUYEN_KHO', $2, NOW(), $3, $4, $5, $6, $7, $8)`,
+            [
+              ct.ma_hang_hoa,
+              so_phieu,
+              phieu.ma_kho_xuat,
+              phieu.ma_kho_nhap,
+              -so_luong_nhap,
+              ct.don_gia,
+              -thanh_tien,
+              nguoi_nhap,
+            ],
+          );
+        }
+
+        // Cập nhật số lượng đã giao
         await client.query(
-          `
-        UPDATE tm_xe_thuc_te
-        SET trang_thai = 'TON_KHO',
-            locked = FALSE,
-            locked_reason = NULL,
-            locked_at = NULL,
-            locked_by=NULL
-        WHERE xe_key = $1
-        `,
-          [xe.xe_key]
+          `UPDATE tm_don_hang_chi_tiet 
+           SET so_luong_da_giao = COALESCE(so_luong_da_giao, 0) + $1
+           WHERE so_don_hang = $2 AND stt = $3`,
+          [item.so_luong_nhap, so_phieu, item.stt],
         );
 
-        // 2.2. Cập nhật trạng thái chi tiết xe
-        await client.query(
-          `
-        UPDATE tm_chuyen_kho_xe
-        SET trang_thai = 'TU_CHOI'
-        WHERE ma_phieu = $1 AND xe_key = $2
-        `,
-          [so_phieu, xe.xe_key]
-        );
+        // Cập nhật số lượng trong Memory để loop sau (nếu có trùng STT) thấy được
+        ct.so_luong_da_giao = (ct.so_luong_da_giao || 0) + item.so_luong_nhap;
       }
 
-      /* =====================================================
-       * 3. HOÀN TÁC PHỤ TÙNG
-       * ===================================================== */
-      const ptRes = await client.query(
-        `
-      SELECT ma_pt
-      FROM tm_chuyen_kho_phu_tung
-      WHERE ma_phieu = $1
-      FOR UPDATE
-      `,
-        [so_phieu]
-      );
+      // Unlock phụ tùng đã nhập đủ
+      for (const item of danh_sach_nhap) {
+        const ct = chiTietMap.get(item.stt);
+        const so_luong_da_giao_moi =
+          (ct.so_luong_da_giao || 0) + item.so_luong_nhap;
 
-      for (const pt of ptRes.rows) {
-        await PhuTung.unlock(
-          pt.ma_pt,
-          phieu.ma_kho_xuat,
-          so_phieu,
-          "CHUYEN_KHO"
-        );
-
-        await client.query(
-          `
-        UPDATE tm_chuyen_kho_phu_tung
-        SET trang_thai = 'TU_CHOI'
-        WHERE ma_phieu = $1 AND ma_pt = $2
-        `,
-          [so_phieu, pt.ma_pt]
-        );
+        if (
+          so_luong_da_giao_moi >= ct.so_luong_dat &&
+          !ct.yeu_cau_dac_biet?.ma_serial
+        ) {
+          // Unlock phụ tùng đã nhập đủ
+          await client.query(
+            `DELETE FROM tm_hang_hoa_khoa WHERE ma_hang_hoa = $1 AND ma_kho = $2 AND so_phieu = $3`,
+            [ct.ma_hang_hoa, phieu.ma_kho_xuat, so_phieu],
+          );
+        }
       }
 
-      /* =====================================================
-       * 4. CẬP NHẬT PHIẾU
-       * ===================================================== */
-      await client.query(
-        `
-      UPDATE tm_chuyen_kho
-      SET trang_thai = $1,
-          nguoi_duyet = $2,
-          dien_giai = $3,
-          ngay_duyet = NOW()
-      WHERE so_phieu = $4
-      `,
-        [TRANG_THAI.TU_CHOI, nguoi_tu_choi, ly_do || null, so_phieu]
+      /* 4. Ghi nhận công nợ nội bộ cho lần nhập này */
+      let tong_gia_tri_nhap = 0;
+      for (const item of danh_sach_nhap) {
+        const ct = chiTietMap.get(item.stt);
+        tong_gia_tri_nhap += Number(item.so_luong_nhap) * Number(ct.don_gia);
+      }
+
+      if (tong_gia_tri_nhap > 0) {
+        await CongNoService.recordInternalDebt(client, {
+          ma_kho_no: phieu.ma_kho_nhap,
+          ma_kho_co: phieu.ma_kho_xuat,
+          so_phieu_chuyen_kho: so_phieu,
+          ngay_phat_sinh: new Date(),
+          so_tien: tong_gia_tri_nhap,
+          ghi_chu: `Nhập kho từ phiếu ${so_phieu}`,
+        });
+      }
+
+      /* 5. Kiểm tra xem đã nhập đủ chưa */
+      const checkComplete = await client.query(
+        `SELECT COUNT(*) as chua_du
+         FROM tm_don_hang_chi_tiet
+         WHERE so_don_hang = $1 
+           AND COALESCE(so_luong_da_giao, 0) < so_luong_dat`,
+        [so_phieu],
       );
+
+      const hoan_thanh = checkComplete.rows[0].chua_du === "0";
+
+      // Cập nhật trạng thái phiếu - Chỉ chuyển HOAN_THANH khi đã nhập đủ
+      // Nếu chưa đủ, giữ nguyên DA_DUYET để có thể nhập tiếp
+      if (hoan_thanh) {
+        await client.query(
+          `UPDATE tm_don_hang SET trang_thai = 'HOAN_THANH' WHERE so_don_hang = $1`,
+          [so_phieu],
+        );
+      }
 
       await client.query("COMMIT");
-      return { success: true };
+
+      return {
+        success: true,
+        message: hoan_thanh
+          ? "Nhập kho hoàn thành"
+          : "Nhập kho một phần thành công. Phiếu vẫn ở trạng thái DA_DUYET, bạn có thể tiếp tục nhập.",
+        hoan_thanh,
+      };
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -671,143 +622,145 @@ class ChuyenKhoService {
       client.release();
     }
   }
+
   async getDanhSach(filters = {}) {
     const { trang_thai, ma_kho_xuat, ma_kho_nhap, tu_ngay, den_ngay } = filters;
-    const conditions = [];
+    const conditions = ["h.loai_don_hang = 'CHUYEN_KHO'"];
     const values = [];
     let idx = 1;
 
-    // Xây dựng điều kiện lọc động
     if (trang_thai) {
-      conditions.push(`ck.trang_thai = $${idx++}`);
+      conditions.push(`h.trang_thai = $${idx++}`);
       values.push(trang_thai);
     }
     if (ma_kho_xuat) {
-      conditions.push(`ck.ma_kho_xuat = $${idx++}`);
+      conditions.push(`h.ma_ben_xuat = $${idx++}`);
       values.push(ma_kho_xuat);
     }
     if (ma_kho_nhap) {
-      conditions.push(`ck.ma_kho_nhap = $${idx++}`);
+      conditions.push(`h.ma_ben_nhap = $${idx++}`);
       values.push(ma_kho_nhap);
     }
-    if (tu_ngay) {
-      conditions.push(`ck.ngay_chuyen_kho >= $${idx++}`);
-      values.push(tu_ngay);
-    }
-    if (den_ngay) {
-      conditions.push(`ck.ngay_chuyen_kho <= $${idx++}`);
-      values.push(den_ngay);
-    }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const sql = `
         SELECT 
-            ck.so_phieu, 
-            ck.ngay_chuyen_kho, 
-            ck.ma_kho_xuat, 
-            ck.ma_kho_nhap, 
-            ck.trang_thai, 
-            ck.nguoi_tao, 
-            ck.nguoi_duyet, 
-            ck.ngay_duyet, 
-            ck.dien_giai, 
-            COUNT(ct.id) AS so_dong, 
-            COALESCE(SUM(ct.thanh_tien), 0) AS tong_gia_tri 
-        FROM tm_chuyen_kho ck 
-        LEFT JOIN tm_chuyen_kho_phu_tung ct ON ck.so_phieu = ct.ma_phieu 
+            h.so_don_hang as so_phieu, 
+            h.ngay_dat_hang as ngay_chuyen_kho, 
+            h.ma_ben_xuat as ma_kho_xuat, 
+            h.ma_ben_nhap as ma_kho_nhap, 
+            h.trang_thai, 
+            h.created_by as nguoi_tao,
+            COALESCE(u_tao.ho_ten, u_tao.username) as ten_nguoi_tao,
+            h.ghi_chu as dien_giai
+        FROM tm_don_hang h
+        LEFT JOIN sys_user u_tao ON h.created_by::text = u_tao.id::text
         ${whereClause} 
-        GROUP BY 
-            ck.so_phieu, 
-            ck.ngay_chuyen_kho, 
-            ck.ma_kho_xuat, 
-            ck.ma_kho_nhap, 
-            ck.trang_thai, 
-            ck.nguoi_tao, 
-            ck.nguoi_duyet, 
-            ck.ngay_duyet, 
-            ck.dien_giai 
-        ORDER BY ck.ngay_chuyen_kho DESC, ck.so_phieu DESC`;
+        ORDER BY h.ngay_dat_hang DESC, h.so_don_hang DESC`;
 
-    try {
-      const result = await pool.query(sql, values);
-      return result.rows;
-    } catch (error) {
-      console.error("Lỗi khi lấy danh sách chuyển kho:", error);
-      throw error;
-    }
-  }
-
-  async getChiTiet(ma_phieu) {
-    const client = await pool.connect();
-    try {
-      // 1. Lấy thông tin phiếu
-      const phieuRes = await client.query(
-        `SELECT * FROM tm_chuyen_kho WHERE so_phieu = $1`,
-        [ma_phieu]
-      );
-
-      if (phieuRes.rowCount === 0) return null;
-
-      // 2. Lấy chi tiết xe (Code cũ của bạn thiếu phần này)
-      const xeRes = await client.query(
-        `SELECT
-            ct.stt, ct.xe_key, ct.trang_thai,
-            x.so_khung, x.so_may, x.ma_mau, x.ma_loai_xe
-         FROM tm_chuyen_kho_xe ct
-         JOIN tm_xe_thuc_te x ON ct.xe_key = x.xe_key
-         WHERE ct.ma_phieu = $1
-         ORDER BY ct.stt`,
-        [ma_phieu]
-      );
-
-      // 3. Lấy chi tiết phụ tùng
-      const ptRes = await client.query(
-        `SELECT * FROM tm_chuyen_kho_phu_tung WHERE ma_phieu = $1 ORDER BY stt`,
-        [ma_phieu]
-      );
-
-      return {
-        phieu: phieuRes.rows[0],
-        chi_tiet_xe: xeRes.rows, // <--- Frontend cần field này
-        chi_tiet_phu_tung: ptRes.rows, // <--- Frontend cần field này (đổi tên từ chi_tiet thành chi_tiet_phu_tung cho rõ)
-      };
-    } finally {
-      client.release();
-    }
-  }
-  // Export Chuyển kho xe
-  async getAllTransferXe(filters = {}) {
-    const sql = `
-      SELECT 
-        ctx.*, 
-        ck.ngay_chuyen_kho as ngay_tao,
-        ck.ma_kho_xuat as tu_ma_kho,
-        ck.ma_kho_nhap as den_ma_kho,
-        u.ho_ten as nguoi_tao_ten
-      FROM tm_chuyen_kho_xe ctx
-      INNER JOIN tm_chuyen_kho ck ON ctx.ma_phieu = ck.so_phieu
-      LEFT JOIN sys_user u ON ck.nguoi_tao = u.id::text
-    `;
-    const result = await pool.query(sql);
+    const result = await pool.query(sql, values);
     return result.rows;
   }
 
-  // Export Chuyển kho phụ tùng
-  async getAllTransferPT(filters = {}) {
-    const sql = `
+  async getChiTiet(ma_phieu) {
+    const phieuRes = await pool.query(
+      `SELECT 
+        h.*, 
+        h.so_don_hang as so_phieu, 
+        h.ngay_dat_hang as ngay_chuyen_kho, 
+        h.ma_ben_xuat as ma_kho_xuat, 
+        h.ma_ben_nhap as ma_kho_nhap,
+        h.created_by as nguoi_tao,
+        COALESCE(u_tao.ho_ten, u_tao.username) as ten_nguoi_tao,
+        h.nguoi_gui,
+        COALESCE(u_gui.ho_ten, u_gui.username) as ten_nguoi_gui,
+        h.nguoi_duyet,
+        COALESCE(u_duyet.ho_ten, u_duyet.username) as ten_nguoi_duyet,
+        h.ngay_duyet,
+        COALESCE(kx.ten_kho, kx.ma_kho) as ten_kho_xuat, kx.dia_chi as dia_chi_kho_xuat, kx.dien_thoai as sdt_kho_xuat,
+        COALESCE(kn.ten_kho, kn.ma_kho) as ten_kho_nhap, kn.dia_chi as dia_chi_kho_nhap, kn.dien_thoai as sdt_kho_nhap
+      FROM tm_don_hang h
+      LEFT JOIN sys_user u_tao ON h.created_by::text = u_tao.id::text
+      LEFT JOIN sys_user u_gui ON h.nguoi_gui::text = u_gui.id::text
+      LEFT JOIN sys_user u_duyet ON h.nguoi_duyet::text = u_duyet.id::text
+      LEFT JOIN sys_kho kx ON h.ma_ben_xuat = kx.ma_kho
+      LEFT JOIN sys_kho kn ON h.ma_ben_nhap = kn.ma_kho
+      WHERE h.so_don_hang = $1`,
+      [ma_phieu],
+    );
+
+    if (phieuRes.rowCount === 0) return null;
+
+    const detailsRes = await pool.query(
+      `SELECT
+          ct.stt, (ct.yeu_cau_dac_biet->>'ma_serial') as xe_key, 
+          ct.ma_hang_hoa as ma_pt, ct.so_luong_dat as so_luong,
+          ct.so_luong_da_giao,
+          (ct.so_luong_dat - COALESCE(ct.so_luong_da_giao, 0)) as so_luong_con_lai,
+          ct.don_gia, ct.thanh_tien,
+          pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh
+       FROM tm_don_hang_chi_tiet ct
+       LEFT JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
+       WHERE ct.so_don_hang = $1
+       ORDER BY ct.stt`,
+      [ma_phieu],
+    );
+
+    const chi_tiet_xe = detailsRes.rows.filter((r) => r.xe_key);
+    const chi_tiet_phu_tung = detailsRes.rows.filter((r) => !r.xe_key);
+
+    return {
+      phieu: phieuRes.rows[0],
+      chi_tiet_xe,
+      chi_tiet_phu_tung,
+    };
+  }
+
+  /* =====================================================
+   * LẤY DỮ LIỆU EXPORT XE
+   * ===================================================== */
+  async getAllTransferXe(filters = {}) {
+    const queryStr = `
       SELECT 
-        ctp.*, 
-        ck.ngay_chuyen_kho as ngay_tao,
-        ck.ma_kho_xuat as tu_ma_kho,
-        ck.ma_kho_nhap as den_ma_kho,
-        pt.ten_pt
-      FROM tm_chuyen_kho_phu_tung ctp
-      INNER JOIN tm_chuyen_kho ck ON ctp.ma_phieu = ck.so_phieu
-      LEFT JOIN tm_phu_tung pt ON ctp.ma_pt = pt.ma_pt
+        h.so_don_hang as ma_phieu,
+        h.created_at,
+        (ct.yeu_cau_dac_biet->>'ma_serial') as xe_key,
+        h.ma_ben_xuat as tu_ma_kho,
+        h.ma_ben_nhap as den_ma_kho,
+        COALESCE(u.ho_ten, u.username) as nguoi_tao_ten
+      FROM tm_don_hang_chi_tiet ct
+      JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
+      LEFT JOIN sys_user u ON h.created_by::text = u.id::text
+      WHERE h.loai_don_hang = 'CHUYEN_KHO'
+        AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NOT NULL
+      ORDER BY h.created_at DESC
     `;
-    const result = await pool.query(sql);
+    const result = await pool.query(queryStr);
+    return result.rows;
+  }
+
+  /* =====================================================
+   * LẤY DỮ LIỆU EXPORT PHỤ TÙNG
+   * ===================================================== */
+  async getAllTransferPT(filters = {}) {
+    const queryStr = `
+      SELECT 
+        h.so_don_hang as ma_phieu,
+        h.created_at,
+        ct.ma_hang_hoa as ma_pt,
+        hh.ten_hang_hoa as ten_pt,
+        ct.so_luong_dat as so_luong,
+        h.ma_ben_xuat as tu_ma_kho,
+        h.ma_ben_nhap as den_ma_kho
+      FROM tm_don_hang_chi_tiet ct
+      JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
+      LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
+      WHERE h.loai_don_hang = 'CHUYEN_KHO'
+        AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NULL
+      ORDER BY h.created_at DESC
+    `;
+    const result = await pool.query(queryStr);
     return result.rows;
   }
 }

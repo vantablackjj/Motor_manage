@@ -1,70 +1,82 @@
-const {query} = require("../config/database")
+const { query } = require("../config/database");
 
-class loaiHinhService{
-    static async getAll(){
-        const result = await query(
-            `SELECT ma_lh, ten_lh
-FROM sys_loai_hinh
-WHERE status = true
-ORDER BY ten_lh;
+class loaiHinhService {
+  static async getAll(filters = {}) {
+    let sql = `SELECT ma_lh, ten_lh, status, id FROM dm_loai_hinh WHERE 1=1`;
+    const params = [];
 
-            `
-        )
-        return result.rows
+    if (filters.status !== undefined) {
+      if (String(filters.status) === "all") {
+        // Return ALL
+      } else {
+        sql += ` AND status = $1`;
+        params.push(filters.status === "true" || filters.status === true);
+      }
+    } else {
+      // Default: Only Active
+      sql += ` AND status = true`;
     }
 
-    static async getByID(id){
-        const result = await  query(`
-            select * from sys_loai_hinh
-            where id = $1
-            `
-            ,[id]
-        )
-        return result.rows[0]
-    }
+    sql += ` ORDER BY ten_lh`;
 
-    static async create(data){
-        const checkExsits = await query(`
-                Select 1 from sys_loai_hinh 
-                where ma_lh = $1    
-            `,[data.ma_lh]
-        )
-        if(!checkExsits){
-            throw new Error("loại hình đã tồn tại")
-        }
-        const result = await query(`
-                insert into sys_loai_hinh(ma_lh,ten_lh,status)
-                Values($1,$2,$3)
-                Returning *    
-            `,[data.ma_lh,data.ten_lh,data.status]
-        )
-        return result.rows[0]
-    }
+    const result = await query(sql, params);
+    return result.rows;
+  }
 
-    static async update(id, data) {
+  static async getByID(code) {
     const result = await query(
-      `UPDATE sys_loai_hinh
-       SET ma_lh=$1, ten_lh=$2, status=$3
-       WHERE id=$4
-       RETURNING *`,
-      [data.ma_lh, data.ten_lh, data.status, id]
+      `
+            select * from dm_loai_hinh
+            where ma_lh = $1
+            `,
+      [code],
     );
     return result.rows[0];
   }
 
-  static async delete(id) {
-        const exists = await this.getByID(id);
-        if (!exists) throw new Error('Loại hình không tồn tại');
-
-        const result = await query(
-            `UPDATE sys_loai_hinh
-             SET status = false
-             WHERE id = $1
-             RETURNING *`,
-            [id]
-        );
-        return result.rows[0];
+  static async create(data) {
+    const checkExsits = await query(
+      `
+                Select 1 from dm_loai_hinh 
+                where ma_lh = $1    
+            `,
+      [data.ma_lh],
+    );
+    if (checkExsits.rows.length > 0) {
+      throw new Error("loại hình đã tồn tại");
     }
+    const result = await query(
+      `
+                insert into dm_loai_hinh(ma_lh,ten_lh,status)
+                Values($1,$2,$3)
+                Returning *    
+            `,
+      [data.ma_lh, data.ten_lh, data.status || true],
+    );
+    return result.rows[0];
+  }
+
+  static async update(code, data) {
+    const result = await query(
+      `UPDATE dm_loai_hinh
+       SET ma_lh=COALESCE($1, ma_lh), ten_lh=COALESCE($2, ten_lh), status=COALESCE($3, status), updated_at = CURRENT_TIMESTAMP
+       WHERE ma_lh=$4
+       RETURNING *`,
+      [data.ma_lh, data.ten_lh, data.status, code],
+    );
+    return result.rows[0];
+  }
+
+  static async delete(code) {
+    const result = await query(
+      `UPDATE dm_loai_hinh
+             SET status = false, updated_at = CURRENT_TIMESTAMP
+             WHERE ma_lh = $1
+             RETURNING *`,
+      [code],
+    );
+    return result.rows[0];
+  }
 }
 
 module.exports = loaiHinhService;

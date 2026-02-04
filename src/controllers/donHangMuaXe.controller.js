@@ -31,8 +31,8 @@ class DonHangMuaXeController {
    */
   async create(req, res, next) {
     try {
-      const username = req.user.username; // ✅ Dùng username thay vì id
-      const data = await DonHangMuaXeService.createDonHang(req.body, username);
+      const userId = req.user.id;
+      const data = await DonHangMuaXeService.createDonHang(req.body, userId);
 
       sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);
     } catch (err) {
@@ -45,10 +45,10 @@ class DonHangMuaXeController {
    */
   async createWithDetails(req, res, next) {
     try {
-      const username = req.user.username;
+      const userId = req.user.id;
       const data = await DonHangMuaXeService.createDonHangWithDetails(
         req.body,
-        username
+        userId,
       );
 
       sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);
@@ -93,7 +93,7 @@ class DonHangMuaXeController {
       const { ma_phieu, id } = req.params;
       const data = await DonHangMuaXeService.deleteChiTiet(
         ma_phieu,
-        parseInt(id)
+        parseInt(id),
       );
 
       sendSuccess(res, data, "Xóa chi tiết đơn hàng thành công");
@@ -108,9 +108,8 @@ class DonHangMuaXeController {
   async submit(req, res, next) {
     try {
       const { ma_phieu } = req.params;
-      const username = req.user.username; // ✅ Dùng username
-
-      const data = await DonHangMuaXeService.submitDonHang(ma_phieu, username);
+      const userId = req.user.id;
+      const data = await DonHangMuaXeService.submitDonHang(ma_phieu, userId);
 
       sendSuccess(res, data, "Đã gửi đơn mua xe để duyệt");
     } catch (err) {
@@ -124,9 +123,8 @@ class DonHangMuaXeController {
   async approve(req, res, next) {
     try {
       const { ma_phieu } = req.params;
-      const username = req.user.username; // ✅ Dùng username
-
-      const data = await DonHangMuaXeService.duyetDonHang(ma_phieu, username);
+      const userId = req.user.id;
+      const data = await DonHangMuaXeService.duyetDonHang(ma_phieu, userId);
 
       sendSuccess(res, data, "Đơn mua xe đã được duyệt");
     } catch (err) {
@@ -140,13 +138,13 @@ class DonHangMuaXeController {
   async reject(req, res, next) {
     try {
       const { ma_phieu } = req.params;
-      const username = req.user.username;
+      const userId = req.user.id;
       const { ly_do } = req.body;
 
       const data = await DonHangMuaXeService.tuChoiDonHang(
         ma_phieu,
-        username,
-        ly_do
+        userId,
+        ly_do,
       );
 
       sendSuccess(res, data, "Đơn mua xe đã bị từ chối");
@@ -161,8 +159,12 @@ class DonHangMuaXeController {
   async nhapKho(req, res, next) {
     try {
       const { ma_phieu } = req.params;
-      const username = req.user.username;
+      const userId = req.user.id;
       const danhSachXe = req.body.danh_sach_xe || req.body.vehicles; // Array of vehicles
+      const logger = require("../ultils/logger");
+      logger.info(
+        `[DonHangMuaXe] Nhap kho ma_phieu=${ma_phieu} items=${JSON.stringify(danhSachXe)}`,
+      );
 
       if (
         !danhSachXe ||
@@ -175,7 +177,7 @@ class DonHangMuaXeController {
       const data = await DonHangMuaXeService.nhapKhoXe(
         ma_phieu,
         danhSachXe,
-        username
+        userId,
       );
 
       sendSuccess(res, data, "Nhập kho xe thành công");

@@ -241,7 +241,7 @@ class BulkExportController {
       const data = await ChuyenKhoService.getAllTransferXe(req.query);
       const columns = [
         { header: "Mã Phiếu", key: "ma_phieu", width: 20 },
-        { header: "Ngày Chuyển", key: "ngay_tao", width: 20 },
+        { header: "Ngày Chuyển", key: "created_at", width: 20 },
         { header: "Xe Key (VIN/Engine)", key: "xe_key", width: 25 },
         { header: "Từ Kho", key: "tu_ma_kho", width: 15 },
         { header: "Đến Kho", key: "den_ma_kho", width: 15 },
@@ -263,7 +263,7 @@ class BulkExportController {
       const data = await ChuyenKhoService.getAllTransferPT(req.query);
       const columns = [
         { header: "Mã Phiếu", key: "ma_phieu", width: 20 },
-        { header: "Ngày Chuyển", key: "ngay_tao", width: 20 },
+        { header: "Ngày Chuyển", key: "created_at", width: 20 },
         { header: "Mã PT", key: "ma_pt", width: 15 },
         { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
         { header: "Số Lượng", key: "so_luong", width: 12 },

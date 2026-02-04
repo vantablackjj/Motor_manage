@@ -4,15 +4,13 @@ const { authenticate } = require("../middleware/auth");
 const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../ultils/respone");
-const Kho = require("../services/kho.service")
+const Kho = require("../services/kho.service");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
 
-
-
 // Validation schemas
 const createKhoSchema = Joi.object({
-  ma_kho: Joi.string().required().max(50),
+  ma_kho: Joi.string().max(50),
   ten_kho: Joi.string().required().max(200),
   dia_chi: Joi.string().max(500).allow("", null),
   dien_thoai: Joi.string().max(50).allow("", null),
@@ -20,7 +18,6 @@ const createKhoSchema = Joi.object({
   mac_dinh: Joi.boolean().default(false),
   ghi_chu: Joi.string().allow("", null),
 });
-
 
 const updateKhoSchema = Joi.object({
   ten_kho: Joi.string().required().max(200),
@@ -40,14 +37,14 @@ router.get("/", authenticate, async (req, res, next) => {
         req.query.chinh === "true"
           ? true
           : req.query.chinh === "false"
-          ? false
-          : undefined,
+            ? false
+            : undefined,
       daily:
         req.query.daily === "true"
           ? true
           : req.query.daily === "false"
-          ? false
-          : undefined,
+            ? false
+            : undefined,
     };
 
     const data = await Kho.getAll(filters);
@@ -86,7 +83,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PUT /api/v1/kho/:ma_kho - Cập nhật kho
@@ -108,7 +105,7 @@ router.put(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // DELETE /api/v1/kho/:ma_kho - Xóa kho (soft delete)
@@ -129,9 +126,7 @@ router.delete(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
-
 module.exports = router;
-

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const Xe = require("../services/xe.service");
+const VehicleService = require("../services/themXe.service"); // Add this
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
 const { checkRole } = require("../middleware/roleCheck");
@@ -9,15 +10,14 @@ const { ROLES } = require("../config/constants");
 const Joi = require("joi");
 
 const themXeSchema = Joi.object({
-  xe_key: Joi.string().max(50).required(),
   ma_loai_xe: Joi.string().max(50).required(),
-  ma_mau: Joi.string().max(50).allow(null),
+  ma_mau: Joi.string().max(50).allow(null, ""),
   so_khung: Joi.string().max(100).required(),
   so_may: Joi.string().max(100).required(),
   ma_kho_hien_tai: Joi.string().max(50).required(),
-  ngay_nhap: Joi.date().required(),
-  gia_nhap: Joi.number().min(0).required(),
-  ghi_chu: Joi.string().allow("", null),
+  ngay_nhap: Joi.date().optional(),
+  gia_nhap: Joi.number().min(0).optional(),
+  ghi_chu: Joi.string().allow("", null).optional(),
 });
 
 const capNhatXeSchema = Joi.object({
@@ -69,6 +69,18 @@ router.get("/kho/:ma_kho", authenticate, async (req, res, next) => {
   }
 });
 
+// Alias cho tồn kho (theo yêu cầu user)
+router.get("/ton-kho/:ma_kho", authenticate, async (req, res, next) => {
+  try {
+    const { ma_kho } = req.params;
+    const filters = req.query;
+    const data = await Xe.getTonKho(ma_kho, filters);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Lấy lịch sử xe
 router.get("/:xe_key/lich-su", authenticate, async (req, res, next) => {
   try {
@@ -95,21 +107,13 @@ router.post(
   validate(themXeSchema),
   async (req, res, next) => {
     try {
-      const data = {
-        ...req.body,
-        nguoi_tao: req.user.id,
-      };
+      const result = await VehicleService.nhapXeMoi(req.body, req.user.id);
 
-      const xe = await Xe.create(data);
-
-      res.status(201).json({
-        success: true,
-        data: xe,
-      });
+      res.status(201).json(result);
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
@@ -137,7 +141,7 @@ router.put(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 // Khóa xe

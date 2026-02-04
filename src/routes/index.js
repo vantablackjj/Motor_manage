@@ -24,6 +24,8 @@ const donHangMuaXeRoutes = require("./donHangMuaXe.routes");
 const bulkImportRoutes = require("./bulkImport.routes");
 const bulkExportRoutes = require("./bulkExport.routes");
 const baoCaoRoutes = require("./baoCao.routes");
+const productRoutes = require("./product.routes");
+const orderRoutes = require("./order.routes");
 // Mount routes
 router.use("/auth", authRoutes);
 router.use("/kho", khoRoutes);
@@ -48,4 +50,6 @@ router.use("/don-hang-mua-xe", donHangMuaXeRoutes);
 router.use("/import", bulkImportRoutes);
 router.use("/export", bulkExportRoutes);
 router.use("/bao-cao", baoCaoRoutes);
+router.use("/products", productRoutes);
+router.use("/orders", orderRoutes);
 module.exports = router;

@@ -22,7 +22,7 @@ const authenticate = async (req, res, next) => {
       return sendError(
         res,
         "Token format invalid. Format: Bearer [token]",
-        401
+        401,
       );
     }
 
@@ -44,8 +44,6 @@ const authenticate = async (req, res, next) => {
       username: user.username,
       ho_ten: user.ho_ten,
       vai_tro: user.vai_tro,
-      ma_kho: user.ma_kho,
-      ten_kho: user.ten_kho,
     };
 
     next();
@@ -96,7 +94,6 @@ const optionalAuth = async (req, res, next) => {
           id: user.id,
           username: user.username,
           vai_tro: user.vai_tro,
-          ma_kho: user.ma_kho,
         }
       : null;
 
@@ -115,7 +112,6 @@ const generateToken = (user) => {
     id: user.id,
     username: user.username,
     vai_tro: user.vai_tro,
-    ma_kho: user.ma_kho,
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
