@@ -40,7 +40,10 @@ seedAdmin.js
 *.txt
 *.sql
 *.xlsx
-*.json
+# Ignore data dumps but keep configuration
+*_dump.json
+schema_dump.json
+brand_dump.json
 
 # Specific files found
 full_tables.txt
