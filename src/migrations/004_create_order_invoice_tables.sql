@@ -11,35 +11,63 @@
 CREATE TABLE IF NOT EXISTS tm_don_hang (
     id SERIAL PRIMARY KEY,
     so_don_hang VARCHAR(50) UNIQUE NOT NULL,
-    loai_don_hang enum_loai_don_hang NOT NULL,
-    ngay_dat_hang DATE NOT NULL,
-    
-    -- Polymorphic references
-    ma_ben_xuat VARCHAR(50) NOT NULL, -- Kho hoặc Đối tác
-    loai_ben_xuat enum_loai_ben NOT NULL,
-    ma_ben_nhap VARCHAR(50) NOT NULL, -- Kho hoặc Đối tác
-    loai_ben_nhap enum_loai_ben NOT NULL,
-    
-    -- Financials
-    tong_gia_tri DECIMAL(15,2) DEFAULT 0,
-    chiet_khau DECIMAL(15,2) DEFAULT 0,
-    vat_percentage DECIMAL(5,2) DEFAULT 0,
-    thanh_tien DECIMAL(15,2) DEFAULT 0,
-    
-    -- Delivery tracking
-    so_hoa_don_du_kien INTEGER DEFAULT 1,
-    so_hoa_don_da_xuat INTEGER DEFAULT 0,
-    
-    -- Status
-    trang_thai enum_trang_thai_don_hang DEFAULT 'NHAP',
-    
-    -- Audit
-    nguoi_tao VARCHAR(100),
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    nguoi_duyet VARCHAR(100),
-    ngay_duyet TIMESTAMP,
-    ghi_chu TEXT
+    ngay_dat_hang DATE NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='loai_don_hang') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN loai_don_hang enum_loai_don_hang NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='ma_ben_xuat') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN ma_ben_xuat VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='loai_ben_xuat') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN loai_ben_xuat enum_loai_ben NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='ma_ben_nhap') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN ma_ben_nhap VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='loai_ben_nhap') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN loai_ben_nhap enum_loai_ben NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='tong_gia_tri') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN tong_gia_tri DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='chiet_khau') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN chiet_khau DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='vat_percentage') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN vat_percentage DECIMAL(5,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='thanh_tien') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN thanh_tien DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='so_hoa_don_du_kien') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN so_hoa_don_du_kien INTEGER DEFAULT 1;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='so_hoa_don_da_xuat') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN so_hoa_don_da_xuat INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN trang_thai enum_trang_thai_don_hang DEFAULT 'NHAP';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='nguoi_tao') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN nguoi_tao VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='nguoi_duyet') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN nguoi_duyet VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='ngay_duyet') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN ngay_duyet TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_don_hang' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_don_hang ADD COLUMN ghi_chu TEXT;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_don_hang_loai ON tm_don_hang(loai_don_hang);
 CREATE INDEX idx_tm_don_hang_trang_thai ON tm_don_hang(trang_thai);

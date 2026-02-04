@@ -12,19 +12,45 @@ CREATE TABLE IF NOT EXISTS tm_hang_hoa_serial (
     id SERIAL PRIMARY KEY,
     ma_serial VARCHAR(100) UNIQUE NOT NULL,
     ma_hang_hoa VARCHAR(50) REFERENCES tm_hang_hoa(ma_hang_hoa) NOT NULL,
-    serial_identifier VARCHAR(100) NOT NULL, -- Số khung, IMEI, Serial number
-    ma_kho_hien_tai VARCHAR(50) REFERENCES sys_kho(ma_kho),
-    trang_thai enum_trang_thai_serial DEFAULT 'TON_KHO',
-    locked BOOLEAN DEFAULT FALSE,
-    locked_reason VARCHAR(100),
-    locked_at TIMESTAMP,
-    gia_von DECIMAL(15,2), -- Giá vốn riêng của serial này
-    thuoc_tinh_rieng JSONB DEFAULT '{}', -- Màu sắc, size, phiên bản cụ thể
-    ngay_nhap_kho TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    serial_identifier VARCHAR(100) NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='ma_kho_hien_tai') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN ma_kho_hien_tai VARCHAR(50) REFERENCES sys_kho(ma_kho);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN trang_thai enum_trang_thai_serial DEFAULT 'TON_KHO';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='locked') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN locked BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='locked_reason') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN locked_reason VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='locked_at') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN locked_at TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='gia_von') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN gia_von DECIMAL(15,2);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='thuoc_tinh_rieng') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN thuoc_tinh_rieng JSONB DEFAULT '{}';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='ngay_nhap_kho') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN ngay_nhap_kho TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_serial' AND column_name='ngay_cap_nhat') THEN
+        ALTER TABLE tm_hang_hoa_serial ADD COLUMN ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hang_hoa_serial_ma_hang ON tm_hang_hoa_serial(ma_hang_hoa);
 CREATE INDEX idx_tm_hang_hoa_serial_kho ON tm_hang_hoa_serial(ma_kho_hien_tai);

@@ -126,18 +126,43 @@ COMMENT ON COLUMN sys_kho_new.thong_tin_them IS 'JSONB: {capacity: 1000, nhiet_d
 CREATE TABLE IF NOT EXISTS tm_hang_hoa (
     id SERIAL PRIMARY KEY,
     ma_hang_hoa VARCHAR(50) UNIQUE NOT NULL,
-    ten_hang_hoa VARCHAR(255) NOT NULL,
-    ma_nhom_hang VARCHAR(50) REFERENCES dm_nhom_hang(ma_nhom),
-    loai_quan_ly enum_loai_quan_ly NOT NULL DEFAULT 'BATCH',
-    gia_ban_mac_dinh DECIMAL(15,2) DEFAULT 0,
-    gia_von_mac_dinh DECIMAL(15,2) DEFAULT 0,
-    don_vi_tinh VARCHAR(20),
-    mo_ta TEXT,
-    thong_so_ky_thuat JSONB DEFAULT '{}',
-    status BOOLEAN DEFAULT TRUE,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ten_hang_hoa VARCHAR(255) NOT NULL
 );
+
+-- Ensure all columns exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='ma_nhom_hang') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN ma_nhom_hang VARCHAR(50) REFERENCES dm_nhom_hang(ma_nhom);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='loai_quan_ly') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN loai_quan_ly enum_loai_quan_ly NOT NULL DEFAULT 'BATCH';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='gia_ban_mac_dinh') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN gia_ban_mac_dinh DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='gia_von_mac_dinh') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN gia_von_mac_dinh DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='don_vi_tinh') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN don_vi_tinh VARCHAR(20);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='mo_ta') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN mo_ta TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='thong_so_ky_thuat') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN thong_so_ky_thuat JSONB DEFAULT '{}';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='status') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN status BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa' AND column_name='ngay_cap_nhat') THEN
+        ALTER TABLE tm_hang_hoa ADD COLUMN ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hang_hoa_nhom ON tm_hang_hoa(ma_nhom_hang);
 CREATE INDEX idx_tm_hang_hoa_loai ON tm_hang_hoa(loai_quan_ly);
