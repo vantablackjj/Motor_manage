@@ -5,6 +5,7 @@ if (process.env.NODE_ENV !== "production") {
 const app = require("./src/app");
 const logger = require("./src/ultils/logger");
 const { pool } = require("./src/config/database");
+const MigrationRunner = require("./src/ultils/migrationRunner");
 
 const PORT = process.env.PORT || 3000;
 
@@ -13,6 +14,12 @@ async function startServer() {
     logger.info("Starting server...");
     logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
     logger.info(`DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
+
+    // Run migrations
+    logger.info("Running migrations...");
+    const migrationRunner = new MigrationRunner();
+    await migrationRunner.run();
+    logger.info("✅ Migrations completed");
 
     await pool.query("SELECT NOW()");
     logger.info("✅ Database connected successfully");
@@ -32,4 +39,3 @@ async function startServer() {
 }
 
 startServer();
- 
