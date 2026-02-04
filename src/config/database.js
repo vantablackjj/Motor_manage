@@ -3,9 +3,13 @@ const logger = require("../ultils/logger");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("render.com")
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl:
+    process.env.NODE_ENV === "production" ||
+    (process.env.DATABASE_URL &&
+      !process.env.DATABASE_URL.includes("localhost") &&
+      !process.env.DATABASE_URL.includes("127.0.0.1"))
+      ? { rejectUnauthorized: false }
+      : false,
   connectionTimeoutMillis: 5000,
 });
 
@@ -17,6 +21,7 @@ const query = async (text, params) => {
     );
     logger.info("--- DB CONNECTION DEBUG ---");
     logger.info("DATABASE_URL: %s", redactedUrl);
+    logger.info("SSL Enabled: %s", !!pool.options.ssl);
     logger.info("---------------------------");
     global.dbLogged = true;
   }
