@@ -153,7 +153,11 @@ FROM (VALUES
     ('KE_TOAN', 'KE_TOAN', 'Kế toán', '{"view_gia_von": true, "edit_don_hang": false, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
     ('SALE', 'SALE', 'Nhân viên bán hàng', '{"view_gia_von": false, "edit_don_hang": true, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE)
 ) AS v(ma_quyen, ten_quyen, mo_ta, permissions, status)
-WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE sys_role.ten_quyen = v.ten_quyen);
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_role 
+    WHERE sys_role.ma_quyen = v.ma_quyen 
+       OR sys_role.ten_quyen = v.ten_quyen
+);
 
 -- Assign default role to existing users
 UPDATE sys_user 
