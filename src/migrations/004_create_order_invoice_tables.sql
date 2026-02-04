@@ -109,44 +109,78 @@ COMMENT ON COLUMN tm_don_hang_chi_tiet.yeu_cau_dac_biet IS 'JSONB: {mau_sac: "Đ
 CREATE TABLE IF NOT EXISTS tm_hoa_don (
     id SERIAL PRIMARY KEY,
     so_hoa_don VARCHAR(50) UNIQUE NOT NULL,
-    loai_hoa_don enum_loai_hoa_don NOT NULL,
-    so_don_hang VARCHAR(50) REFERENCES tm_don_hang(so_don_hang), -- NULL nếu không qua đơn
-    lan_thu INTEGER DEFAULT 1, -- Lần giao thứ mấy
-    ngay_hoa_don DATE NOT NULL,
-    
-    -- Polymorphic references
-    ma_ben_xuat VARCHAR(50) NOT NULL,
-    loai_ben_xuat enum_loai_ben NOT NULL,
-    ma_ben_nhap VARCHAR(50) NOT NULL,
-    loai_ben_nhap enum_loai_ben NOT NULL,
-    
-    -- Financials
-    tong_tien DECIMAL(15,2) DEFAULT 0,
-    chiet_khau DECIMAL(15,2) DEFAULT 0,
-    tien_thue_gtgt DECIMAL(15,2) DEFAULT 0,
-    thanh_tien DECIMAL(15,2) DEFAULT 0,
-    
-    -- Tax
-    da_ke_khai_thue BOOLEAN DEFAULT FALSE,
-    ngay_ke_khai DATE,
-    
-    -- Delivery info
-    nguoi_giao VARCHAR(100),
-    nguoi_nhan VARCHAR(100),
-    phuong_tien VARCHAR(100),
-    thoi_gian_giao TIMESTAMP,
-    
-    -- Link to warehouse slip
-    so_phieu_kho VARCHAR(50),
-    
-    -- Status
-    trang_thai enum_trang_thai_hoa_don DEFAULT 'NHAP',
-    
-    -- Audit
-    nguoi_lap VARCHAR(100),
-    ngay_lap TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ghi_chu TEXT
+    ngay_hoa_don DATE NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='loai_hoa_don') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN loai_hoa_don enum_loai_hoa_don NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='so_don_hang') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN so_don_hang VARCHAR(50) REFERENCES tm_don_hang(so_don_hang);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='lan_thu') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN lan_thu INTEGER DEFAULT 1;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='ma_ben_xuat') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN ma_ben_xuat VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='loai_ben_xuat') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN loai_ben_xuat enum_loai_ben NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='ma_ben_nhap') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN ma_ben_nhap VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='loai_ben_nhap') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN loai_ben_nhap enum_loai_ben NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='tong_tien') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN tong_tien DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='chiet_khau') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN chiet_khau DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='tien_thue_gtgt') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN tien_thue_gtgt DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='thanh_tien') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN thanh_tien DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='da_ke_khai_thue') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN da_ke_khai_thue BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='ngay_ke_khai') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN ngay_ke_khai DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='nguoi_giao') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN nguoi_giao VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='nguoi_nhan') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN nguoi_nhan VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='phuong_tien') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN phuong_tien VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='thoi_gian_giao') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN thoi_gian_giao TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='so_phieu_kho') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN so_phieu_kho VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN trang_thai enum_trang_thai_hoa_don DEFAULT 'NHAP';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='nguoi_lap') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN nguoi_lap VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='ngay_lap') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN ngay_lap TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hoa_don' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_hoa_don ADD COLUMN ghi_chu TEXT;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hoa_don_loai ON tm_hoa_don(loai_hoa_don);
 CREATE INDEX idx_tm_hoa_don_don_hang ON tm_hoa_don(so_don_hang);
@@ -189,18 +223,42 @@ COMMENT ON TABLE tm_hoa_don_chi_tiet IS 'Chi tiết hóa đơn (hàng hóa thự
 CREATE TABLE IF NOT EXISTS tm_phieu_kho (
     id SERIAL PRIMARY KEY,
     so_phieu VARCHAR(50) UNIQUE NOT NULL,
-    ngay_phieu TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    loai_phieu enum_loai_phieu_kho NOT NULL,
-    ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
-    so_don_hang VARCHAR(50) REFERENCES tm_don_hang(so_don_hang), -- NULL nếu thủ công
-    so_hoa_don VARCHAR(50) REFERENCES tm_hoa_don(so_hoa_don), -- NULL nếu thủ công
-    nguoi_lap VARCHAR(100),
-    tong_gia_tri DECIMAL(15,2) DEFAULT 0,
-    trang_thai enum_trang_thai_phieu_kho DEFAULT 'NHAP',
-    dien_giai TEXT,
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ngay_phieu TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='loai_phieu') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN loai_phieu enum_loai_phieu_kho NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='ma_kho') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='so_don_hang') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN so_don_hang VARCHAR(50) REFERENCES tm_don_hang(so_don_hang);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='so_hoa_don') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN so_hoa_don VARCHAR(50) REFERENCES tm_hoa_don(so_hoa_don);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='nguoi_lap') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN nguoi_lap VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='tong_gia_tri') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN tong_gia_tri DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN trang_thai enum_trang_thai_phieu_kho DEFAULT 'NHAP';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='dien_giai') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN dien_giai TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_kho' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_phieu_kho ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_phieu_kho_loai ON tm_phieu_kho(loai_phieu);
 CREATE INDEX idx_tm_phieu_kho_kho ON tm_phieu_kho(ma_kho);

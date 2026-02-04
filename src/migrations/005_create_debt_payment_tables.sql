@@ -11,14 +11,27 @@
 CREATE TABLE IF NOT EXISTS tm_cong_no_doi_tac (
     id SERIAL PRIMARY KEY,
     ma_doi_tac VARCHAR(50) REFERENCES dm_doi_tac(ma_doi_tac) NOT NULL,
-    loai_cong_no enum_loai_cong_no NOT NULL,
-    tong_no DECIMAL(15,2) DEFAULT 0,
-    tong_da_thanh_toan DECIMAL(15,2) DEFAULT 0,
-    con_lai DECIMAL(15,2) GENERATED ALWAYS AS (tong_no - tong_da_thanh_toan) STORED,
-    ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
     UNIQUE(ma_doi_tac, loai_cong_no)
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac' AND column_name='loai_cong_no') THEN
+        ALTER TABLE tm_cong_no_doi_tac ADD COLUMN loai_cong_no enum_loai_cong_no NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac' AND column_name='tong_no') THEN
+        ALTER TABLE tm_cong_no_doi_tac ADD COLUMN tong_no DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac' AND column_name='tong_da_thanh_toan') THEN
+        ALTER TABLE tm_cong_no_doi_tac ADD COLUMN tong_da_thanh_toan DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac' AND column_name='con_lai') THEN
+        ALTER TABLE tm_cong_no_doi_tac ADD COLUMN con_lai DECIMAL(15,2) GENERATED ALWAYS AS (tong_no - tong_da_thanh_toan) STORED;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac' AND column_name='ngay_cap_nhat') THEN
+        ALTER TABLE tm_cong_no_doi_tac ADD COLUMN ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_cong_no_dt_doi_tac ON tm_cong_no_doi_tac(ma_doi_tac);
 CREATE INDEX idx_tm_cong_no_dt_loai ON tm_cong_no_doi_tac(loai_cong_no);
@@ -31,17 +44,37 @@ COMMENT ON TABLE tm_cong_no_doi_tac IS 'Tổng hợp công nợ đối tác';
 CREATE TABLE IF NOT EXISTS tm_cong_no_doi_tac_ct (
     id SERIAL PRIMARY KEY,
     ma_doi_tac VARCHAR(50) REFERENCES dm_doi_tac(ma_doi_tac) NOT NULL,
-    loai_cong_no enum_loai_cong_no NOT NULL,
     so_hoa_don VARCHAR(50) REFERENCES tm_hoa_don(so_hoa_don),
-    ngay_phat_sinh DATE NOT NULL,
-    so_tien DECIMAL(15,2) NOT NULL,
-    da_thanh_toan DECIMAL(15,2) DEFAULT 0,
-    con_lai DECIMAL(15,2) GENERATED ALWAYS AS (so_tien - da_thanh_toan) STORED,
-    han_thanh_toan DATE,
-    trang_thai enum_trang_thai_cong_no DEFAULT 'CHUA_TT',
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ngay_phat_sinh DATE NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='loai_cong_no') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN loai_cong_no enum_loai_cong_no NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='so_tien') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN so_tien DECIMAL(15,2) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='da_thanh_toan') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN da_thanh_toan DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='con_lai') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN con_lai DECIMAL(15,2) GENERATED ALWAYS AS (so_tien - da_thanh_toan) STORED;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='han_thanh_toan') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN han_thanh_toan DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN trang_thai enum_trang_thai_cong_no DEFAULT 'CHUA_TT';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_doi_tac_ct' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_cong_no_doi_tac_ct ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_cong_no_dt_ct_doi_tac ON tm_cong_no_doi_tac_ct(ma_doi_tac);
 CREATE INDEX idx_tm_cong_no_dt_ct_hoa_don ON tm_cong_no_doi_tac_ct(so_hoa_don);
@@ -55,15 +88,26 @@ COMMENT ON TABLE tm_cong_no_doi_tac_ct IS 'Chi tiết công nợ đối tác';
 -- =====================================================
 CREATE TABLE IF NOT EXISTS tm_cong_no_noi_bo (
     id SERIAL PRIMARY KEY,
-    ma_kho_no VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL, -- Kho nợ (nhận hàng)
-    ma_kho_co VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL, -- Kho có (xuất hàng)
-    tong_no DECIMAL(15,2) DEFAULT 0,
-    tong_da_tra DECIMAL(15,2) DEFAULT 0,
-    con_lai DECIMAL(15,2) GENERATED ALWAYS AS (tong_no - tong_da_tra) STORED,
-    ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+    ma_kho_no VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
+    ma_kho_co VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
     UNIQUE(ma_kho_no, ma_kho_co)
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo' AND column_name='tong_no') THEN
+        ALTER TABLE tm_cong_no_noi_bo ADD COLUMN tong_no DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo' AND column_name='tong_da_tra') THEN
+        ALTER TABLE tm_cong_no_noi_bo ADD COLUMN tong_da_tra DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo' AND column_name='con_lai') THEN
+        ALTER TABLE tm_cong_no_noi_bo ADD COLUMN con_lai DECIMAL(15,2) GENERATED ALWAYS AS (tong_no - tong_da_tra) STORED;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo' AND column_name='ngay_cap_nhat') THEN
+        ALTER TABLE tm_cong_no_noi_bo ADD COLUMN ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_cong_no_nb_kho_no ON tm_cong_no_noi_bo(ma_kho_no);
 CREATE INDEX idx_tm_cong_no_nb_kho_co ON tm_cong_no_noi_bo(ma_kho_co);
@@ -77,16 +121,36 @@ CREATE TABLE IF NOT EXISTS tm_cong_no_noi_bo_ct (
     id SERIAL PRIMARY KEY,
     ma_kho_no VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
     ma_kho_co VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
-    so_phieu_chuyen_kho VARCHAR(50), -- Link to tm_don_hang (loai = CHUYEN_KHO)
-    ngay_phat_sinh DATE NOT NULL,
-    so_tien DECIMAL(15,2) NOT NULL, -- Theo giá vốn
-    da_thanh_toan DECIMAL(15,2) DEFAULT 0,
-    con_lai DECIMAL(15,2) GENERATED ALWAYS AS (so_tien - da_thanh_toan) STORED,
-    han_thanh_toan DATE,
-    trang_thai enum_trang_thai_cong_no DEFAULT 'CHUA_TT',
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ngay_phat_sinh DATE NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='so_phieu_chuyen_kho') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN so_phieu_chuyen_kho VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='so_tien') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN so_tien DECIMAL(15,2) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='da_thanh_toan') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN da_thanh_toan DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='con_lai') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN con_lai DECIMAL(15,2) GENERATED ALWAYS AS (so_tien - da_thanh_toan) STORED;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='han_thanh_toan') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN han_thanh_toan DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='trang_thai') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN trang_thai enum_trang_thai_cong_no DEFAULT 'CHUA_TT';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_cong_no_noi_bo_ct' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_cong_no_noi_bo_ct ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_cong_no_nb_ct_kho_no ON tm_cong_no_noi_bo_ct(ma_kho_no);
 CREATE INDEX idx_tm_cong_no_nb_ct_kho_co ON tm_cong_no_noi_bo_ct(ma_kho_co);
@@ -100,20 +164,48 @@ COMMENT ON TABLE tm_cong_no_noi_bo_ct IS 'Chi tiết công nợ nội bộ';
 CREATE TABLE IF NOT EXISTS tm_phieu_thu_chi (
     id SERIAL PRIMARY KEY,
     so_phieu_tc VARCHAR(50) UNIQUE NOT NULL,
-    loai_phieu enum_loai_phieu_thu_chi NOT NULL,
-    so_tien DECIMAL(15,2) NOT NULL,
-    hinh_thuc enum_hinh_thuc_thanh_toan NOT NULL,
-    ma_hoa_don VARCHAR(50) REFERENCES tm_hoa_don(so_hoa_don), -- Link để trừ nợ
-    ma_doi_tac VARCHAR(50) REFERENCES dm_doi_tac(ma_doi_tac),
-    ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho),
-    ngay_giao_dich TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    noi_dung TEXT,
-    nguoi_lap VARCHAR(100),
-    nguoi_nhan VARCHAR(100), -- Người nhận tiền (nếu CHI)
-    nguoi_nop VARCHAR(100), -- Người nộp tiền (nếu THU)
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    so_tien DECIMAL(15,2) NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='loai_phieu') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN loai_phieu enum_loai_phieu_thu_chi NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='hinh_thuc') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN hinh_thuc enum_hinh_thuc_thanh_toan NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ma_hoa_don') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ma_hoa_don VARCHAR(50) REFERENCES tm_hoa_don(so_hoa_don);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ma_doi_tac') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ma_doi_tac VARCHAR(50) REFERENCES dm_doi_tac(ma_doi_tac);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ma_kho') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ngay_giao_dich') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ngay_giao_dich TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='noi_dung') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN noi_dung TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='nguoi_lap') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN nguoi_lap VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='nguoi_nhan') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN nguoi_nhan VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='nguoi_nop') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN nguoi_nop VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ghi_chu') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_phieu_thu_chi' AND column_name='ngay_tao') THEN
+        ALTER TABLE tm_phieu_thu_chi ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_phieu_tc_loai ON tm_phieu_thu_chi(loai_phieu);
 CREATE INDEX idx_tm_phieu_tc_hoa_don ON tm_phieu_thu_chi(ma_hoa_don);

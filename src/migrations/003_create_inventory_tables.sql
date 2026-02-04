@@ -69,14 +69,27 @@ CREATE TABLE IF NOT EXISTS tm_hang_hoa_ton_kho (
     id SERIAL PRIMARY KEY,
     ma_hang_hoa VARCHAR(50) REFERENCES tm_hang_hoa(ma_hang_hoa) NOT NULL,
     ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
-    so_luong_ton INTEGER DEFAULT 0,
-    so_luong_khoa INTEGER DEFAULT 0, -- Số lượng đang bị khóa (chờ xuất)
-    so_luong_toi_thieu INTEGER DEFAULT 0, -- Cảnh báo tồn kho
-    gia_von_binh_quan DECIMAL(15,2) DEFAULT 0, -- Weighted average cost
-    cap_nhat_cuoi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
     UNIQUE(ma_hang_hoa, ma_kho)
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_ton_kho' AND column_name='so_luong_ton') THEN
+        ALTER TABLE tm_hang_hoa_ton_kho ADD COLUMN so_luong_ton INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_ton_kho' AND column_name='so_luong_khoa') THEN
+        ALTER TABLE tm_hang_hoa_ton_kho ADD COLUMN so_luong_khoa INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_ton_kho' AND column_name='so_luong_toi_thieu') THEN
+        ALTER TABLE tm_hang_hoa_ton_kho ADD COLUMN so_luong_toi_thieu INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_ton_kho' AND column_name='gia_von_binh_quan') THEN
+        ALTER TABLE tm_hang_hoa_ton_kho ADD COLUMN gia_von_binh_quan DECIMAL(15,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_ton_kho' AND column_name='cap_nhat_cuoi') THEN
+        ALTER TABLE tm_hang_hoa_ton_kho ADD COLUMN cap_nhat_cuoi TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hang_hoa_ton_kho_hang ON tm_hang_hoa_ton_kho(ma_hang_hoa);
 CREATE INDEX idx_tm_hang_hoa_ton_kho_kho ON tm_hang_hoa_ton_kho(ma_kho);
@@ -94,12 +107,24 @@ CREATE TABLE IF NOT EXISTS tm_hang_hoa_khoa (
     id SERIAL PRIMARY KEY,
     ma_hang_hoa VARCHAR(50) REFERENCES tm_hang_hoa(ma_hang_hoa) NOT NULL,
     ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho) NOT NULL,
-    so_phieu VARCHAR(50) NOT NULL, -- Số đơn hàng/phiếu chuyển kho
-    loai_phieu VARCHAR(50) NOT NULL, -- DON_HANG, CHUYEN_KHO
-    so_luong_khoa INTEGER NOT NULL,
-    ly_do TEXT,
-    ngay_khoa TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    so_phieu VARCHAR(50) NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_khoa' AND column_name='loai_phieu') THEN
+        ALTER TABLE tm_hang_hoa_khoa ADD COLUMN loai_phieu VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_khoa' AND column_name='so_luong_khoa') THEN
+        ALTER TABLE tm_hang_hoa_khoa ADD COLUMN so_luong_khoa INTEGER NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_khoa' AND column_name='ly_do') THEN
+        ALTER TABLE tm_hang_hoa_khoa ADD COLUMN ly_do TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_khoa' AND column_name='ngay_khoa') THEN
+        ALTER TABLE tm_hang_hoa_khoa ADD COLUMN ngay_khoa TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hang_hoa_khoa_phieu ON tm_hang_hoa_khoa(so_phieu);
 CREATE INDEX idx_tm_hang_hoa_khoa_hang_kho ON tm_hang_hoa_khoa(ma_hang_hoa, ma_kho);
@@ -111,19 +136,45 @@ COMMENT ON TABLE tm_hang_hoa_khoa IS 'Tracking khóa tồn kho batch (tương t�
 -- =====================================================
 CREATE TABLE IF NOT EXISTS tm_hang_hoa_lich_su (
     id SERIAL PRIMARY KEY,
-    ma_hang_hoa VARCHAR(50) REFERENCES tm_hang_hoa(ma_hang_hoa),
-    ma_serial VARCHAR(100) REFERENCES tm_hang_hoa_serial(ma_serial), -- NULL nếu BATCH
-    loai_giao_dich VARCHAR(50) NOT NULL, -- NHAP, XUAT, CHUYEN_KHO, BAN, MUA
-    so_chung_tu VARCHAR(50),
-    ngay_giao_dich TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ma_kho_xuat VARCHAR(50) REFERENCES sys_kho(ma_kho),
-    ma_kho_nhap VARCHAR(50) REFERENCES sys_kho(ma_kho),
-    so_luong INTEGER DEFAULT 1, -- 1 cho SERIAL, N cho BATCH
-    don_gia DECIMAL(15,2),
-    thanh_tien DECIMAL(15,2),
-    nguoi_thuc_hien VARCHAR(100),
-    dien_giai TEXT
+    ma_hang_hoa VARCHAR(50) REFERENCES tm_hang_hoa(ma_hang_hoa)
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='ma_serial') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN ma_serial VARCHAR(100) REFERENCES tm_hang_hoa_serial(ma_serial);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='loai_giao_dich') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN loai_giao_dich VARCHAR(50) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='so_chung_tu') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN so_chung_tu VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='ngay_giao_dich') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN ngay_giao_dich TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='ma_kho_xuat') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN ma_kho_xuat VARCHAR(50) REFERENCES sys_kho(ma_kho);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='ma_kho_nhap') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN ma_kho_nhap VARCHAR(50) REFERENCES sys_kho(ma_kho);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='so_luong') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN so_luong INTEGER DEFAULT 1;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='don_gia') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN don_gia DECIMAL(15,2);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='thanh_tien') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN thanh_tien DECIMAL(15,2);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='nguoi_thuc_hien') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN nguoi_thuc_hien VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tm_hang_hoa_lich_su' AND column_name='dien_giai') THEN
+        ALTER TABLE tm_hang_hoa_lich_su ADD COLUMN dien_giai TEXT;
+    END IF;
+END $$;
 
 CREATE INDEX idx_tm_hang_hoa_lich_su_hang ON tm_hang_hoa_lich_su(ma_hang_hoa);
 CREATE INDEX idx_tm_hang_hoa_lich_su_serial ON tm_hang_hoa_lich_su(ma_serial);
