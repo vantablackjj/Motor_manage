@@ -11,23 +11,58 @@
 CREATE TABLE IF NOT EXISTS dm_doi_tac (
     id SERIAL PRIMARY KEY,
     ma_doi_tac VARCHAR(50) UNIQUE NOT NULL,
-    ten_doi_tac VARCHAR(255) NOT NULL,
-    loai_doi_tac enum_loai_doi_tac NOT NULL DEFAULT 'KHACH_HANG',
-    ma_so_thue VARCHAR(50),
-    dia_chi TEXT,
-    dien_thoai VARCHAR(20),
-    email VARCHAR(100),
-    so_cmnd VARCHAR(20),
-    ngay_sinh DATE,
-    ho_khau TEXT,
-    dai_dien VARCHAR(255),
-    tai_khoan VARCHAR(50),
-    ngan_hang VARCHAR(100),
-    status BOOLEAN DEFAULT TRUE,
-    ghi_chu TEXT,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ten_doi_tac VARCHAR(255) NOT NULL
 );
+
+-- Ensure all columns exist (in case of previous CASCADE drops)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='loai_doi_tac') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN loai_doi_tac enum_loai_doi_tac NOT NULL DEFAULT 'KHACH_HANG';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ma_so_thue') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ma_so_thue VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='dia_chi') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN dia_chi TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='dien_thoai') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN dien_thoai VARCHAR(20);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='email') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN email VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='so_cmnd') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN so_cmnd VARCHAR(20);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ngay_sinh') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ngay_sinh DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ho_khau') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ho_khau TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='dai_dien') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN dai_dien VARCHAR(255);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='tai_khoan') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN tai_khoan VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ngan_hang') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ngan_hang VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='status') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN status BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ghi_chu') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ghi_chu TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ngay_tao') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dm_doi_tac' AND column_name='ngay_cap_nhat') THEN
+        ALTER TABLE dm_doi_tac ADD COLUMN ngay_cap_nhat TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_dm_doi_tac_loai ON dm_doi_tac(loai_doi_tac);
 CREATE INDEX idx_dm_doi_tac_status ON dm_doi_tac(status);
