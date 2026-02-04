@@ -13,12 +13,12 @@ DECLARE
 BEGIN
     -- 1. Ensure ADMIN role exists and get its ID
     -- Note: Migration 006 already creates default roles, but we ensure it here too
-    IF NOT EXISTS (SELECT 1 FROM sys_role WHERE ten_quyen = 'ADMIN') THEN
+    IF NOT EXISTS (SELECT 1 FROM sys_role WHERE ten_quyen = 'ADMIN' OR ma_quyen = 'ADMIN') THEN
         INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
         VALUES ('ADMIN', 'ADMIN', 'Quản trị viên hệ thống', '{"view_gia_von": true, "edit_don_hang": true, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE);
     END IF;
 
-    SELECT id INTO admin_role_id FROM sys_role WHERE ten_quyen = 'ADMIN' LIMIT 1;
+    SELECT id INTO admin_role_id FROM sys_role WHERE ten_quyen = 'ADMIN' OR ma_quyen = 'ADMIN' LIMIT 1;
 
     -- 2. Create the admin user if it doesn't exist
     IF NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'admin') THEN
