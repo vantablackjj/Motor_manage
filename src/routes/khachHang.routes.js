@@ -12,6 +12,9 @@ const brandSchema = Joi.object({
   email: Joi.string().email().max(100).allow(null, ""),
   ho_khau: Joi.string().max(300).allow(null, ""),
   la_ncc: Joi.boolean().default(false),
+  loai_doi_tac: Joi.string()
+    .valid("KHACH_HANG", "NHA_CUNG_CAP", "CA_HAI")
+    .allow(null, ""),
   ngay_sinh: Joi.date().allow(null, ""),
   ma_so_thue: Joi.string().max(50).allow(null, ""),
   so_cmnd: Joi.string().max(20).allow(null, ""),
