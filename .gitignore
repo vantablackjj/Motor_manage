@@ -27,8 +27,27 @@ tmp/
 temp/
 debug_*.js
 fix_*.js
-test_connection.js
+test_*.js
+check_*.js
+list_*.js
+dump_*.js
+add_*.js
+reset_*.js
+seedAdmin.js
 *.bak
+
+# Check & Logs Output
+*.txt
+*.sql
+*.xlsx
+*.json
+
+# Specific files found
+full_tables.txt
+tables.txt
+tables_final.txt
+result_po.txt
+logo.png
 
 # System
 Thumbs.db
