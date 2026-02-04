@@ -38,7 +38,9 @@ seedAdmin.js
 
 # Check & Logs Output
 *.txt
-*.sql
+# *.sql
+!src/migrations/*.sql
+
 *.xlsx
 # Ignore data dumps but keep configuration
 *_dump.json

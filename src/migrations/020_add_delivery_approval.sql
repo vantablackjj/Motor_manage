@@ -5,9 +5,8 @@
 -- Date: 2026-02-04
 -- =====================================================
 
--- Step 1: Add new states to enum_trang_thai_hoa_don
-ALTER TYPE enum_trang_thai_hoa_don ADD VALUE IF NOT EXISTS 'CHO_DUYET_GIAO';
-ALTER TYPE enum_trang_thai_hoa_don ADD VALUE IF NOT EXISTS 'DA_DUYET_GIAO';
+-- Step 1 is already handled in 018_add_delivery_enum_values.sql
+
 
 -- Step 2: Add approval tracking columns to tm_hoa_don
 ALTER TABLE tm_hoa_don 
