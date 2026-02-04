@@ -8,8 +8,8 @@
 DO $$
 DECLARE
     admin_role_id INTEGER;
-    -- Password hash for 'admin' (bcrypt 10 rounds)
-    admin_password_hash VARCHAR(255) := '$2a$10$oM80aibKQsOI4nPc3CP4j1HYGzXI9piH4YInQW17YJt0vDC'; 
+    -- Password hash for 'admin123456' (bcrypt 10 rounds)
+    admin_password_hash VARCHAR(255) := '$2a$10$DTqtXrvDplJxTjaVWE7G07bZ2sEWMgvzuR7G9mq0XH8H0.E'; 
 BEGIN
     -- 1. Ensure ADMIN role exists and get its ID
     -- Note: Migration 006 already creates default roles, but we ensure it here too
@@ -39,15 +39,15 @@ BEGIN
             admin_role_id, 
             TRUE
         );
-        RAISE NOTICE 'Admin user created successfully with password: admin';
+        RAISE NOTICE 'Admin user created successfully with password: admin123456';
     ELSE
-        -- If user exists but login failed, update the password to 'admin'
+        -- If user exists, update the password to 'admin123456'
         UPDATE sys_user 
         SET password_hash = admin_password_hash,
             role_id = admin_role_id,
             status = TRUE
         WHERE username = 'admin';
-        RAISE NOTICE 'Admin user already exists. Password reset to: admin';
+        RAISE NOTICE 'Admin user password reset to: admin123456';
     END IF;
 
 END $$;
