@@ -178,12 +178,30 @@ COMMENT ON COLUMN tm_hang_hoa.thong_so_ky_thuat IS 'JSONB: Thuộc tính chung c
 -- =====================================================
 CREATE TABLE IF NOT EXISTS sys_role (
     id SERIAL PRIMARY KEY,
-    ten_quyen VARCHAR(50) UNIQUE NOT NULL,
-    mo_ta TEXT,
-    permissions JSONB DEFAULT '{}',
-    status BOOLEAN DEFAULT TRUE,
-    ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ten_quyen VARCHAR(50) UNIQUE NOT NULL
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_role' AND column_name='ma_quyen') THEN
+        ALTER TABLE sys_role ADD COLUMN ma_quyen VARCHAR(50);
+    END IF;
+    -- Ensure ma_quyen is nullable or has a default to avoid NOT NULL violations during migration
+    ALTER TABLE sys_role ALTER COLUMN ma_quyen DROP NOT NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_role' AND column_name='mo_ta') THEN
+        ALTER TABLE sys_role ADD COLUMN mo_ta TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_role' AND column_name='permissions') THEN
+        ALTER TABLE sys_role ADD COLUMN permissions JSONB DEFAULT '{}';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_role' AND column_name='status') THEN
+        ALTER TABLE sys_role ADD COLUMN status BOOLEAN DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sys_role' AND column_name='ngay_tao') THEN
+        ALTER TABLE sys_role ADD COLUMN ngay_tao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
 
 CREATE INDEX idx_sys_role_status ON sys_role(status);
 

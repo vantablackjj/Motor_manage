@@ -145,14 +145,14 @@ BEGIN
 END $$;
 
 -- 7. CREATE DEFAULT ROLES
-INSERT INTO sys_role (ten_quyen, mo_ta, permissions, status)
-SELECT v.ten_quyen, v.mo_ta, v.permissions, v.status
+INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
+SELECT v.ma_quyen, v.ten_quyen, v.mo_ta, v.permissions, v.status
 FROM (VALUES 
-    ('ADMIN', 'Quản trị viên', '{"view_gia_von": true, "edit_don_hang": true, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
-    ('KHO', 'Nhân viên kho', '{"view_gia_von": false, "edit_don_hang": false, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE),
-    ('KE_TOAN', 'Kế toán', '{"view_gia_von": true, "edit_don_hang": false, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
-    ('SALE', 'Nhân viên bán hàng', '{"view_gia_von": false, "edit_don_hang": true, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE)
-) AS v(ten_quyen, mo_ta, permissions, status)
+    ('ADMIN', 'ADMIN', 'Quản trị viên', '{"view_gia_von": true, "edit_don_hang": true, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
+    ('KHO', 'KHO', 'Nhân viên kho', '{"view_gia_von": false, "edit_don_hang": false, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE),
+    ('KE_TOAN', 'KE_TOAN', 'Kế toán', '{"view_gia_von": true, "edit_don_hang": false, "duyet_phieu": true, "view_reports": true}'::jsonb, TRUE),
+    ('SALE', 'SALE', 'Nhân viên bán hàng', '{"view_gia_von": false, "edit_don_hang": true, "duyet_phieu": false, "view_reports": false}'::jsonb, TRUE)
+) AS v(ma_quyen, ten_quyen, mo_ta, permissions, status)
 WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE sys_role.ten_quyen = v.ten_quyen);
 
 -- Assign default role to existing users
