@@ -94,8 +94,6 @@ class MigrationRunner {
     } catch (error) {
       logger.error("Migration process failed", error);
       throw error;
-    } finally {
-      await pool.end();
     }
   }
 
