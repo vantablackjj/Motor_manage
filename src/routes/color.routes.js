@@ -1,10 +1,9 @@
-
-const Joi = require('joi');
+const Joi = require("joi");
 // routes/color.routes.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const  colorSchema = Joi.object({
+const colorSchema = Joi.object({
   ma_mau: Joi.string().required().max(50),
   ten_mau: Joi.string().required().max(100),
   gia_tri: Joi.string().required().max(50),
@@ -12,38 +11,45 @@ const  colorSchema = Joi.object({
   status: Joi.boolean().default(true),
 });
 
-const { authenticate } = require('../middleware/auth');
-const { checkRole } = require('../middleware/roleCheck');
-const { validate } = require('../middleware/validation');
-const { ROLES } = require('../config/constants');
+const updateColorSchema = Joi.object({
+  ma_mau: Joi.string().max(50),
+  ten_mau: Joi.string().max(100),
+  gia_tri: Joi.string().max(50),
+  mac_dinh: Joi.boolean(),
+  status: Joi.boolean(),
+});
 
-const colorController = require('../controllers/color.controller');
+const { authenticate } = require("../middleware/auth");
+const { checkRole } = require("../middleware/roleCheck");
+const { validate } = require("../middleware/validation");
+const { ROLES } = require("../config/constants");
 
+const colorController = require("../controllers/color.controller");
 
-router.get('/', authenticate, colorController.getAll);
-router.get('/:id', authenticate, colorController.getOne);
+router.get("/", authenticate, colorController.getAll);
+router.get("/:ma_mau", authenticate, colorController.getOne);
 
 router.post(
-  '/',
+  "/",
   authenticate,
   checkRole(ROLES.ADMIN),
   validate(colorSchema),
-  colorController.create
+  colorController.create,
 );
 
 router.put(
-  '/:ma_mau',
+  "/:ma_mau",
   authenticate,
   checkRole(ROLES.ADMIN),
-  validate(colorSchema),
-  colorController.update
+  validate(updateColorSchema),
+  colorController.update,
 );
 
 router.delete(
-  '/:id',
+  "/:ma_mau",
   authenticate,
   checkRole(ROLES.ADMIN),
-  colorController.remove
+  colorController.remove,
 );
 
 module.exports = router;

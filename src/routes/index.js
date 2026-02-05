@@ -37,6 +37,7 @@ router.use("/chuyen-kho", chuyenKhoRoutes);
 router.use("/xe", xeRoutes);
 router.use("/color", colorRoutes);
 router.use("/brand", brandRoutes);
+router.use("/nhom-hang", brandRoutes);
 router.use("/loai-hinh", loaiHinhRoutes);
 router.use("/noi-sx", noiSx);
 router.use("/model-car", modelCarRoutes);

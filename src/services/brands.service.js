@@ -4,26 +4,26 @@ const { query } = require("../config/database");
 class BrandService {
   // Lấy danh sách thương hiệu/nhóm hàng
   static async getAll(filters = {}) {
-    let sql = `SELECT id, ma_nhom as ma_nh, ten_nhom as ten_nh, status
+    let sql = `SELECT id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha
              FROM dm_nhom_hang
              WHERE 1=1`;
     const params = [];
     let idx = 1;
 
-    // Filter by Parent Group (ma_nhom_cha)
-    // Default to 'XE' (Vehicles) if not specified to preserve backward compatibility
-    if (filters.ma_nhom_cha) {
+    // Support both 'type' and 'ma_nhom_cha' filters
+    const parentFilter = filters.type || filters.ma_nhom_cha;
+
+    if (parentFilter) {
       sql += ` AND ma_nhom_cha = $${idx++}`;
-      params.push(filters.ma_nhom_cha);
+      params.push(parentFilter);
     } else {
+      // Default to 'XE' for backward compatibility
       sql += ` AND ma_nhom_cha = 'XE'`;
     }
 
     // Filter by status
     if (filters.status !== undefined) {
-      if (String(filters.status) === "all") {
-        // Return ALL (active + deleted)
-      } else {
+      if (String(filters.status) !== "all") {
         sql += ` AND status = $${idx++}`;
         params.push(filters.status === "true" || filters.status === true);
       }
@@ -51,7 +51,8 @@ class BrandService {
 
   // Tạo mới thương hiệu / nhóm hàng
   static async create(data) {
-    const { ten_nh, type = "XE" } = data;
+    const { ten_nh } = data;
+    const type = data.ma_nhom_cha || data.type || "XE";
     const { generateCode } = require("../ultils/codeGenerator");
 
     // Generate code

@@ -11,6 +11,13 @@ const brandSchema = Joi.object({
   type: Joi.string().valid("XE", "PT").default("XE"),
 });
 
+const updateBrandSchema = Joi.object({
+  ma_nh: Joi.string().max(50),
+  ten_nh: Joi.string().max(200),
+  status: Joi.boolean(),
+  type: Joi.string().valid("XE", "PT"),
+});
+
 const { authenticate } = require("../middleware/auth");
 const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
@@ -33,7 +40,7 @@ router.put(
   "/:id",
   authenticate,
   checkRole(ROLES.ADMIN),
-  validate(brandSchema),
+  validate(updateBrandSchema),
   controller.update,
 );
 

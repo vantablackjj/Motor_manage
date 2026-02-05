@@ -3,13 +3,24 @@ const { query } = require("../config/database");
 
 class ColorService {
   // Lấy danh sách màu
-  static async getAll() {
-    const result = await query(
-      `SELECT ma_mau, ten_mau, gia_tri, mac_dinh, status
-       FROM dm_mau
-       WHERE status = true
-       ORDER BY ten_mau`,
-    );
+  static async getAll(filters = {}) {
+    let sql = `SELECT ma_mau, ten_mau, gia_tri, mac_dinh, status
+               FROM dm_mau
+               WHERE 1=1`;
+    const params = [];
+    let idx = 1;
+
+    if (filters.status !== undefined) {
+      if (String(filters.status) !== "all") {
+        sql += ` AND status = $${idx++}`;
+        params.push(filters.status === "true" || filters.status === true);
+      }
+    } else {
+      sql += ` AND status = true`;
+    }
+
+    sql += ` ORDER BY ten_mau`;
+    const result = await query(sql, params);
     return result.rows;
   }
 
