@@ -111,28 +111,33 @@ class OrderService {
   }
 
   /**
-   * Add a single item to an existing order (only if status is NHAP)
+   * Add item to existing order (Only in NHAP status)
    */
-  static async addItemToOrder(idOrNo, itemData) {
-    const { ma_hang_hoa, so_luong_dat, don_gia, yeu_cau_dac_biet } = itemData;
+  static async addItemToOrder(so_don_hang, itemData) {
+    const {
+      ma_hang_hoa,
+      so_luong_dat,
+      don_gia,
+      loai_hang, // This was added in the instruction, but not used in the provided snippet. Keeping it for consistency.
+      yeu_cau_dac_biet,
+    } = itemData;
 
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // 1. Find the order and verify status
-      const orderRes = await client.query(
-        `SELECT so_don_hang, trang_thai FROM tm_don_hang 
-         WHERE so_don_hang = $1 
-         OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
-        [idOrNo],
+      // 1. Get order and verify
+      const orderResult = await client.query(
+        `SELECT * FROM tm_don_hang WHERE so_don_hang = $1::text OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+        [so_don_hang],
       );
+      const order = orderResult.rows[0];
 
-      const order = orderRes.rows[0];
+      // STRICT CHECK: Only allow adding items in NHAP status
       if (!order) throw new Error("Đơn hàng không tồn tại");
       if (order.trang_thai !== "NHAP") {
         throw new Error(
-          `Chỉ có thể thêm hàng vào đơn ở trạng thái NHAP. Hiện tại: ${order.trang_thai}`,
+          `Không thể thêm sản phẩm vào đơn hàng ở trạng thái ${order.trang_thai}. Chỉ được phép thêm sản phẩm khi đơn hàng ở trạng thái Nháp (NHAP).`,
         );
       }
 
@@ -160,15 +165,15 @@ class OrderService {
 
       // 4. Update order total
       await client.query(
-        `UPDATE tm_don_hang
-         SET tong_gia_tri = (SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1),
-             thanh_tien = (
-               SELECT (SUM(so_luong_dat * don_gia) - chiet_khau + (SUM(so_luong_dat * don_gia) * vat_percentage / 100))
-               FROM tm_don_hang_chi_tiet, tm_don_hang
-               WHERE tm_don_hang_chi_tiet.so_don_hang = $1 AND tm_don_hang.so_don_hang = $1
-               GROUP BY chiet_khau, vat_percentage
-             )
-         WHERE so_don_hang = $1`,
+        `UPDATE tm_don_hang d
+         SET tong_gia_tri = sub.total,
+             thanh_tien = sub.total - d.chiet_khau + (sub.total * d.vat_percentage / 100)
+         FROM (
+           SELECT COALESCE(SUM(so_luong_dat * don_gia), 0) as total
+           FROM tm_don_hang_chi_tiet
+           WHERE so_don_hang = $1
+         ) sub
+         WHERE d.so_don_hang = $1`,
         [order.so_don_hang],
       );
 
@@ -183,26 +188,25 @@ class OrderService {
   }
 
   /**
-   * Remove a single item from an existing order (only if status is NHAP)
+   * Remove item from order (Only in NHAP status)
    */
-  static async removeItemFromOrder(idOrNo, stt) {
+  static async removeItemFromOrder(so_don_hang, stt) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // 1. Find the order and verify status
-      const orderRes = await client.query(
-        `SELECT so_don_hang, trang_thai FROM tm_don_hang 
-         WHERE so_don_hang = $1 
-         OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
-        [idOrNo],
+      // 1. Get order and verify
+      const orderResult = await client.query(
+        `SELECT * FROM tm_don_hang WHERE so_don_hang = $1::text OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+        [so_don_hang],
       );
-
-      const order = orderRes.rows[0];
+      const order = orderResult.rows[0];
       if (!order) throw new Error("Đơn hàng không tồn tại");
+
+      // STRICT CHECK: Only allow removing items in NHAP status
       if (order.trang_thai !== "NHAP") {
         throw new Error(
-          `Chỉ có thể xóa hàng khỏi đơn ở trạng thái NHAP. Hiện tại: ${order.trang_thai}`,
+          `Không thể xóa sản phẩm khỏi đơn hàng ở trạng thái ${order.trang_thai}. Chỉ được phép xóa sản phẩm khi đơn hàng ở trạng thái Nháp (NHAP).`,
         );
       }
 
@@ -218,15 +222,15 @@ class OrderService {
 
       // 3. Update order total
       await client.query(
-        `UPDATE tm_don_hang
-         SET tong_gia_tri = COALESCE((SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1), 0),
-             thanh_tien = (
-               SELECT COALESCE((SUM(so_luong_dat * don_gia) - chiet_khau + (SUM(so_luong_dat * don_gia) * vat_percentage / 100)), 0)
-               FROM tm_don_hang_chi_tiet, tm_don_hang
-               WHERE tm_don_hang_chi_tiet.so_don_hang = $1 AND tm_don_hang.so_don_hang = $1
-               GROUP BY chiet_khau, vat_percentage
-             )
-         WHERE so_don_hang = $1`,
+        `UPDATE tm_don_hang d
+         SET tong_gia_tri = sub.total,
+             thanh_tien = sub.total - d.chiet_khau + (sub.total * d.vat_percentage / 100)
+         FROM (
+           SELECT COALESCE(SUM(so_luong_dat * don_gia), 0) as total
+           FROM tm_don_hang_chi_tiet
+           WHERE so_don_hang = $1
+         ) sub
+         WHERE d.so_don_hang = $1`,
         [order.so_don_hang],
       );
 
@@ -273,8 +277,14 @@ class OrderService {
       );
 
       const vat_percentage = order.vat_percentage || 0;
-      const tien_thue_gtgt = (tong_tien * vat_percentage) / 100;
-      const inv_thanh_tien = tong_tien + tien_thue_gtgt;
+
+      // Proportional discount calculation
+      const orderTotal = Number(order.tong_gia_tri) || 1; // Avoid division by zero
+      const invDiscount =
+        (Number(order.chiet_khau) || 0) * (tong_tien / orderTotal);
+
+      const tien_thue_gtgt = ((tong_tien - invDiscount) * vat_percentage) / 100;
+      const inv_thanh_tien = tong_tien - invDiscount + tien_thue_gtgt;
 
       // 3. Insert Invoice Header
       await client.query(
@@ -282,8 +292,8 @@ class OrderService {
         INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_tien, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap, ghi_chu
-        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $9, $10, 'DA_GIAO', $11, $12)
+          tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap, ghi_chu
+        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $9, $10, $11, 'DA_GIAO', $12, $13)
       `,
         [
           so_hoa_don,
@@ -294,6 +304,7 @@ class OrderService {
           order.ma_ben_nhap,
           order.loai_ben_nhap,
           tong_tien,
+          invDiscount,
           tien_thue_gtgt,
           inv_thanh_tien,
           nguoi_lap,
@@ -455,7 +466,7 @@ class OrderService {
       // 8. Update Order Header Status if all items delivered
       const remainingResult = await client.query(
         `
-        SELECT SUM(so_luong_con_lai) as total_remaining FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1
+        SELECT SUM(so_luong_dat - so_luong_da_giao) as total_remaining FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1
       `,
         [order.so_don_hang],
       );
@@ -631,13 +642,59 @@ class OrderService {
   }
 
   /**
-   * Update order header (Discount, VAT, Note)
+   * Update Order Header (VAT, Discount, Notes) - Only allowed in NHAP status
    */
-  static async updateOrder(idOrNo, data) {
-    const { vat_percentage, chiet_khau, ghi_chu } = data;
+  static async updateOrder(so_don_hang, updateData) {
+    const { vat_percentage, chiet_khau, ghi_chu } = updateData;
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // 1. Get current order and verify status
+      const orderResult = await client.query(
+        `SELECT * FROM tm_don_hang 
+         WHERE so_don_hang = $1::text 
+         OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+        [so_don_hang],
+      );
+      const order = orderResult.rows[0];
+      if (!order) throw new Error("Đơn hàng không tồn tại");
+
+      // STRICT CHECK: Only allow updates in NHAP status
+      if (order.trang_thai !== "NHAP") {
+        throw new Error(
+          `Không thể chỉnh sửa đơn hàng ở trạng thái ${order.trang_thai}. Chỉ được phép chỉnh sửa khi đơn hàng ở trạng thái Nháp (NHAP).`,
+        );
+      }
+
+      // 2. Update header fields
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      if (vat_percentage !== undefined) {
+        updates.push(`vat_percentage = $${paramCount++}`);
+        values.push(vat_percentage);
+      }
+      if (chiet_khau !== undefined) {
+        updates.push(`chiet_khau = $${paramCount++}`);
+        values.push(chiet_khau);
+      }
+      if (ghi_chu !== undefined) {
+        updates.push(`ghi_chu = $${paramCount++}`);
+        values.push(ghi_chu);
+      }
+
+      if (updates.length === 0) {
+        await client.query("ROLLBACK");
+        return order; // No updates to apply
+      }
+
+      // Recalculate thanh_tien if vat_percentage or chiet_khau are updated
+      updates.push(
+        `thanh_tien = (tong_gia_tri - COALESCE(chiet_khau, 0) + (tong_gia_tri * COALESCE(vat_percentage, 0) / 100))`,
+      );
 
       const res = await client.query(
         `UPDATE tm_don_hang 
@@ -650,8 +707,6 @@ class OrderService {
          RETURNING *`,
         [vat_percentage, chiet_khau, ghi_chu, idOrNo],
       );
-
-      if (res.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
 
       await client.query("COMMIT");
       return res.rows[0];
@@ -667,6 +722,30 @@ class OrderService {
    * Update Order Status (Approve, Cancel, etc.)
    */
   static async updateStatus(idOrNo, status, userId) {
+    // 1. Check current status
+    const checkRes = await pool.query(
+      `SELECT trang_thai FROM tm_don_hang 
+       WHERE so_don_hang = $1 
+       OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+      [idOrNo],
+    );
+
+    if (checkRes.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
+    const currentStatus = checkRes.rows[0].trang_thai;
+
+    // Business Rule: Once approved (DA_DUYET, DANG_GIAO, HOAN_THANH), cannot cancel or revert
+    const lockedStatuses = ["DA_DUYET", "DANG_GIAO", "HOAN_THANH"];
+    const revertStatuses = ["NHAP", "GUI_DUYET", "HUY", "TU_CHOI"];
+
+    if (
+      lockedStatuses.includes(currentStatus) &&
+      revertStatuses.includes(status)
+    ) {
+      throw new Error(
+        `Đơn hàng đã được xác nhận (${currentStatus}), không thể hủy hoặc thay đổi trạng thái về ${status}.`,
+      );
+    }
+
     const res = await pool.query(
       `UPDATE tm_don_hang 
        SET 
@@ -681,7 +760,6 @@ class OrderService {
       [status, userId, idOrNo],
     );
 
-    if (res.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
     return res.rows[0];
   }
 

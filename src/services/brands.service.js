@@ -34,7 +34,15 @@ class BrandService {
 
     sql += ` ORDER BY ten_nhom`;
 
+    // Debug logging
+    console.log("[BrandService.getAll] SQL:", sql);
+    console.log("[BrandService.getAll] Params:", params);
+    console.log("[BrandService.getAll] Filters:", filters);
+
     const result = await query(sql, params);
+
+    console.log("[BrandService.getAll] Result count:", result.rows.length);
+
     return result.rows;
   }
 
@@ -51,21 +59,23 @@ class BrandService {
 
   // Tạo mới thương hiệu / nhóm hàng
   static async create(data) {
-    const { ten_nh } = data;
-    const type = data.ma_nhom_cha || data.type || "XE";
+    const { ten_nh, ma_nhom_cha, type } = data;
+    // Priority: ma_nhom_cha > type > default "XE"
+    const parentGroup = ma_nhom_cha || type || "XE";
+
     const { generateCode } = require("../ultils/codeGenerator");
 
     // Generate code
     const ma_nh = await generateCode("dm_nhom_hang", "ma_nhom", "NH");
 
     // Đảm bảo nhóm cha tồn tại
-    if (type === "XE") {
+    if (parentGroup === "XE") {
       await query(
         `INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, status)
              VALUES ('XE', 'Xe máy', NULL, true)
              ON CONFLICT (ma_nhom) DO NOTHING`,
       );
-    } else if (type === "PT") {
+    } else if (parentGroup === "PT") {
       await query(
         `INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, status)
              VALUES ('PT', 'Phụ tùng', NULL, true)
@@ -77,7 +87,7 @@ class BrandService {
       `INSERT INTO dm_nhom_hang (ma_nhom, ten_nhom, ma_nhom_cha, status)
              VALUES ($1, $2, $3, true)
              RETURNING id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha`,
-      [ma_nh, String(ten_nh).trim(), type],
+      [ma_nh, String(ten_nh).trim(), parentGroup],
     );
     return result.rows[0];
   }
