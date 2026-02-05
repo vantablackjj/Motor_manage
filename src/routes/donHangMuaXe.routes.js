@@ -150,44 +150,80 @@ router.get(
     try {
       const { ma_phieu } = req.params;
       const DonHangMuaXeService = require("../services/donHangMuaXe.service");
+      const HoaDonBanService = require("../services/hoaDonBan.service");
       const PdfService = require("../services/pdf.service");
 
-      const order = await DonHangMuaXeService.getDetail(ma_phieu);
-      if (!order)
-        return res.status(404).json({ message: "Đơn hàng không tồn tại" });
+      let invoiceData = {};
 
-      // Map to Invoice Format
-      const invoiceData = {
-        so_hd: order.ma_phieu,
-        ngay_ban: order.ngay_dat_hang || order.created_at,
-        loai_hoa_don: "MUA_HANG",
+      if (
+        ma_phieu.startsWith("PNK") ||
+        ma_phieu.startsWith("HD") ||
+        ma_phieu.startsWith("CK")
+      ) {
+        const hd = await HoaDonBanService.getById(ma_phieu);
+        if (!hd)
+          return res.status(404).json({ message: "Phiếu không tồn tại" });
 
-        // PO uses ma_ncc and ma_kho_nhap
-        // Need names? getDetail usually returns names join (check service output or assume)
-        // If getDetail returns codes only, names will be missing.
-        // Assuming getDetail returns enriched data.
-        ten_ben_xuat: order.ten_ncc || order.ma_ncc,
-        dia_chi_ben_xuat: order.dia_chi_ncc || "",
-        sdt_ben_xuat: order.dien_thoai_ncc || "",
+        invoiceData = {
+          so_hd: hd.so_hd,
+          ngay_ban: hd.ngay_ban || hd.created_at,
+          loai_hoa_don: hd.loai_hoa_don,
+          ten_ben_xuat: hd.ten_ben_xuat,
+          dia_chi_ben_xuat: hd.dia_chi_ben_xuat,
+          sdt_ben_xuat: hd.sdt_ben_xuat,
+          ten_ben_nhap: hd.ten_ben_nhap,
+          dia_chi_ben_nhap: hd.dia_chi_ben_nhap,
+          ten_nguoi_tao: hd.nguoi_tao,
+          tong_tien: hd.tong_tien,
+          thanh_toan: hd.thanh_tien,
+          ghi_chu: hd.ghi_chu,
+          trang_thai: hd.trang_thai,
+          chi_tiet_pt: (hd.chi_tiet_pt || []).map((item) => ({
+            stt: item.stt,
+            ten_hang_hoa: item.ten_pt || item.ma_pt,
+            don_vi_tinh: item.don_vi_tinh || "Chiếc",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien,
+          })),
+          chi_tiet_xe: (hd.chi_tiet_xe || []).map((item) => ({
+            stt: item.stt,
+            ten_hang_hoa: item.ten_pt || item.ma_pt,
+            don_vi_tinh: "Chiếc",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien,
+          })),
+        };
+      } else {
+        const order = await DonHangMuaXeService.getDetail(ma_phieu);
+        if (!order)
+          return res.status(404).json({ message: "Đơn hàng không tồn tại" });
 
-        ten_ben_nhap: order.ten_kho_nhap || order.ma_kho_nhap,
-        dia_chi_ben_nhap: order.dia_chi_kho_nhap || "",
-
-        ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
-        tong_tien: order.tong_tien,
-        ghi_chu: order.ghi_chu,
-        thanh_toan: 0, // PO usually not paid yet in this context or partial
-        trang_thai: order.trang_thai,
-
-        chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
-          stt: idx + 1,
-          ten_hang_hoa: item.ten_xe || item.ma_loai_xe, // PO Xe
-          don_vi_tinh: "Chiếc",
-          so_luong: item.so_luong,
-          don_gia: item.don_gia,
-          thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
-        })),
-      };
+        invoiceData = {
+          so_hd: order.so_phieu,
+          ngay_ban: order.ngay_dat_hang || order.created_at,
+          loai_hoa_don: "MUA_HANG",
+          ten_ben_xuat: order.ten_ncc || order.ma_ncc,
+          dia_chi_ben_xuat: order.dia_chi_ncc || "",
+          sdt_ben_xuat: order.dien_thoai_ncc || "",
+          ten_ben_nhap: order.ten_kho_nhap || order.ma_kho_nhap,
+          dia_chi_ben_nhap: order.dia_chi_kho_nhap || "",
+          ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
+          tong_tien: order.tong_tien,
+          ghi_chu: order.ghi_chu,
+          thanh_toan: 0,
+          trang_thai: order.trang_thai,
+          chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
+            stt: idx + 1,
+            ten_hang_hoa: item.ten_xe || item.ten_loai_xe || item.ma_loai_xe,
+            don_vi_tinh: "Chiếc",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
+          })),
+        };
+      }
 
       await PdfService.generateInvoicePdf(invoiceData, res);
     } catch (err) {

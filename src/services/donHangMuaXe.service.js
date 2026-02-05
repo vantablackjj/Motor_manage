@@ -672,85 +672,161 @@ class DonHangMuaXeService {
    * 8. Nhập kho xe
    * ========================= */
   async nhapKhoXe(maPhieu, danhSachXe, userId) {
-    const results = {
-      success: [],
-      errors: [],
-    };
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    // 1. Get current status and standard ID
-    const orderRes = await pool.query(
-      `SELECT so_don_hang, trang_thai FROM tm_don_hang 
-       WHERE so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)`,
-      [maPhieu],
-    );
-
-    if (!orderRes.rows.length) {
-      throw { status: 404, message: "Đơn hàng không tồn tại" };
-    }
-
-    const { so_don_hang, trang_thai } = orderRes.rows[0];
-
-    // Allow Approved or Partially Receiving
-    const validStatuses = ["DA_DUYET", "DANG_NHAP_KHO"];
-    if (!validStatuses.includes(trang_thai)) {
-      throw {
-        status: 400,
-        message: `Đơn hàng phải ở trạng thái ĐÃ DUYỆT hoặc ĐANG NHẬP KHO. Trạng thái hiện tại: ${trang_thai}`,
-      };
-    }
-
-    // 2. Process items
-    for (const item of danhSachXe) {
-      try {
-        const result = await VehicleService.nhapXeTuDonHang(
-          so_don_hang, // Use standardized ID
-          item.id,
-          item,
-          userId,
-        );
-        results.success.push({
-          id: item.id,
-          xe_key: result.data.xe_key,
-        });
-      } catch (err) {
-        results.errors.push({
-          id: item.id,
-          message: err.message,
-        });
-      }
-    }
-
-    // 3. Post-process Status Update
-    const checkRes = await pool.query(
-      `SELECT 
-        COUNT(*) as total_items,
-        COUNT(*) FILTER (WHERE so_luong_da_giao >= so_luong_dat) as completed_items,
-        COUNT(*) FILTER (WHERE so_luong_da_giao > 0) as partial_items
-       FROM tm_don_hang_chi_tiet
-       WHERE so_don_hang = $1`,
-      [so_don_hang],
-    );
-
-    const { total_items, completed_items, partial_items } = checkRes.rows[0];
-
-    let newStatus = trang_thai;
-    if (
-      parseInt(completed_items) === parseInt(total_items) &&
-      parseInt(total_items) > 0
-    ) {
-      newStatus = "HOAN_THANH";
-    } else if (parseInt(partial_items) > 0) {
-      newStatus = "DANG_NHAP_KHO";
-    }
-
-    if (newStatus !== trang_thai) {
-      await pool.query(
-        `UPDATE tm_don_hang SET trang_thai = $1, updated_at = NOW() WHERE so_don_hang = $2`,
-        [newStatus, so_don_hang],
+      // 1. Get current status and standard ID
+      const orderRes = await client.query(
+        `SELECT id, so_don_hang, trang_thai, ma_ben_nhap, ma_ben_xuat 
+         FROM tm_don_hang 
+         WHERE so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)
+         FOR UPDATE`,
+        [maPhieu],
       );
-    }
 
-    return results;
+      if (!orderRes.rows.length) {
+        throw { status: 404, message: "Đơn hàng không tồn tại" };
+      }
+
+      const order = orderRes.rows[0];
+      const so_don_hang = order.so_don_hang;
+
+      // Allow Approved or Partially Receiving
+      const validStatuses = ["DA_DUYET", "DANG_NHAP_KHO"];
+      if (!validStatuses.includes(order.trang_thai)) {
+        throw {
+          status: 400,
+          message: `Đơn hàng phải ở trạng thái ĐÃ DUYỆT hoặc ĐANG NHẬP KHO. Trạng thái hiện tại: ${order.trang_thai}`,
+        };
+      }
+
+      // 2. Sinh mã phiếu nhập kho (Hóa đơn mua)
+      const { rows: hdRows } = await client.query(
+        `SELECT 'PNK' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_hd')::text, 6, '0') as inv_no`,
+      );
+      const soPhieuNhapKho = hdRows[0].inv_no;
+
+      const results = {
+        success: [],
+        errors: [],
+        so_phieu_nhap: soPhieuNhapKho,
+      };
+
+      let tongTienHienTai = 0;
+      let itemsProcessed = 0;
+
+      // 3. Process items using internal client to maintain transaction
+      for (const item of danhSachXe) {
+        try {
+          // Note: Passing 'client' to ensure it runs within same transaction
+          // We need to modify nhapXeTuDonHang to accept client or use internal logic
+          const result = await VehicleService.nhapXeTuDonHang(
+            so_don_hang,
+            item.id,
+            item,
+            userId,
+            client,
+          );
+
+          const giaNhap = Number(item.gia_nhap || result.data.gia_nhap || 0);
+          tongTienHienTai += giaNhap;
+
+          // Create Invoice Detail
+          await client.query(
+            `INSERT INTO tm_hoa_don_chi_tiet (
+              so_hoa_don, stt, ma_hang_hoa, ma_serial, so_luong, don_gia, thanh_tien
+            ) VALUES ($1, $2, $3, $4, 1, $5, $5)`,
+            [
+              soPhieuNhapKho,
+              ++itemsProcessed,
+              result.data.ma_loai_xe,
+              result.data.xe_key,
+              giaNhap,
+            ],
+          );
+
+          results.success.push({
+            id: item.id,
+            xe_key: result.data.xe_key,
+          });
+        } catch (err) {
+          results.errors.push({
+            id: item.id,
+            message: err.message,
+          });
+        }
+      }
+
+      if (itemsProcessed === 0) {
+        throw new Error("Không có xe nào được nhập thành công");
+      }
+
+      // 4. Tạo Header Hóa đơn (tm_hoa_don)
+      await client.query(
+        `INSERT INTO tm_hoa_don (
+          so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
+          ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
+          tong_tien, thanh_tien, trang_thai, nguoi_lap
+        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $5, 'DA_THANH_TOAN', $6)`,
+        [
+          soPhieuNhapKho,
+          so_don_hang,
+          order.ma_ben_xuat, // NCC
+          order.ma_ben_nhap, // Kho nhập
+          tongTienHienTai,
+          userId,
+        ],
+      );
+
+      // 5. Ghi nhận công nợ (SỬ DỤNG MÃ HÓA ĐƠN)
+      await CongNoService.recordDoiTacDebt(client, {
+        ma_doi_tac: order.ma_ben_xuat,
+        loai_cong_no: "PHAI_TRA",
+        so_hoa_don: soPhieuNhapKho,
+        ngay_phat_sinh: new Date(),
+        so_tien: tongTienHienTai,
+        ghi_chu: `Nhập ${itemsProcessed} xe theo phiếu ${soPhieuNhapKho} (Đơn: ${so_don_hang})`,
+      });
+
+      // 6. Post-process Status Update
+      const checkRes = await client.query(
+        `SELECT 
+          COUNT(*) as total_items,
+          SUM(so_luong_dat) as total_qty,
+          SUM(so_luong_da_giao) as total_delivered
+         FROM tm_don_hang_chi_tiet
+         WHERE so_don_hang = $1`,
+        [so_don_hang],
+      );
+
+      const { total_qty, total_delivered } = checkRes.rows[0];
+
+      let newStatus = order.trang_thai;
+      if (
+        Number(total_delivered) >= Number(total_qty) &&
+        Number(total_qty) > 0
+      ) {
+        newStatus = "HOAN_THANH";
+      } else if (Number(total_delivered) > 0) {
+        newStatus = "DANG_NHAP_KHO";
+      }
+
+      if (newStatus !== order.trang_thai) {
+        await client.query(
+          `UPDATE tm_don_hang SET trang_thai = $1, updated_at = NOW() WHERE so_don_hang = $2`,
+          [newStatus, so_don_hang],
+        );
+      }
+
+      await client.query("COMMIT");
+      return results;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
   // Lấy chi tiết đơn hàng cho export
   async getAllDetails(filters = {}) {

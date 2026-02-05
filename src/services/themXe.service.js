@@ -267,11 +267,18 @@ class VehicleService {
     }
   }
 
-  async nhapXeTuDonHang(maPhieu, chiTietId, data, userId) {
-    const client = await pool.connect();
+  async nhapXeTuDonHang(
+    maPhieu,
+    chiTietId,
+    data,
+    userId,
+    externalClient = null,
+  ) {
+    const client = externalClient || (await pool.connect());
+    const isInternal = !externalClient;
 
     try {
-      await client.query("BEGIN");
+      if (isInternal) await client.query("BEGIN");
 
       /* =====================================================
        * 1. Lấy chi tiết đơn hàng + đơn hàng (CÓ LOCK)
@@ -319,13 +326,6 @@ class VehicleService {
         throw {
           status: 400,
           message: "Chi tiết này đã nhập đủ số lượng",
-        };
-      }
-
-      if (chiTiet.trang_thai !== "DA_DUYET") {
-        throw {
-          status: 400,
-          message: `Đơn hàng chưa được duyệt. Trạng thái hiện tại: ${chiTiet.trang_thai}`,
         };
       }
 
@@ -421,37 +421,23 @@ class VehicleService {
         ],
       );
 
-      /* =====================================================
-       * 4. Ghi nhận công nợ đối tác (PHẢI TRẢ)
-       * ===================================================== */
-      const dhRes = await client.query(
-        "SELECT ma_ben_xuat as ma_ncc FROM tm_don_hang WHERE so_don_hang = $1",
-        [chiTiet.so_phieu],
-      );
-
-      if (dhRes.rows.length) {
-        await CongNoService.recordDoiTacDebt(client, {
-          ma_doi_tac: dhRes.rows[0].ma_ncc,
-          loai_cong_no: "PHAI_TRA",
-          so_hoa_don: null, // Don't link to invoice yet, as it might not exist
-          ngay_phat_sinh: ngayNhap,
-          so_tien: giaNhap,
-          ghi_chu: `Nhập xe ${chiTiet.ma_loai_xe} (Khung: ${soKhung}) từ đơn ${chiTiet.so_phieu}`,
-        });
-      }
-
-      await client.query("COMMIT");
+      if (isInternal) await client.query("COMMIT");
 
       return {
         success: true,
         message: "Nhập xe từ đơn hàng thành công",
-        data: await this.getXeDetail(xeKey),
+        data: {
+          ...chiTiet,
+          xe_key: xeKey,
+          ma_loai_xe: chiTiet.ma_loai_xe,
+          gia_nhap: giaNhap,
+        },
       };
     } catch (err) {
-      await client.query("ROLLBACK");
+      if (isInternal) await client.query("ROLLBACK");
       throw err;
     } finally {
-      client.release();
+      if (isInternal) client.release();
     }
   }
 

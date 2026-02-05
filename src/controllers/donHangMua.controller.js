@@ -132,6 +132,108 @@ class DonHangMuaController {
       next(err);
     }
   }
+
+  async inDonHang(req, res, next) {
+    try {
+      const { ma_phieu } = req.params;
+      const DonHangMuaService = require("../services/donHangMua.service");
+      const HoaDonBanService = require("../services/hoaDonBan.service");
+      const PdfService = require("../services/pdf.service");
+
+      let invoiceData = {};
+
+      if (
+        ma_phieu.startsWith("PNK") ||
+        ma_phieu.startsWith("HD") ||
+        ma_phieu.startsWith("CK")
+      ) {
+        // Fetch as a specific Invoice/Slip
+        const hd = await HoaDonBanService.getById(ma_phieu);
+        if (!hd) {
+          return res.status(404).json({ message: "Hóa đơn không tồn tại" });
+        }
+
+        invoiceData = {
+          so_hd: hd.so_hd,
+          ngay_ban: hd.ngay_ban || hd.created_at,
+          loai_hoa_don: hd.loai_hoa_don,
+
+          ten_ben_xuat: hd.ten_ben_xuat,
+          dia_chi_ben_xuat: hd.dia_chi_ben_xuat,
+          sdt_ben_xuat: hd.sdt_ben_xuat,
+
+          ten_ben_nhap: hd.ten_ben_nhap,
+          dia_chi_ben_nhap: hd.dia_chi_ben_nhap,
+
+          ten_nguoi_tao: hd.nguoi_tao,
+          tong_tien: hd.tong_tien,
+          chiet_khau: hd.chiet_khau,
+          vat: hd.tien_thue_gtgt,
+          thanh_toan: hd.thanh_tien,
+          ghi_chu: hd.ghi_chu,
+          trang_thai: hd.trang_thai,
+
+          chi_tiet_pt: (hd.chi_tiet_pt || []).map((item) => ({
+            stt: item.stt,
+            ten_hang_hoa: item.ten_pt || item.ma_pt,
+            don_vi_tinh: item.don_vi_tinh || "Cái",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien,
+          })),
+          chi_tiet_xe: (hd.chi_tiet_xe || []).map((item) => ({
+            stt: item.stt,
+            ten_hang_hoa: item.ten_pt || item.ma_pt, // For Mua Xe, it might be in ten_pt field
+            don_vi_tinh: item.don_vi_tinh || "Chiếc",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien,
+          })),
+        };
+      } else {
+        // Fetch as the whole Order
+        const order = await DonHangMuaService.getChiTiet(ma_phieu);
+        if (!order) {
+          return res.status(404).json({ message: "Đơn hàng không tồn tại" });
+        }
+
+        invoiceData = {
+          so_hd: order.so_phieu,
+          ngay_ban: order.ngay_dat_hang || order.created_at,
+          loai_hoa_don:
+            order.loai_don_hang === "MUA_HANG" ? "MUA_HANG" : "BAN_HANG",
+
+          ten_ben_xuat: order.ten_ncc || order.ma_ncc,
+          dia_chi_ben_xuat: order.dia_chi_ncc || "",
+          sdt_ben_xuat: order.dien_thoai_ncc || "",
+
+          ten_ben_nhap: order.ten_kho || order.ma_kho_nhap,
+          dia_chi_ben_nhap: order.dia_chi_kho || "",
+
+          ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
+          tong_tien: order.tong_gia_tri,
+          chiet_khau: order.chiet_khau || 0,
+          vat: order.vat_percentage || 0,
+          thanh_toan: order.thanh_tien,
+          ghi_chu: order.ghi_chu || order.dien_giai,
+          trang_thai: order.trang_thai,
+
+          chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
+            stt: idx + 1,
+            ten_hang_hoa: item.ten_pt || item.ma_hang_hoa,
+            don_vi_tinh: item.don_vi_tinh || "Cái",
+            so_luong: item.so_luong,
+            don_gia: item.don_gia,
+            thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
+          })),
+        };
+      }
+
+      await PdfService.generateInvoicePdf(invoiceData, res);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new DonHangMuaController();

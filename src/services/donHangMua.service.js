@@ -348,7 +348,11 @@ class DonHangMuaService {
       }
 
       await client.query("COMMIT");
-      return { success: true, message: "Nhập kho thành công" };
+      return {
+        success: true,
+        message: "Nhập kho thành công",
+        so_phieu_nhap: soPhieuNhapKho,
+      };
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;

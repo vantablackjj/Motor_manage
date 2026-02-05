@@ -86,4 +86,11 @@ router.post(
   checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
   donHangMuaController.huyDuyet,
 );
+
+router.get(
+  "/:ma_phieu/in-don-hang",
+  authenticate,
+  donHangMuaController.inDonHang,
+);
+
 module.exports = router;
