@@ -197,6 +197,22 @@ class DonHangMuaController {
           return res.status(404).json({ message: "Đơn hàng không tồn tại" });
         }
 
+        // Filter only received items and recalculate totals
+        const filteredChiTiet = (order.chi_tiet || []).filter(
+          (item) => (item.so_luong_da_giao || 0) > 0,
+        );
+
+        // Recalculate total for filtered items
+        const rawTongTien = filteredChiTiet.reduce(
+          (sum, item) =>
+            sum + Number(item.so_luong_da_giao) * Number(item.don_gia),
+          0,
+        );
+        const vatRate = Number(order.vat_percentage || 0);
+        const chietKhau = Number(order.chiet_khau || 0);
+        const vatTien = (rawTongTien - chietKhau) * (vatRate / 100);
+        const finalThanhToan = rawTongTien - chietKhau + vatTien;
+
         invoiceData = {
           so_hd: order.so_phieu,
           ngay_ban: order.ngay_dat_hang || order.created_at,
@@ -211,20 +227,20 @@ class DonHangMuaController {
           dia_chi_ben_nhap: order.dia_chi_kho || "",
 
           ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
-          tong_tien: order.tong_gia_tri,
-          chiet_khau: order.chiet_khau || 0,
-          vat: order.vat_percentage || 0,
-          thanh_toan: order.thanh_tien,
+          tong_tien: rawTongTien,
+          chiet_khau: chietKhau,
+          vat: vatTien,
+          thanh_toan: finalThanhToan,
           ghi_chu: order.ghi_chu || order.dien_giai,
           trang_thai: order.trang_thai,
 
-          chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
+          chi_tiet_pt: filteredChiTiet.map((item, idx) => ({
             stt: idx + 1,
             ten_hang_hoa: item.ten_pt || item.ma_hang_hoa,
             don_vi_tinh: item.don_vi_tinh || "Cái",
-            so_luong: item.so_luong,
+            so_luong: item.so_luong_da_giao,
             don_gia: item.don_gia,
-            thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
+            thanh_tien: item.so_luong_da_giao * item.don_gia,
           })),
         };
       }

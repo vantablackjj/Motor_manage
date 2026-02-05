@@ -200,6 +200,16 @@ router.get(
         if (!order)
           return res.status(404).json({ message: "Đơn hàng không tồn tại" });
 
+        // Filter only received items and recalculate totals
+        const filteredDetails = (order.chi_tiet || []).filter(
+          (item) => (item.so_luong_da_giao || 0) > 0,
+        );
+        const rawTongTien = filteredDetails.reduce(
+          (sum, item) =>
+            sum + Number(item.so_luong_da_giao) * Number(item.don_gia),
+          0,
+        );
+
         invoiceData = {
           so_hd: order.so_phieu,
           ngay_ban: order.ngay_dat_hang || order.created_at,
@@ -207,20 +217,20 @@ router.get(
           ten_ben_xuat: order.ten_ncc || order.ma_ncc,
           dia_chi_ben_xuat: order.dia_chi_ncc || "",
           sdt_ben_xuat: order.dien_thoai_ncc || "",
-          ten_ben_nhap: order.ten_kho_nhap || order.ma_kho_nhap,
+          ten_ben_nhap: order.ten_kho || order.ma_kho_nhap,
           dia_chi_ben_nhap: order.dia_chi_kho_nhap || "",
           ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
-          tong_tien: order.tong_tien,
+          tong_tien: rawTongTien,
           ghi_chu: order.ghi_chu,
-          thanh_toan: 0,
+          thanh_toan: rawTongTien,
           trang_thai: order.trang_thai,
-          chi_tiet_pt: (order.chi_tiet || []).map((item, idx) => ({
+          chi_tiet_pt: filteredDetails.map((item, idx) => ({
             stt: idx + 1,
             ten_hang_hoa: item.ten_xe || item.ten_loai_xe || item.ma_loai_xe,
             don_vi_tinh: "Chiếc",
-            so_luong: item.so_luong,
+            so_luong: item.so_luong_da_giao,
             don_gia: item.don_gia,
-            thanh_tien: item.thanh_tien || item.so_luong * item.don_gia,
+            thanh_tien: item.so_luong_da_giao * item.don_gia,
           })),
         };
       }

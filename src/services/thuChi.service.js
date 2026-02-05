@@ -141,6 +141,17 @@ class ThuChiService {
           phieu.so_tien,
           client,
         );
+      } else if (phieu.ma_doi_tac) {
+        // Nếu là phiếu thu chi cho đối tác, cập nhật công nợ đối tác
+        const CongNoService = require("./congNo.service");
+        const loai_cong_no =
+          phieu.loai_phieu === "THU" ? "PHAI_THU" : "PHAI_TRA";
+        await CongNoService.processDoiTacPayment(
+          phieu.ma_doi_tac,
+          loai_cong_no,
+          phieu.so_tien,
+          client,
+        );
       }
 
       if (shouldManageTransaction) await client.query("COMMIT");

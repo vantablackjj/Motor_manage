@@ -4,39 +4,80 @@ const path = require("path");
 
 class PdfService {
   constructor() {
+    // Common font paths on Windows - broaden search
+    const winDir = process.env.WINDIR || "C:/Windows";
+    const fontDir = path.join(winDir, "Fonts");
+
     this.fontPaths = {
-      regular: "C:/Windows/Fonts/arial.ttf",
-      bold: "C:/Windows/Fonts/arialbd.ttf",
-      italics: "C:/Windows/Fonts/ariali.ttf",
+      regular: [
+        path.join(fontDir, "arial.ttf"),
+        path.join(fontDir, "Arial.ttf"),
+        path.join(fontDir, "times.ttf"),
+        path.join(fontDir, "Times.ttf"),
+        path.join(fontDir, "tahoma.ttf"),
+      ],
+      bold: [
+        path.join(fontDir, "arialbd.ttf"),
+        path.join(fontDir, "Arialbd.ttf"),
+        path.join(fontDir, "timesbd.ttf"),
+        path.join(fontDir, "Timesbd.ttf"),
+        path.join(fontDir, "tahomabd.ttf"),
+      ],
+      italics: [
+        path.join(fontDir, "ariali.ttf"),
+        path.join(fontDir, "Ariali.ttf"),
+        path.join(fontDir, "timesi.ttf"),
+        path.join(fontDir, "Timesi.ttf"),
+      ],
     };
     this.fonts = {
-      regular: "Arial",
-      bold: "Arial-Bold",
-      italics: "Arial-Italic",
+      regular: "MainFont",
+      bold: "MainFont-Bold",
+      italics: "MainFont-Italic",
     };
   }
 
   /**
-   * Generates a PDF Invoice
-   * @param {Object} invoiceData - Full invoice data containing headers and items
-   * @param {Object} res - Express response object to stream to
+   * Finds the first existing font path from a list
    */
+  _findFont(paths) {
+    for (const p of paths) {
+      try {
+        if (fs.existsSync(p)) {
+          console.log(`Using font: ${p}`);
+          return p;
+        }
+      } catch (e) {}
+    }
+    return null;
+  }
+
   async generateInvoicePdf(invoiceData, res) {
     const doc = new PDFDocument({ margin: 30, size: "A4" });
 
-    // Try to register fonts
+    // Try to register fonts with fallbacks
     try {
-      if (fs.existsSync(this.fontPaths.regular))
-        doc.registerFont(this.fonts.regular, this.fontPaths.regular);
-      else this.fonts.regular = "Helvetica";
+      const regPath = this._findFont(this.fontPaths.regular);
+      if (regPath) {
+        doc.registerFont(this.fonts.regular, regPath);
+      } else {
+        console.warn("Could not find regular font, falling back to Helvetica");
+        this.fonts.regular = "Helvetica";
+      }
 
-      if (fs.existsSync(this.fontPaths.bold))
-        doc.registerFont(this.fonts.bold, this.fontPaths.bold);
-      else this.fonts.bold = "Helvetica-Bold";
+      const boldPath = this._findFont(this.fontPaths.bold);
+      if (boldPath) {
+        doc.registerFont(this.fonts.bold, boldPath);
+      } else {
+        this.fonts.bold = "Helvetica-Bold";
+      }
 
-      if (fs.existsSync(this.fontPaths.italics))
-        doc.registerFont(this.fonts.italics, this.fontPaths.italics);
-      else this.fonts.italics = "Helvetica-Oblique";
+      const italPath = this._findFont(this.fontPaths.italics);
+      if (italPath) {
+        doc.registerFont(this.fonts.italics, italPath);
+      } else {
+        this.fonts.italics = "Helvetica-Oblique";
+      }
     } catch (e) {
       console.error("Font registration failed:", e);
       this.fonts = {
@@ -50,10 +91,13 @@ class PdfService {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=${invoiceData.so_hd}.pdf`,
+      `attachment; filename=${invoiceData.so_hd || "invoice"}.pdf`,
     );
 
     doc.pipe(res);
+
+    // Set default font immediately
+    doc.font(this.fonts.regular);
 
     // --- CONFIGURATION BASED ON TYPE AND STATUS ---
     let title = "HÓA ĐƠN";
@@ -73,9 +117,9 @@ class PdfService {
     const status = invoiceData.trang_thai || "";
 
     if (invoiceData.loai_hoa_don === "MUA_HANG") {
-      title = "HÓA ĐƠN MUA HÀNG";
-      senderLabel = "Nhà cung cấp:";
-      receiverLabel = "Kho nhập:";
+      title = "Hóa Đơn Mua Hàng";
+      senderLabel = "Nhà Cung cấp:";
+      receiverLabel = "Kho Nhập:";
 
       senderName = invoiceData.ten_ben_xuat;
       senderAddress = invoiceData.dia_chi_ben_xuat;
@@ -87,9 +131,9 @@ class PdfService {
 
       if (["NHAP", "CHO_DUYET"].includes(status)) isDraft = true;
     } else if (invoiceData.loai_hoa_don === "CHUYEN_KHO") {
-      title = "HÓA ĐƠN CHUYỂN KHO";
-      senderLabel = "Kho xuất:";
-      receiverLabel = "Kho nhập:";
+      title = "Hóa Đơn Chuyển Kho";
+      senderLabel = "Kho Xuất:";
+      receiverLabel = "Kho Nhap:";
 
       senderName = invoiceData.ten_ben_xuat;
       senderAddress = invoiceData.dia_chi_ben_xuat;
@@ -103,10 +147,10 @@ class PdfService {
     } else {
       // BAN_HANG
       senderLabel = "Đơn vị bán:";
-      receiverLabel = "Khách hàng:";
+      receiverLabel = "Khách Hàng:";
 
       if (["DANG_GIAO", "DA_GIAO", "CHO_GIAO"].includes(status)) {
-        title = "PHIẾU GIAO HÀNG";
+        title = "Phiếu Giao Hàng";
       } else if (["NHAP", "CHO_DUYET", "GUI_DUYET"].includes(status)) {
         title = "PHIẾU TẠM TÍNH";
         isDraft = true;
@@ -160,12 +204,12 @@ class PdfService {
 
     doc.fontSize(10);
     doc.text(
-      `Ngày lập: ${new Date(invoiceData.ngay_ban).toLocaleDateString("vi-VN")}`,
+      `Ngày Lập: ${new Date(invoiceData.ngay_ban).toLocaleDateString("vi-VN")}`,
       startX,
       startY,
     );
     doc.text(
-      `Người lập: ${invoiceData.ten_nguoi_tao || invoiceData.nguoi_tao || "N/A"}`,
+      `Người Lập: ${invoiceData.ten_nguoi_tao || invoiceData.nguoi_tao || "N/A"}`,
       350,
       startY,
     );
@@ -177,11 +221,11 @@ class PdfService {
     doc.font(this.fonts.bold).text(receiverLabel, startX, currentY);
     doc.font(this.fonts.regular).text(receiverName, startX + 70, currentY);
 
-    doc.text(`Địa chỉ: ${receiverAddress}`, startX, currentY + 15);
+    doc.text(`Địa Chỉ: ${receiverAddress}`, startX, currentY + 15);
     if (receiverPhone) doc.text(`SĐT: ${receiverPhone}`, 350, currentY);
 
     if (invoiceData.ghi_chu) {
-      doc.text(`Ghi chú: ${invoiceData.ghi_chu}`, startX, currentY + 30);
+      doc.text(`Ghi Chú: ${invoiceData.ghi_chu}`, startX, currentY + 30);
       doc.moveDown(2);
     } else {
       doc.moveDown(2);
@@ -251,13 +295,13 @@ class PdfService {
     doc.moveDown();
     doc.font(this.fonts.bold);
     doc.text(
-      `Tổng tiền: ${Number(invoiceData.tong_tien || 0).toLocaleString("vi-VN")} đ`,
+      `Tổng Tiền: ${Number(invoiceData.tong_tien || 0).toLocaleString("vi-VN")} đ`,
       { align: "right" },
     );
 
     if (invoiceData.chiet_khau > 0) {
       doc.text(
-        `Chiết khấu: -${Number(invoiceData.chiet_khau).toLocaleString("vi-VN")} đ`,
+        `Chiết Khấu: -${Number(invoiceData.chiet_khau).toLocaleString("vi-VN")} đ`,
         { align: "right" },
       );
     }
@@ -274,7 +318,7 @@ class PdfService {
         : invoiceData.tong_tien || 0;
     doc
       .fontSize(12)
-      .text(`Thanh toán: ${Number(thanhToanVal).toLocaleString("vi-VN")} đ`, {
+      .text(`Thanh Toán: ${Number(thanhToanVal).toLocaleString("vi-VN")} đ`, {
         align: "right",
         underline: true,
       });
@@ -286,15 +330,15 @@ class PdfService {
     doc.fontSize(10).font(this.fonts.regular);
 
     // Dynamic footer labels
-    let leftSign = "Người lập phiếu";
-    let rightSign = "Khách hàng";
+    let leftSign = "Người Lập Phiếu";
+    let rightSign = "Khách Hàng";
 
     if (invoiceData.loai_hoa_don === "MUA_HANG") {
-      leftSign = "Thủ kho (Nhận)";
-      rightSign = "Nhà cung cấp (Giao)";
+      leftSign = "Thủ Kho (Nhận)";
+      rightSign = "Nhà Cung Cấp (Giao)";
     } else if (invoiceData.loai_hoa_don === "CHUYEN_KHO") {
-      leftSign = "Thủ kho xuất";
-      rightSign = "Thủ kho nhập";
+      leftSign = "Thủ Kho Xuất";
+      rightSign = "Thủ Kho Nhập";
     }
 
     doc.text(leftSign, 50, footerY, { align: "center", width: 150 });

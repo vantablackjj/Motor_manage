@@ -414,37 +414,30 @@ class BaoCaoService {
     const { ma_kh, tu_ngay, den_ngay } = filters;
     let sql = `
       SELECT 
-        kh.ten_doi_tac as ho_ten, 
-        h.ma_ben_nhap as ma_kh,
-        SUM(h.thanh_tien) as tong_phai_tra,
-        SUM(COALESCE(p.da_tra, 0)) as da_tra,
-        SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) as con_lai
-      FROM tm_hoa_don h
-      JOIN dm_doi_tac kh ON h.ma_ben_nhap = kh.ma_doi_tac
-      LEFT JOIN (
-          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
-          FROM tm_phieu_thu_chi 
-          WHERE loai_phieu = 'THU' 
-          GROUP BY ma_hoa_don
-      ) p ON h.so_hoa_don = p.ma_hoa_don
-      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
-        AND h.loai_ben_nhap = 'DOI_TAC'
-        AND kh.loai_doi_tac IN ('KHACH_HANG', 'CA_HAI')
+        dt.ten_doi_tac as ho_ten, 
+        cn.ma_doi_tac as ma_kh,
+        cn.tong_no as tong_phai_tra,
+        cn.tong_da_thanh_toan as da_tra,
+        cn.con_lai
+      FROM tm_cong_no_doi_tac cn
+      JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
+      WHERE cn.loai_cong_no = 'PHAI_THU' AND cn.con_lai > 0
     `;
     const params = [];
     if (ma_kh) {
       params.push(ma_kh);
-      sql += ` AND kh.ma_doi_tac = $${params.length}`;
+      sql += ` AND cn.ma_doi_tac = $${params.length}`;
     }
+    // Filter by update date if tu_ngay/den_ngay provided
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
+      sql += ` AND cn.ngay_cap_nhat >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
+      sql += ` AND cn.ngay_cap_nhat < ($${params.length}::date + 1)`;
     }
-    sql += ` GROUP BY kh.ten_doi_tac, h.ma_ben_nhap HAVING SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) > 0`;
+    sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -453,37 +446,29 @@ class BaoCaoService {
     const { ma_ncc, tu_ngay, den_ngay } = filters;
     let sql = `
       SELECT 
-        ncc.ten_doi_tac as ho_ten, ncc.ma_doi_tac as ma_ncc,
-        SUM(dh.thanh_tien) as tong_phai_tra,
-        SUM(COALESCE(p.da_tra, 0)) as da_tra,
-        SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) as con_lai
-      FROM dm_doi_tac ncc
-      JOIN tm_don_hang dh ON ncc.ma_doi_tac = dh.ma_ben_xuat
-      LEFT JOIN (
-          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
-          FROM tm_phieu_thu_chi 
-          WHERE loai_phieu = 'CHI' 
-          GROUP BY ma_hoa_don
-      ) p ON dh.so_don_hang = p.ma_hoa_don
-      WHERE dh.loai_don_hang IN ('MUA_XE', 'MUA_HANG') 
-        AND dh.trang_thai IN ('DA_DUYET', 'DA_NHAP_KHO', 'HOAN_THANH')
-        AND dh.loai_ben_xuat = 'DOI_TAC'
-        AND ncc.loai_doi_tac IN ('NHA_CUNG_CAP', 'CA_HAI')
+        dt.ten_doi_tac as ho_ten, 
+        cn.ma_doi_tac as ma_ncc,
+        cn.tong_no as tong_phai_tra,
+        cn.tong_da_thanh_toan as da_tra,
+        cn.con_lai
+      FROM tm_cong_no_doi_tac cn
+      JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
+      WHERE cn.loai_cong_no = 'PHAI_TRA' AND cn.con_lai > 0
     `;
     const params = [];
     if (ma_ncc) {
       params.push(ma_ncc);
-      sql += ` AND ncc.ma_doi_tac = $${params.length}`;
+      sql += ` AND cn.ma_doi_tac = $${params.length}`;
     }
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND dh.ngay_dat_hang >= $${params.length}`;
+      sql += ` AND cn.ngay_cap_nhat >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND dh.ngay_dat_hang < ($${params.length}::date + 1)`;
+      sql += ` AND cn.ngay_cap_nhat < ($${params.length}::date + 1)`;
     }
-    sql += ` GROUP BY ncc.ten_doi_tac, ncc.ma_doi_tac HAVING SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) > 0`;
+    sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -622,29 +607,8 @@ class BaoCaoService {
       WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL) AND tk.so_luong_ton <= tk.so_luong_toi_thieu
     `;
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo`;
-    const sqlCustomerDebt = `
-      SELECT SUM(h.thanh_tien - COALESCE(p.da_tra, 0)) as total
-      FROM tm_hoa_don h
-      LEFT JOIN (
-          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
-          FROM tm_phieu_thu_chi 
-          WHERE loai_phieu = 'THU' 
-          GROUP BY ma_hoa_don
-      ) p ON h.so_hoa_don = p.ma_hoa_don
-      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
-    `;
-    const sqlSupplierDebt = `
-      SELECT SUM(dh.thanh_tien - COALESCE(p.da_tra, 0)) as total
-      FROM tm_don_hang dh
-      LEFT JOIN (
-          SELECT ma_hoa_don, SUM(so_tien) as da_tra 
-          FROM tm_phieu_thu_chi 
-          WHERE loai_phieu = 'CHI' 
-          GROUP BY ma_hoa_don
-      ) p ON dh.so_don_hang = p.ma_hoa_don
-      WHERE dh.loai_don_hang IN ('MUA_XE', 'MUA_HANG')
-        AND dh.trang_thai IN ('DA_DUYET', 'DA_NHAP_KHO', 'HOAN_THANH')
-    `;
+    const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU'`;
+    const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA'`;
     const [
       revTodayRes,
       revMonthRes,

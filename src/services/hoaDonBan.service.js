@@ -310,6 +310,17 @@ class HoaDonBanService {
         }
       }
 
+      // Ghi nhận công nợ đối tác
+      const CongNoService = require("./congNo.service");
+      await CongNoService.recordDoiTacDebt(client, {
+        ma_doi_tac: hd.ma_ben_nhap,
+        loai_cong_no: "PHAI_THU",
+        so_hoa_don: so_hd,
+        ngay_phat_sinh: hd.ngay_hoa_don,
+        so_tien: hd.thanh_tien,
+        ghi_chu: `Bán hàng theo hóa đơn ${so_hd}`,
+      });
+
       // Tự động tạo và duyệt phiếu thu tiền (Dòng tiền hợp nhất)
       const phieuThu = await ThuChiService.taoPhieu(
         {

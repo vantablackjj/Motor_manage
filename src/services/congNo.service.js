@@ -177,6 +177,73 @@ class CongNoService {
       if (shouldManageTransaction) client.release();
     }
   }
+
+  async processDoiTacPayment(
+    ma_doi_tac,
+    loai_cong_no,
+    so_tien,
+    externalClient = null,
+  ) {
+    const client = externalClient || (await pool.connect());
+    const shouldManageTransaction = !externalClient;
+
+    try {
+      if (shouldManageTransaction) await client.query("BEGIN");
+
+      let tien_con_lai = Number(so_tien);
+
+      // Distribute payment across unpaid debt items (FIFO)
+      const noRes = await client.query(
+        `
+        SELECT id, con_lai
+        FROM tm_cong_no_doi_tac_ct
+        WHERE ma_doi_tac = $1 AND loai_cong_no = $2 AND con_lai > 0
+        ORDER BY ngay_phat_sinh ASC
+        FOR UPDATE
+        `,
+        [ma_doi_tac, loai_cong_no],
+      );
+
+      for (const khoan_no of noRes.rows) {
+        if (tien_con_lai <= 0) break;
+
+        const so_tien_can_tra = Number(khoan_no.con_lai);
+        const so_tien_tra_nay = Math.min(tien_con_lai, so_tien_can_tra);
+
+        await client.query(
+          `
+          UPDATE tm_cong_no_doi_tac_ct
+          SET da_thanh_toan = da_thanh_toan + $1,
+              trang_thai = (CASE WHEN (so_tien - (da_thanh_toan + $1)) <= 0 THEN 'DA_TT' ELSE 'TT_MOT_PHAN' END)::enum_trang_thai_cong_no
+          WHERE id = $2
+          `,
+          [so_tien_tra_nay, khoan_no.id],
+        );
+
+        tien_con_lai -= so_tien_tra_nay;
+      }
+
+      // Update summary
+      await client.query(
+        `
+        UPDATE tm_cong_no_doi_tac
+        SET tong_da_thanh_toan = tong_da_thanh_toan + $1,
+            updated_at = NOW()
+        WHERE ma_doi_tac = $2 AND loai_cong_no = $3
+        `,
+        [so_tien, ma_doi_tac, loai_cong_no],
+      );
+
+      if (shouldManageTransaction) await client.query("COMMIT");
+      return true;
+    } catch (err) {
+      if (shouldManageTransaction) await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      if (shouldManageTransaction) client.release();
+    }
+  }
+
   /* =====================================================
    * LẤY TỔNG HỢP CÔNG NỢ ĐỐI TÁC
    * ===================================================== */
