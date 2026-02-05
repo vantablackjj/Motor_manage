@@ -207,15 +207,6 @@ class DonHangMuaService {
         const slTonKho = slNhap * heSoDoi;
         const donGiaTonKho = donGia / heSoDoi;
 
-        console.log(`[nhapKho] Processing item:`, {
-          ma_hang_hoa: ct.ma_hang_hoa,
-          ma_kho: don.ma_kho_nhap,
-          slNhap,
-          slTonKho,
-          donGia,
-          donGiaTonKho,
-        });
-
         // 2. Verify ma_hang_hoa exists
         const hangHoaCheck = await client.query(
           `SELECT ma_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = $1`,
@@ -229,7 +220,7 @@ class DonHangMuaService {
 
         // 3. Verify ma_kho exists
         const khoCheck = await client.query(
-          `SELECT ma_kho FROM sys_kho_new WHERE ma_kho = $1`,
+          `SELECT ma_kho FROM sys_kho WHERE ma_kho = $1`,
           [don.ma_kho_nhap],
         );
         if (!khoCheck.rows.length) {
@@ -290,22 +281,12 @@ class DonHangMuaService {
       }
 
       if (tong_gia_tri_nhap > 0) {
-        console.log(`[nhapKho] Recording debt:`, {
-          ma_doi_tac: don.ma_ncc,
-          so_tien: tong_gia_tri_nhap,
-          so_hoa_don: soPhieuCode,
-        });
-
         // Verify supplier exists
         const nccCheck = await client.query(
           `SELECT ma_doi_tac FROM dm_doi_tac WHERE ma_doi_tac = $1`,
           [don.ma_ncc],
         );
-        if (!nccCheck.rows.length) {
-          console.warn(
-            `[nhapKho] Supplier not found: ${don.ma_ncc}, skipping debt recording`,
-          );
-        } else {
+        if (nccCheck.rows.length) {
           await CongNoService.recordDoiTacDebt(client, {
             ma_doi_tac: don.ma_ncc,
             loai_cong_no: "PHAI_TRA",
