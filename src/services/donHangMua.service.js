@@ -165,7 +165,11 @@ class DonHangMuaService {
 
       if (!donResult.rows.length) throw new Error("Đơn hàng không tồn tại");
       const don = donResult.rows[0];
-      const soPhieuCode = don.so_don_hang;
+      // 2. Sinh mã phiếu nhập kho (Hóa đơn mua)
+      const { rows: hdRows } = await client.query(
+        `SELECT 'PNK' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_hd')::text, 6, '0') as inv_no`,
+      );
+      const soPhieuNhapKho = hdRows[0].inv_no;
 
       if (
         don.trang_thai !== "DA_DUYET" &&
@@ -175,20 +179,49 @@ class DonHangMuaService {
         throw new Error("Đơn hàng phải được duyệt trước khi nhập kho");
       }
 
-      // Process Items
+      // 3. Tính tổng giá trị cho đợt nhập này để tạo hóa đơn
+      let tong_thanh_tien_nhap = 0;
+      for (const item of danhSachHang) {
+        const ctRes = await client.query(
+          "SELECT don_gia FROM tm_don_hang_chi_tiet WHERE id = $1",
+          [item.id],
+        );
+        if (ctRes.rows.length) {
+          tong_thanh_tien_nhap +=
+            Number(item.so_luong_nhap) *
+            Number(item.don_gia || ctRes.rows[0].don_gia);
+        }
+      }
+
+      // 4. Tạo Header Hóa đơn (tm_hoa_don) - BẮT BUỘC để tránh lỗi FK công nợ
+      await client.query(
+        `INSERT INTO tm_hoa_don (
+          so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
+          ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
+          tong_tien, thanh_tien, trang_thai, nguoi_lap
+        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $5, 'DA_THANH_TOAN', $6)`,
+        [
+          soPhieuNhapKho,
+          don.so_don_hang,
+          don.ma_ncc,
+          don.ma_kho_nhap,
+          tong_thanh_tien_nhap,
+          nguoi_nhap,
+        ],
+      );
+
+      // 5. Process Items
+      let stt_hd = 1;
       for (const item of danhSachHang) {
         // item: { id (detail_id), so_luong_nhap, don_gia (optional override) }
 
         // 1. Get Detail & Lock
         const ctRes = await client.query(
           `SELECT * FROM tm_don_hang_chi_tiet WHERE id = $1 AND so_don_hang = $2 FOR UPDATE`,
-          [item.id, soPhieuCode],
+          [item.id, don.so_don_hang],
         );
 
         if (!ctRes.rows.length) {
-          console.error(
-            `[nhapKho] Detail not found: id=${item.id}, so_don_hang=${soPhieuCode}`,
-          );
           throw new Error(`Chi tiết đơn hàng không tồn tại (id: ${item.id})`);
         }
         const ct = ctRes.rows[0];
@@ -202,12 +235,12 @@ class DonHangMuaService {
           );
         }
 
-        const donGia = item.don_gia || ct.don_gia;
-        const heSoDoi = Number(item.he_so_doi) || 1; // Default 1 if no conversion
+        const donGia = Number(item.don_gia || ct.don_gia);
+        const heSoDoi = Number(item.he_so_doi) || 1;
         const slTonKho = slNhap * heSoDoi;
         const donGiaTonKho = donGia / heSoDoi;
 
-        // 2. Verify ma_hang_hoa exists
+        // Verify ma_hang_hoa exists
         const hangHoaCheck = await client.query(
           `SELECT ma_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = $1`,
           [ct.ma_hang_hoa],
@@ -218,7 +251,7 @@ class DonHangMuaService {
           );
         }
 
-        // 3. Verify ma_kho exists
+        // Verify ma_kho exists
         const khoCheck = await client.query(
           `SELECT ma_kho FROM sys_kho WHERE ma_kho = $1`,
           [don.ma_kho_nhap],
@@ -227,7 +260,15 @@ class DonHangMuaService {
           throw new Error(`Kho không tồn tại: ${don.ma_kho_nhap}`);
         }
 
-        // 4. Update Stock (Warehouse Service logic usually, but inline here for speed)
+        // Create Invoice Detail
+        await client.query(
+          `INSERT INTO tm_hoa_don_chi_tiet (
+            so_hoa_don, stt, ma_hang_hoa, so_luong, don_gia
+          ) VALUES ($1, $2, $3, $4, $5)`,
+          [soPhieuNhapKho, stt_hd++, ct.ma_hang_hoa, slNhap, donGia],
+        );
+
+        // Update Stock
         await client.query(
           `INSERT INTO tm_hang_hoa_ton_kho (ma_hang_hoa, ma_kho, so_luong_ton, gia_von_binh_quan, updated_at)
             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
@@ -238,7 +279,7 @@ class DonHangMuaService {
           [ct.ma_hang_hoa, don.ma_kho_nhap, slTonKho, donGiaTonKho],
         );
 
-        // 5. Update Detail Delivered Qty (Tracks PO Unit)
+        // Update Detail Delivered Qty
         await client.query(
           `UPDATE tm_don_hang_chi_tiet 
            SET so_luong_da_giao = so_luong_da_giao + $1 
@@ -246,7 +287,7 @@ class DonHangMuaService {
           [slNhap, ct.id],
         );
 
-        // 6. Log History (Tracks Base Unit)
+        // Log History
         await client.query(
           `INSERT INTO tm_hang_hoa_lich_su (
             ma_hang_hoa, loai_giao_dich, so_chung_tu, ngay_giao_dich,
@@ -255,47 +296,35 @@ class DonHangMuaService {
           ) VALUES ($1, 'NHAP_KHO', $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7, $8)`,
           [
             ct.ma_hang_hoa,
-            soPhieuCode,
+            soPhieuNhapKho,
             don.ma_kho_nhap,
             slTonKho,
             donGiaTonKho,
-            slNhap * donGia, // Total value remains the same
+            slNhap * donGia,
             nguoi_nhap,
-            `Nhập ${slNhap} (quy đổi ${slTonKho}) ${ct.ma_hang_hoa} từ đơn ${soPhieuCode}`,
+            `Nhập ${slNhap} (quy đổi ${slTonKho}) ${ct.ma_hang_hoa} từ đơn ${don.so_don_hang}`,
           ],
         );
       }
 
-      /* 5. Ghi nhận công nợ đối tác cho lần nhập này */
-      let tong_gia_tri_nhap = 0;
-      for (const item of danhSachHang) {
-        const ctRes = await client.query(
-          "SELECT don_gia FROM tm_don_hang_chi_tiet WHERE id = $1",
-          [item.id],
-        );
-        if (ctRes.rows.length) {
-          tong_gia_tri_nhap +=
-            Number(item.so_luong_nhap) *
-            Number(item.don_gia || ctRes.rows[0].don_gia);
-        }
-      }
-
-      if (tong_gia_tri_nhap > 0) {
+      /* 6. Ghi nhận công nợ đối tác cho đợt nhập này */
+      if (tong_thanh_tien_nhap > 0) {
         // Verify supplier exists
         const nccCheck = await client.query(
           `SELECT ma_doi_tac FROM dm_doi_tac WHERE ma_doi_tac = $1`,
           [don.ma_ncc],
         );
-        if (nccCheck.rows.length) {
-          await CongNoService.recordDoiTacDebt(client, {
-            ma_doi_tac: don.ma_ncc,
-            loai_cong_no: "PHAI_TRA",
-            so_hoa_don: soPhieuCode,
-            ngay_phat_sinh: new Date(),
-            so_tien: tong_gia_tri_nhap,
-            ghi_chu: `Nhập kho phụ tùng từ đơn ${soPhieuCode}`,
-          });
+        if (!nccCheck.rows.length) {
+          throw new Error(`Nhà cung cấp không tồn tại: ${don.ma_ncc}`);
         }
+        await CongNoService.recordDoiTacDebt(client, {
+          ma_doi_tac: don.ma_ncc,
+          loai_cong_no: "PHAI_TRA",
+          so_hoa_don: soPhieuNhapKho,
+          ngay_phat_sinh: new Date(),
+          so_tien: tong_thanh_tien_nhap,
+          ghi_chu: `Nhập kho phụ tùng theo phiếu ${soPhieuNhapKho} (Đơn: ${don.so_don_hang})`,
+        });
       }
 
       // Check Completion
@@ -303,18 +332,18 @@ class DonHangMuaService {
         `SELECT COUNT(*) as remaining 
          FROM tm_don_hang_chi_tiet 
          WHERE so_don_hang = $1 AND so_luong_da_giao < so_luong_dat`,
-        [soPhieuCode],
+        [don.so_don_hang],
       );
 
       if (parseInt(checkDone.rows[0].remaining) === 0) {
         await client.query(
           `UPDATE tm_don_hang SET trang_thai = 'HOAN_THANH', updated_at = NOW() WHERE so_don_hang = $1`,
-          [soPhieuCode],
+          [don.so_don_hang],
         );
       } else {
         await client.query(
           `UPDATE tm_don_hang SET trang_thai = 'DANG_GIAO', updated_at = NOW() WHERE so_don_hang = $1`,
-          [soPhieuCode],
+          [don.so_don_hang],
         );
       }
 
