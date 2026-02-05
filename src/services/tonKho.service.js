@@ -52,7 +52,7 @@ class InventoryService {
     const sql = `
       INSERT INTO tm_hang_hoa_ton_kho (ma_kho, ma_hang_hoa, so_luong_ton)
       VALUES ($1, $2, $3)
-      ON CONFLICT (ma_kho, ma_hang_hoa)
+      ON CONFLICT (ma_hang_hoa, ma_kho)
       DO UPDATE SET so_luong_ton = EXCLUDED.so_luong_ton, updated_at = NOW()
       RETURNING *;
     `;
@@ -108,7 +108,7 @@ class InventoryService {
     const sqlInsert = `
       INSERT INTO tm_hang_hoa_ton_kho (ma_kho, ma_hang_hoa, so_luong_ton)
       VALUES ($1, $2, 0)
-      ON CONFLICT (ma_kho, ma_hang_hoa) DO NOTHING;
+      ON CONFLICT (ma_hang_hoa, ma_kho) DO NOTHING;
     `;
     await query(sqlInsert, [toKho, ma_pt]);
 

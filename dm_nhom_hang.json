@@ -1,0 +1,57 @@
+[
+  {
+    "ma_nhom": "LAPTOP",
+    "ten_nhom": "Laptop",
+    "ma_nhom_cha": null
+  },
+  {
+    "ma_nhom": "DIEN_THOAI",
+    "ten_nhom": "Điện thoại",
+    "ma_nhom_cha": null
+  },
+  {
+    "ma_nhom": "XE",
+    "ten_nhom": "Xe máy",
+    "ma_nhom_cha": null
+  },
+  {
+    "ma_nhom": "PT",
+    "ten_nhom": "Phụ tùng",
+    "ma_nhom_cha": null
+  },
+  {
+    "ma_nhom": "Yamaha",
+    "ten_nhom": "Yamaha",
+    "ma_nhom_cha": "XE"
+  },
+  {
+    "ma_nhom": "HonDa",
+    "ten_nhom": "Honda",
+    "ma_nhom_cha": "XE"
+  },
+  {
+    "ma_nhom": "Phanh",
+    "ten_nhom": "Hệ thống Phanh",
+    "ma_nhom_cha": "PT"
+  },
+  {
+    "ma_nhom": "NH0001",
+    "ten_nhom": "TestBrand_Yamaha_Clone",
+    "ma_nhom_cha": "XE"
+  },
+  {
+    "ma_nhom": "NH0002",
+    "ten_nhom": "TestPart_Phanh",
+    "ma_nhom_cha": "PT"
+  },
+  {
+    "ma_nhom": "NH0003",
+    "ten_nhom": "guong",
+    "ma_nhom_cha": "XE"
+  },
+  {
+    "ma_nhom": "LOP",
+    "ten_nhom": "Lop",
+    "ma_nhom_cha": "PT"
+  }
+]

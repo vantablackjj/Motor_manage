@@ -51,13 +51,14 @@ class OrderService {
       );
 
       // Insert Header
-      const orderResult = await client.query(
+      const { rows: orderRows } = await client.query(
         `
         INSERT INTO tm_don_hang (
           so_don_hang, loai_don_hang, ngay_dat_hang,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_gia_tri, thanh_tien, trang_thai, nguoi_tao, ghi_chu
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, 'NHAP', $9, $10)
+          tong_gia_tri, chiet_khau, vat_percentage, thanh_tien,
+          trang_thai, nguoi_tao, ghi_chu
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'NHAP', $12, $13)
         RETURNING *
       `,
         [
@@ -69,6 +70,11 @@ class OrderService {
           ma_ben_nhap,
           loai_ben_nhap,
           tong_gia_tri,
+          data.chiet_khau || 0,
+          data.vat_percentage || 0,
+          tong_gia_tri -
+            (data.chiet_khau || 0) +
+            (tong_gia_tri * (data.vat_percentage || 0)) / 100,
           nguoi_tao,
           ghi_chu,
         ],
@@ -95,7 +101,7 @@ class OrderService {
       }
 
       await client.query("COMMIT");
-      return orderResult.rows[0];
+      return orderRows[0];
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -156,7 +162,12 @@ class OrderService {
       await client.query(
         `UPDATE tm_don_hang
          SET tong_gia_tri = (SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1),
-             thanh_tien = (SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+             thanh_tien = (
+               SELECT (SUM(so_luong_dat * don_gia) - chiet_khau + (SUM(so_luong_dat * don_gia) * vat_percentage / 100))
+               FROM tm_don_hang_chi_tiet, tm_don_hang
+               WHERE tm_don_hang_chi_tiet.so_don_hang = $1 AND tm_don_hang.so_don_hang = $1
+               GROUP BY chiet_khau, vat_percentage
+             )
          WHERE so_don_hang = $1`,
         [order.so_don_hang],
       );
@@ -209,7 +220,12 @@ class OrderService {
       await client.query(
         `UPDATE tm_don_hang
          SET tong_gia_tri = COALESCE((SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1), 0),
-             thanh_tien = COALESCE((SELECT SUM(so_luong_dat * don_gia) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1), 0)
+             thanh_tien = (
+               SELECT COALESCE((SUM(so_luong_dat * don_gia) - chiet_khau + (SUM(so_luong_dat * don_gia) * vat_percentage / 100)), 0)
+               FROM tm_don_hang_chi_tiet, tm_don_hang
+               WHERE tm_don_hang_chi_tiet.so_don_hang = $1 AND tm_don_hang.so_don_hang = $1
+               GROUP BY chiet_khau, vat_percentage
+             )
          WHERE so_don_hang = $1`,
         [order.so_don_hang],
       );
@@ -256,14 +272,18 @@ class OrderService {
         0,
       );
 
+      const vat_percentage = order.vat_percentage || 0;
+      const tien_thue_gtgt = (tong_tien * vat_percentage) / 100;
+      const inv_thanh_tien = tong_tien + tien_thue_gtgt;
+
       // 3. Insert Invoice Header
       await client.query(
         `
         INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_tien, thanh_tien, trang_thai, nguoi_lap, ghi_chu
-        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $8, 'DA_GIAO', $9, $10)
+          tong_tien, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap, ghi_chu
+        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $9, $10, 'DA_GIAO', $11, $12)
       `,
         [
           so_hoa_don,
@@ -274,6 +294,8 @@ class OrderService {
           order.ma_ben_nhap,
           order.loai_ben_nhap,
           tong_tien,
+          tien_thue_gtgt,
+          inv_thanh_tien,
           nguoi_lap,
           ghi_chu,
         ],
@@ -409,7 +431,7 @@ class OrderService {
           ma_doi_tac: order.ma_ben_xuat, // NCC
           loai_cong_no: "PHAI_TRA",
           so_hoa_don: so_hoa_don,
-          so_tien: tong_tien,
+          so_tien: inv_thanh_tien,
           ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
         });
       } else if (order.loai_don_hang === "BAN_HANG") {
@@ -417,7 +439,7 @@ class OrderService {
           ma_doi_tac: order.ma_ben_nhap, // Khách hàng
           loai_cong_no: "PHAI_THU",
           so_hoa_don: so_hoa_don,
-          so_tien: tong_tien,
+          so_tien: inv_thanh_tien,
           ghi_chu: `Nợ bán hàng theo hóa đơn ${so_hoa_don}`,
         });
       } else if (order.loai_don_hang === "CHUYEN_KHO") {
@@ -606,6 +628,39 @@ class OrderService {
       ...order,
       items: itemsResult.rows,
     };
+  }
+
+  /**
+   * Update order header (Discount, VAT, Note)
+   */
+  static async updateOrder(idOrNo, data) {
+    const { vat_percentage, chiet_khau, ghi_chu } = data;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const res = await client.query(
+        `UPDATE tm_don_hang 
+         SET 
+          vat_percentage = COALESCE($1, vat_percentage),
+          chiet_khau = COALESCE($2, chiet_khau),
+          ghi_chu = COALESCE($3, ghi_chu),
+          thanh_tien = (tong_gia_tri - COALESCE($2, chiet_khau) + (tong_gia_tri * COALESCE($1, vat_percentage) / 100))
+         WHERE so_don_hang = $4 OR (CASE WHEN $4::text ~ '^\\d+$' THEN id = $4::text::int ELSE FALSE END)
+         RETURNING *`,
+        [vat_percentage, chiet_khau, ghi_chu, idOrNo],
+      );
+
+      if (res.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
+
+      await client.query("COMMIT");
+      return res.rows[0];
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   /**

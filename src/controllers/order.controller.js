@@ -69,6 +69,19 @@ class OrderController {
   }
 
   /**
+   * Update Order Header (Discount, VAT, Note)
+   */
+  static async update(req, res) {
+    try {
+      const { id } = req.params;
+      const order = await OrderService.updateOrder(id, req.body);
+      res.json({ success: true, data: order });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
    * Update Order Status (Approve, Cancel)
    */
   static async updateStatus(req, res) {

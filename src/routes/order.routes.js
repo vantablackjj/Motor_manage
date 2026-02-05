@@ -9,6 +9,7 @@ router.get("/:id/details", OrderController.getDetail);
 router.post("/:id/details", OrderController.addItem);
 router.delete("/:id/details/:stt", OrderController.removeItem);
 router.post("/", OrderController.create);
+router.put("/:id", OrderController.update);
 router.patch("/:id/status", OrderController.updateStatus);
 router.post("/:id/deliver", OrderController.deliver);
 
