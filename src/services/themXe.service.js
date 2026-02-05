@@ -433,7 +433,7 @@ class VehicleService {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: dhRes.rows[0].ma_ncc,
           loai_cong_no: "PHAI_TRA",
-          so_hoa_don: chiTiet.so_phieu,
+          so_hoa_don: null, // Don't link to invoice yet, as it might not exist
           ngay_phat_sinh: ngayNhap,
           so_tien: giaNhap,
           ghi_chu: `Nhập xe ${chiTiet.ma_loai_xe} (Khung: ${soKhung}) từ đơn ${chiTiet.so_phieu}`,
