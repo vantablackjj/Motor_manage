@@ -16,6 +16,7 @@ class BaoCaoService {
       LEFT JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
       LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
       WHERE x.trang_thai = 'TON_KHO' AND pt.status = true
+      AND (pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang = 'XE')
     `;
     const params = [];
     if (ma_kho) {
@@ -41,7 +42,7 @@ class BaoCaoService {
       FROM tm_hang_hoa_ton_kho tk
       JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON tk.ma_kho = k.ma_kho
-      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
+      WHERE (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL)
     `;
     const params = [];
     if (ma_kho) {
@@ -66,6 +67,7 @@ class BaoCaoService {
       JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
       WHERE x.trang_thai = 'TON_KHO'
+      AND (pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang = 'XE')
       GROUP BY k.ten_kho
     `;
     const sqlPT = `
@@ -73,7 +75,7 @@ class BaoCaoService {
       FROM tm_hang_hoa_ton_kho tk
       JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
       JOIN sys_kho k ON tk.ma_kho = k.ma_kho
-      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
+      WHERE (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL)
       GROUP BY k.ten_kho
     `;
     const [xeRes, ptRes] = await Promise.all([
@@ -150,7 +152,8 @@ class BaoCaoService {
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
         JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND pt.ma_nhom_hang = 'XE'
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
+        AND (pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang = 'XE')
       `;
     } else {
       sql = `
@@ -158,7 +161,8 @@ class BaoCaoService {
         FROM tm_hoa_don_chi_tiet ct
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
+        AND (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL)
       `;
     }
 
@@ -229,7 +233,7 @@ class BaoCaoService {
 
       LEFT JOIN tm_hang_hoa_serial x ON ls.ma_serial = x.ma_serial
       JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE pt.ma_nhom_hang = 'XE'
+      WHERE (pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang = 'XE')
     `;
     const params = [];
     if (tu_ngay) {
@@ -273,7 +277,7 @@ class BaoCaoService {
       LEFT JOIN dm_doi_tac kh_ban ON hd.ma_ben_nhap = kh_ban.ma_doi_tac
 
       JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL)
+      WHERE (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL)
     `;
     const params = [];
     if (tu_ngay) {
@@ -431,11 +435,11 @@ class BaoCaoService {
     // Filter by update date if tu_ngay/den_ngay provided
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND cn.ngay_cap_nhat >= $${params.length}`;
+      sql += ` AND cn.updated_at >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND cn.ngay_cap_nhat < ($${params.length}::date + 1)`;
+      sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
     }
     sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
@@ -462,11 +466,11 @@ class BaoCaoService {
     }
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND cn.ngay_cap_nhat >= $${params.length}`;
+      sql += ` AND cn.updated_at >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND cn.ngay_cap_nhat < ($${params.length}::date + 1)`;
+      sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
     }
     sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
@@ -604,7 +608,8 @@ class BaoCaoService {
       SELECT COUNT(*) as total 
       FROM tm_hang_hoa_ton_kho tk 
       JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa 
-      WHERE (pt.ma_nhom_hang != 'XE' OR pt.ma_nhom_hang IS NULL) AND tk.so_luong_ton <= tk.so_luong_toi_thieu
+      WHERE (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL) 
+      AND tk.so_luong_ton <= tk.so_luong_toi_thieu
     `;
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo`;
     const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU'`;
