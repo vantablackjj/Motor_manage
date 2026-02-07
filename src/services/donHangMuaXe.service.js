@@ -2,6 +2,7 @@ const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
 const { withTransaction } = require("../ultils/transaction");
 const VehicleService = require("./themXe.service");
+const CongNoService = require("./congNo.service");
 
 class DonHangMuaXeService {
   /* =========================
@@ -716,11 +717,10 @@ class DonHangMuaXeService {
       let tongTienHienTai = 0;
       let itemsProcessed = 0;
 
-      // 3. Process items using internal client to maintain transaction
+      const invoiceDetails = [];
       for (const item of danhSachXe) {
         try {
           // Note: Passing 'client' to ensure it runs within same transaction
-          // We need to modify nhapXeTuDonHang to accept client or use internal logic
           const result = await VehicleService.nhapXeTuDonHang(
             so_don_hang,
             item.id,
@@ -732,19 +732,11 @@ class DonHangMuaXeService {
           const giaNhap = Number(item.gia_nhap || result.data.gia_nhap || 0);
           tongTienHienTai += giaNhap;
 
-          // Create Invoice Detail
-          await client.query(
-            `INSERT INTO tm_hoa_don_chi_tiet (
-              so_hoa_don, stt, ma_hang_hoa, ma_serial, so_luong, don_gia, thanh_tien
-            ) VALUES ($1, $2, $3, $4, 1, $5, $5)`,
-            [
-              soPhieuNhapKho,
-              ++itemsProcessed,
-              result.data.ma_loai_xe,
-              result.data.xe_key,
-              giaNhap,
-            ],
-          );
+          invoiceDetails.push({
+            ma_loai_xe: result.data.ma_loai_xe,
+            xe_key: result.data.xe_key,
+            don_gia: giaNhap,
+          });
 
           results.success.push({
             id: item.id,
@@ -758,11 +750,11 @@ class DonHangMuaXeService {
         }
       }
 
-      if (itemsProcessed === 0) {
+      if (invoiceDetails.length === 0) {
         throw new Error("Không có xe nào được nhập thành công");
       }
 
-      // 4. Tạo Header Hóa đơn (tm_hoa_don)
+      // 4. Tạo Header Hóa đơn (tm_hoa_don) - PHẢI TRƯỚC CHI TIẾT
       await client.query(
         `INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
@@ -779,6 +771,17 @@ class DonHangMuaXeService {
         ],
       );
 
+      // 5. Tạo Chi tiết Hóa đơn (tm_hoa_don_chi_tiet)
+      for (let i = 0; i < invoiceDetails.length; i++) {
+        const det = invoiceDetails[i];
+        await client.query(
+          `INSERT INTO tm_hoa_don_chi_tiet (
+            so_hoa_don, stt, ma_hang_hoa, ma_serial, so_luong, don_gia, thanh_tien
+          ) VALUES ($1, $2, $3, $4, 1, $5, $5)`,
+          [soPhieuNhapKho, i + 1, det.ma_loai_xe, det.xe_key, det.don_gia],
+        );
+      }
+
       // 5. Ghi nhận công nợ (SỬ DỤNG MÃ HÓA ĐƠN)
       await CongNoService.recordDoiTacDebt(client, {
         ma_doi_tac: order.ma_ben_xuat,
@@ -786,16 +789,15 @@ class DonHangMuaXeService {
         so_hoa_don: soPhieuNhapKho,
         ngay_phat_sinh: new Date(),
         so_tien: tongTienHienTai,
-        ghi_chu: `Nhập ${itemsProcessed} xe theo phiếu ${soPhieuNhapKho} (Đơn: ${so_don_hang})`,
+        ghi_chu: `Nhập ${invoiceDetails.length} xe theo phiếu ${soPhieuNhapKho} (Đơn: ${so_don_hang})`,
       });
 
       // 6. Post-process Status Update
       const checkRes = await client.query(
         `SELECT 
-          COUNT(*) as total_items,
           SUM(so_luong_dat) as total_qty,
           SUM(so_luong_da_giao) as total_delivered
-         FROM tm_don_hang_chi_tiet
+         FROM tm_don_hang_chi_tiet 
          WHERE so_don_hang = $1`,
         [so_don_hang],
       );
