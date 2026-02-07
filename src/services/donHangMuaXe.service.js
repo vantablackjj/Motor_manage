@@ -776,8 +776,8 @@ class DonHangMuaXeService {
         const det = invoiceDetails[i];
         await client.query(
           `INSERT INTO tm_hoa_don_chi_tiet (
-            so_hoa_don, stt, ma_hang_hoa, ma_serial, so_luong, don_gia, thanh_tien
-          ) VALUES ($1, $2, $3, $4, 1, $5, $5)`,
+            so_hoa_don, stt, ma_hang_hoa, ma_serial, so_luong, so_luong_nhan, don_gia
+          ) VALUES ($1, $2, $3, $4, 1, 1, $5)`,
           [soPhieuNhapKho, i + 1, det.ma_loai_xe, det.xe_key, det.don_gia],
         );
       }
