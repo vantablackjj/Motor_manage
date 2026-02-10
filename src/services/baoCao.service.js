@@ -415,35 +415,130 @@ class BaoCaoService {
   }
 
   async congNoKhachHang(filters = {}) {
-    const { ma_kh, tu_ngay, den_ngay } = filters;
-    let sql = `
+    const { ma_kh, ma_ncc, tu_ngay, den_ngay, loai_cong_no } = filters;
+
+    // If specific type is requested, return only that type
+    if (loai_cong_no === "PHAI_TRA") {
+      return this.congNoNhaCungCap(filters);
+    } else if (loai_cong_no === "PHAI_THU") {
+      // Return only customer debts
+      let sql = `
+        SELECT 
+          dt.ten_doi_tac as ho_ten, 
+          cn.ma_doi_tac as ma_kh,
+          cn.loai_cong_no,
+          cn.tong_no as tong_phai_tra,
+          cn.tong_da_thanh_toan as da_tra,
+          cn.con_lai,
+          cn.updated_at as ngay_cap_nhat
+        FROM tm_cong_no_doi_tac cn
+        JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
+        WHERE cn.loai_cong_no = 'PHAI_THU' AND cn.con_lai > 0
+      `;
+      const params = [];
+      if (ma_kh) {
+        params.push(ma_kh);
+        sql += ` AND cn.ma_doi_tac = $${params.length}`;
+      }
+      if (tu_ngay) {
+        params.push(tu_ngay);
+        sql += ` AND cn.updated_at >= $${params.length}`;
+      }
+      if (den_ngay) {
+        params.push(den_ngay);
+        sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
+      }
+      sql += ` ORDER BY cn.con_lai DESC`;
+      const { rows } = await pool.query(sql, params);
+      return rows;
+    }
+
+    // Return both customer and supplier debts
+    let sqlKhachHang = `
       SELECT 
         dt.ten_doi_tac as ho_ten, 
-        cn.ma_doi_tac as ma_kh,
+        cn.ma_doi_tac,
+        'KHACH_HANG' as loai_doi_tac,
+        cn.loai_cong_no,
         cn.tong_no as tong_phai_tra,
         cn.tong_da_thanh_toan as da_tra,
-        cn.con_lai
+        cn.con_lai,
+        cn.updated_at as ngay_cap_nhat
       FROM tm_cong_no_doi_tac cn
       JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
       WHERE cn.loai_cong_no = 'PHAI_THU' AND cn.con_lai > 0
     `;
+
+    let sqlNhaCungCap = `
+      SELECT 
+        dt.ten_doi_tac as ho_ten, 
+        cn.ma_doi_tac,
+        'NHA_CUNG_CAP' as loai_doi_tac,
+        cn.loai_cong_no,
+        cn.tong_no as tong_phai_tra,
+        cn.tong_da_thanh_toan as da_tra,
+        cn.con_lai,
+        cn.updated_at as ngay_cap_nhat
+      FROM tm_cong_no_doi_tac cn
+      JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
+      WHERE cn.loai_cong_no = 'PHAI_TRA' AND cn.con_lai > 0
+    `;
+
     const params = [];
+    let filterClause = "";
+
     if (ma_kh) {
       params.push(ma_kh);
-      sql += ` AND cn.ma_doi_tac = $${params.length}`;
+      filterClause += ` AND cn.ma_doi_tac = $${params.length}`;
     }
-    // Filter by update date if tu_ngay/den_ngay provided
+    if (ma_ncc && !ma_kh) {
+      params.push(ma_ncc);
+      filterClause += ` AND cn.ma_doi_tac = $${params.length}`;
+    }
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND cn.updated_at >= $${params.length}`;
+      filterClause += ` AND cn.updated_at >= $${params.length}`;
     }
     if (den_ngay) {
       params.push(den_ngay);
-      sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
+      filterClause += ` AND cn.updated_at < ($${params.length}::date + 1)`;
     }
-    sql += ` ORDER BY cn.con_lai DESC`;
-    const { rows } = await pool.query(sql, params);
-    return rows;
+
+    sqlKhachHang += filterClause;
+    sqlNhaCungCap += filterClause;
+
+    // Combine both queries with UNION ALL
+    const combinedSql = `
+      (${sqlKhachHang})
+      UNION ALL
+      (${sqlNhaCungCap})
+      ORDER BY loai_cong_no DESC, con_lai DESC
+    `;
+
+    const { rows } = await pool.query(combinedSql, params);
+
+    // Calculate summary
+    const summary = {
+      tong_phai_thu: 0,
+      tong_phai_tra: 0,
+      so_khach_hang_no: 0,
+      so_nha_cung_cap_no: 0,
+    };
+
+    rows.forEach((row) => {
+      if (row.loai_cong_no === "PHAI_THU") {
+        summary.tong_phai_thu += parseFloat(row.con_lai || 0);
+        summary.so_khach_hang_no++;
+      } else if (row.loai_cong_no === "PHAI_TRA") {
+        summary.tong_phai_tra += parseFloat(row.con_lai || 0);
+        summary.so_nha_cung_cap_no++;
+      }
+    });
+
+    return {
+      data: rows,
+      summary,
+    };
   }
 
   async congNoNhaCungCap(filters = {}) {

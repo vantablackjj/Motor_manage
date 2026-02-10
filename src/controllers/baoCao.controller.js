@@ -126,16 +126,18 @@ class BaoCaoController {
 
   async congNoKhachHang(req, res) {
     try {
-      let data = [];
-      const { loai_doi_tac } = req.query;
+      const result = await baoCaoService.congNoKhachHang(req.query);
 
-      if (loai_doi_tac === "NHA_CUNG_CAP") {
-        data = await baoCaoService.congNoNhaCungCap(req.query);
+      // Handle both old format (array) and new format (object with data and summary)
+      if (Array.isArray(result)) {
+        res.json({ success: true, data: result });
       } else {
-        data = await baoCaoService.congNoKhachHang(req.query);
+        res.json({
+          success: true,
+          data: result.data,
+          summary: result.summary,
+        });
       }
-
-      res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
