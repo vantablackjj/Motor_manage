@@ -287,6 +287,9 @@ class OrderService {
       const inv_thanh_tien = tong_tien - invDiscount + tien_thue_gtgt;
 
       // 3. Insert Invoice Header
+      const loai_hoa_don =
+        order.loai_don_hang === "MUA_XE" ? "MUA_HANG" : order.loai_don_hang;
+
       await client.query(
         `
         INSERT INTO tm_hoa_don (
@@ -297,7 +300,7 @@ class OrderService {
       `,
         [
           so_hoa_don,
-          order.loai_don_hang,
+          loai_hoa_don,
           order.so_don_hang,
           order.ma_ben_xuat,
           order.loai_ben_xuat,
@@ -326,7 +329,14 @@ class OrderService {
         const loai_quan_ly = prod.rows[0].loai_quan_ly;
 
         // 5. Inventory Movement Logic (MUST be before Detail Insertion for MUA_HANG)
-        if (order.loai_don_hang === "MUA_HANG") {
+        const isMua =
+          order.loai_don_hang === "MUA_HANG" ||
+          order.loai_don_hang === "MUA_XE";
+        const isBan =
+          order.loai_don_hang === "BAN_HANG" ||
+          order.loai_don_hang === "BAN_XE";
+
+        if (isMua) {
           await WarehouseService.processEntry(client, {
             ma_hang_hoa: item.ma_hang_hoa,
             loai_quan_ly,
@@ -339,7 +349,7 @@ class OrderService {
             nguoi_thuc_hien: nguoi_lap,
             ghi_chu,
           });
-        } else if (order.loai_don_hang === "BAN_HANG") {
+        } else if (isBan) {
           await WarehouseService.processExit(client, {
             ma_hang_hoa: item.ma_hang_hoa,
             loai_quan_ly,
@@ -419,15 +429,36 @@ class OrderService {
           );
         }
 
-        // 7. Update Order Progress
-        await client.query(
-          `
-          UPDATE tm_don_hang_chi_tiet
-          SET so_luong_da_giao = so_luong_da_giao + $1
-          WHERE so_don_hang = $2 AND ma_hang_hoa = $3
-        `,
-          [item.so_luong, order.so_don_hang, item.ma_hang_hoa],
-        );
+        // 7. Update Order Progress - Use ID/STT specifically to avoid duplicate product line issues
+        if (item.id || item.stt_don_hang || item.stt) {
+          await client.query(
+            `
+            UPDATE tm_don_hang_chi_tiet
+            SET so_luong_da_giao = so_luong_da_giao + $1
+            WHERE so_don_hang = $2 AND (id = $3 OR stt = $3)
+          `,
+            [
+              item.so_luong,
+              order.so_don_hang,
+              item.id || item.stt_don_hang || item.stt,
+            ],
+          );
+        } else {
+          // Fallback: update the first incomplete row for this product
+          await client.query(
+            `
+            UPDATE tm_don_hang_chi_tiet
+            SET so_luong_da_giao = so_luong_da_giao + $1
+            WHERE id = (
+              SELECT id FROM tm_don_hang_chi_tiet 
+              WHERE so_don_hang = $2 AND ma_hang_hoa = $3 
+              AND so_luong_da_giao < so_luong_dat
+              ORDER BY stt ASC LIMIT 1
+            )
+          `,
+            [item.so_luong, order.so_don_hang, item.ma_hang_hoa],
+          );
+        }
       }
 
       // 7.5 Increment Invoice Count on Order
@@ -437,7 +468,12 @@ class OrderService {
       );
 
       // 7. RECORD FINANCIALS (DEBT)
-      if (order.loai_don_hang === "MUA_HANG") {
+      const isMuaFin =
+        order.loai_don_hang === "MUA_HANG" || order.loai_don_hang === "MUA_XE";
+      const isBanFin =
+        order.loai_don_hang === "BAN_HANG" || order.loai_don_hang === "BAN_XE";
+
+      if (isMuaFin) {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_xuat, // NCC
           loai_cong_no: "PHAI_TRA",
@@ -445,7 +481,7 @@ class OrderService {
           so_tien: inv_thanh_tien,
           ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
         });
-      } else if (order.loai_don_hang === "BAN_HANG") {
+      } else if (isBanFin) {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_nhap, // Khách hàng
           loai_cong_no: "PHAI_THU",
@@ -705,7 +741,7 @@ class OrderService {
           thanh_tien = (tong_gia_tri - COALESCE($2, chiet_khau) + (tong_gia_tri * COALESCE($1, vat_percentage) / 100))
          WHERE so_don_hang = $4 OR (CASE WHEN $4::text ~ '^\\d+$' THEN id = $4::text::int ELSE FALSE END)
          RETURNING *`,
-        [vat_percentage, chiet_khau, ghi_chu, idOrNo],
+        [vat_percentage, chiet_khau, ghi_chu, so_don_hang],
       );
 
       await client.query("COMMIT");
