@@ -49,7 +49,7 @@ class ProductCatalogService {
     // Filter by brand (hierarchical - includes all children)
     if (filters.ma_nh) {
       sql += ` AND hh.ma_nhom_hang IN (
-        SELECT group_code FROM fn_get_all_child_groups($${idx++})
+        SELECT group_code FROM fn_get_all_child_groups($${idx++}::text)
       )`;
       params.push(filters.ma_nh);
     }
@@ -330,7 +330,7 @@ class ProductCatalogService {
         hh.status
        FROM tm_hang_hoa hh
        WHERE hh.ma_nhom_hang IN (
-         SELECT group_code FROM fn_get_all_child_groups($1)
+         SELECT group_code FROM fn_get_all_child_groups($1::text)
        )
        AND hh.status = TRUE
        ORDER BY hh.ten_hang_hoa`,
