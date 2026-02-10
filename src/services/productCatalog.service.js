@@ -31,7 +31,7 @@ class ProductCatalogService {
         hh.don_vi_tinh,
         hh.loai_quan_ly,
         hh.status,
-        get_nhom_hang_path(hh.ma_nhom_hang) as hierarchy_path
+        fn_get_group_path_text(hh.ma_nhom_hang) as hierarchy_path
       FROM tm_hang_hoa hh
       LEFT JOIN dm_nhom_hang nh ON hh.ma_nhom_hang = nh.ma_nhom
       WHERE 1=1
@@ -49,7 +49,7 @@ class ProductCatalogService {
     // Filter by brand (hierarchical - includes all children)
     if (filters.ma_nh) {
       sql += ` AND hh.ma_nhom_hang IN (
-        SELECT ma_nhom FROM get_nhom_hang_children($${idx++})
+        SELECT group_code FROM fn_get_all_child_groups($${idx++})
       )`;
       params.push(filters.ma_nh);
     }
@@ -104,7 +104,7 @@ class ProductCatalogService {
         hh.thong_so_ky_thuat,
         hh.mo_ta,
         hh.status,
-        get_nhom_hang_path(hh.ma_nhom_hang) as hierarchy_path
+        fn_get_group_path_text(hh.ma_nhom_hang) as hierarchy_path
       FROM tm_hang_hoa hh
       LEFT JOIN dm_nhom_hang nh ON hh.ma_nhom_hang = nh.ma_nhom
       WHERE hh.ma_hang_hoa = $1`,
@@ -330,7 +330,7 @@ class ProductCatalogService {
         hh.status
        FROM tm_hang_hoa hh
        WHERE hh.ma_nhom_hang IN (
-         SELECT ma_nhom FROM get_nhom_hang_children($1)
+         SELECT group_code FROM fn_get_all_child_groups($1)
        )
        AND hh.status = TRUE
        ORDER BY hh.ten_hang_hoa`,
