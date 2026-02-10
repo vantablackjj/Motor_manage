@@ -31,7 +31,19 @@ class ProductCatalogService {
         hh.don_vi_tinh,
         hh.loai_quan_ly,
         hh.status,
-        fn_get_group_path_text(hh.ma_nhom_hang) as hierarchy_path
+        (
+          WITH RECURSIVE path_tree AS (
+            SELECT ma_nhom, ten_nhom, ma_nhom_cha, 1 as level
+            FROM dm_nhom_hang
+            WHERE ma_nhom = hh.ma_nhom_hang
+            UNION ALL
+            SELECT n.ma_nhom, n.ten_nhom, n.ma_nhom_cha, pt.level + 1
+            FROM dm_nhom_hang n
+            INNER JOIN path_tree pt ON n.ma_nhom = pt.ma_nhom_cha
+          )
+          SELECT string_agg(ten_nhom, ' > ' ORDER BY level DESC)
+          FROM path_tree
+        ) as hierarchy_path
       FROM tm_hang_hoa hh
       LEFT JOIN dm_nhom_hang nh ON hh.ma_nhom_hang = nh.ma_nhom
       WHERE 1=1
@@ -49,7 +61,11 @@ class ProductCatalogService {
     // Filter by brand (hierarchical - includes all children)
     if (filters.ma_nh) {
       sql += ` AND hh.ma_nhom_hang IN (
-        SELECT group_code FROM fn_get_all_child_groups($${idx++}::text)
+        WITH RECURSIVE h AS (
+          SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = $${idx++}
+          UNION ALL
+          SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom
+        ) SELECT ma_nhom FROM h
       )`;
       params.push(filters.ma_nh);
     }
@@ -104,7 +120,19 @@ class ProductCatalogService {
         hh.thong_so_ky_thuat,
         hh.mo_ta,
         hh.status,
-        fn_get_group_path_text(hh.ma_nhom_hang) as hierarchy_path
+        (
+          WITH RECURSIVE path_tree AS (
+            SELECT ma_nhom, ten_nhom, ma_nhom_cha, 1 as level
+            FROM dm_nhom_hang
+            WHERE ma_nhom = hh.ma_nhom_hang
+            UNION ALL
+            SELECT n.ma_nhom, n.ten_nhom, n.ma_nhom_cha, pt.level + 1
+            FROM dm_nhom_hang n
+            INNER JOIN path_tree pt ON n.ma_nhom = pt.ma_nhom_cha
+          )
+          SELECT string_agg(ten_nhom, ' > ' ORDER BY level DESC)
+          FROM path_tree
+        ) as hierarchy_path
       FROM tm_hang_hoa hh
       LEFT JOIN dm_nhom_hang nh ON hh.ma_nhom_hang = nh.ma_nhom
       WHERE hh.ma_hang_hoa = $1`,
@@ -330,8 +358,12 @@ class ProductCatalogService {
         hh.status
        FROM tm_hang_hoa hh
        WHERE hh.ma_nhom_hang IN (
-         SELECT group_code FROM fn_get_all_child_groups($1::text)
-       )
+          WITH RECURSIVE h AS (
+            SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = $1
+            UNION ALL
+            SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom
+          ) SELECT ma_nhom FROM h
+        )
        AND hh.status = TRUE
        ORDER BY hh.ten_hang_hoa`,
       [ma_nh],

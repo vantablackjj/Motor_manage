@@ -1,0 +1,45 @@
+﻿✅ Cấu trúc backend Node.js đã được tạo!
+DB Connection: {
+  current_database: 'Manage_Warehouse',
+  current_schema: 'public',
+  current_user: 'postgres'
+}
+Functions found: [
+  {
+    schema: 'public',
+    name: 'fn_get_all_child_groups',
+    args: 'p_root_code character varying'
+  },
+  {
+    schema: 'public',
+    name: 'fn_get_all_child_groups',
+    args: 'p_root_code text'
+  },
+  {
+    schema: 'public',
+    name: 'fn_get_fund_type',
+    args: 'p_hinh_thuc text'
+  },
+  { schema: 'public', name: 'fn_update_fund_on_approval', args: '' },
+  { schema: 'public', name: 'fn_revert_fund_on_cancel', args: '' },
+  {
+    schema: 'public',
+    name: 'fn_get_group_path_text',
+    args: 'p_code text'
+  },
+  {
+    schema: 'public',
+    name: 'fn_get_all_child_warehouses',
+    args: 'p_root_code character varying'
+  },
+  {
+    schema: 'public',
+    name: 'fn_get_all_child_warehouses',
+    args: 'p_root_code text'
+  },
+  {
+    schema: 'public',
+    name: 'fn_get_group_path_text',
+    args: 'p_code character varying'
+  }
+]

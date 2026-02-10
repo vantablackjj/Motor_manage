@@ -1,0 +1,10 @@
+﻿--- Checking DB: postgres ---
+  [MISSING] fn_get_all_child_groups not in postgres
+--- Checking DB: Motorbikes ---
+  [MISSING] fn_get_all_child_groups not in Motorbikes
+--- Checking DB: Database ---
+  [MISSING] fn_get_all_child_groups not in Database
+--- Checking DB: manage_motor ---
+  [MISSING] fn_get_all_child_groups not in manage_motor
+--- Checking DB: Manage_Warehouse ---
+  [FOUND] fn_get_all_child_groups exists in Manage_Warehouse
