@@ -1,0 +1,222 @@
+{
+  "count": 31,
+  "rows": [
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260205000020",
+      "ngay_giao_dich": "2026-02-05T13:01:19.607Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260205000040",
+      "ngay_giao_dich": "2026-02-05T12:50:02.469Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "LOP"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260205000038",
+      "ngay_giao_dich": "2026-02-05T11:37:17.503Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260205-843",
+      "ngay_giao_dich": "2026-02-04T21:50:33.202Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260203000026",
+      "ngay_giao_dich": "2026-02-04T21:49:23.163Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260205000039",
+      "ngay_giao_dich": "2026-02-04T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000019",
+      "ngay_giao_dich": "2026-02-03T21:01:00.988Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000018",
+      "ngay_giao_dich": "2026-02-03T19:57:00.520Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000017",
+      "ngay_giao_dich": "2026-02-03T19:56:52.259Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000016",
+      "ngay_giao_dich": "2026-02-03T19:10:22.616Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000015",
+      "ngay_giao_dich": "2026-02-03T19:09:59.176Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "BAN_HANG",
+      "so_chung_tu": "INV20260204000010",
+      "ngay_giao_dich": "2026-02-03T18:59:27.408Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260205000036",
+      "ngay_giao_dich": "2026-02-03T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260205000037",
+      "ngay_giao_dich": "2026-02-03T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260203-297",
+      "ngay_giao_dich": "2026-02-03T03:24:13.505Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260203-029",
+      "ngay_giao_dich": "2026-02-03T03:19:22.624Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260203000026",
+      "ngay_giao_dich": "2026-02-03T03:12:45.981Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "Phanh"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260203-882",
+      "ngay_giao_dich": "2026-02-03T03:02:17.471Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260203-882",
+      "ngay_giao_dich": "2026-02-03T02:52:13.054Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "NK-0012",
+      "ngay_giao_dich": "2026-02-03T02:26:27.699Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "CHUYEN_KHO",
+      "so_chung_tu": "CK20260203-459",
+      "ngay_giao_dich": "2026-02-03T01:56:33.028Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": null,
+      "ngay_giao_dich": "2026-02-03T00:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260202000019",
+      "ngay_giao_dich": "2026-02-02T06:38:59.954Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "LOP"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260202000019",
+      "ngay_giao_dich": "2026-02-02T06:31:29.275Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "LOP"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "POP20260202000015",
+      "ngay_giao_dich": "2026-02-02T06:21:43.182Z",
+      "ten_hang_hoa": "Phanh",
+      "ma_nhom_hang": "LOP"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260202000010",
+      "ngay_giao_dich": "2026-02-01T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260202000009",
+      "ngay_giao_dich": "2026-02-01T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260202000010",
+      "ngay_giao_dich": "2026-02-01T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "PO20260203000025",
+      "ngay_giao_dich": "2026-02-01T17:00:00.000Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "CAP_NHAT",
+      "so_chung_tu": null,
+      "ngay_giao_dich": "2026-02-01T04:09:04.952Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    },
+    {
+      "loai_giao_dich": "NHAP_KHO",
+      "so_chung_tu": "NK-001",
+      "ngay_giao_dich": "2026-02-01T04:02:24.456Z",
+      "ten_hang_hoa": "Honda SH 125i 2024",
+      "ma_nhom_hang": "XE"
+    }
+  ]
+}

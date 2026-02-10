@@ -1,0 +1,122 @@
+[
+  {
+    "so_don_hang": "PO20260205000043",
+    "loai_don_hang": "MUA_XE",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-05T13:26:44.960Z"
+  },
+  {
+    "so_don_hang": "SO20260205000042",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-05T13:03:48.178Z"
+  },
+  {
+    "so_don_hang": "SO20260205000041",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-05T13:00:52.713Z"
+  },
+  {
+    "so_don_hang": "POP20260205000040",
+    "loai_don_hang": "MUA_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-05T12:49:48.567Z"
+  },
+  {
+    "so_don_hang": "PO20260205000039",
+    "loai_don_hang": "MUA_XE",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-05T12:47:59.313Z"
+  },
+  {
+    "so_don_hang": "POP20260205000038",
+    "loai_don_hang": "MUA_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-05T11:36:38.890Z"
+  },
+  {
+    "so_don_hang": "CK20260205-332",
+    "loai_don_hang": "CHUYEN_KHO",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-05T02:54:59.068Z"
+  },
+  {
+    "so_don_hang": "CK20260205-843",
+    "loai_don_hang": "CHUYEN_KHO",
+    "trang_thai": "DA_DUYET",
+    "created_at": "2026-02-04T21:50:21.963Z"
+  },
+  {
+    "so_don_hang": "PO20260205000037",
+    "loai_don_hang": "MUA_XE",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-04T21:44:20.169Z"
+  },
+  {
+    "so_don_hang": "PO20260205000036",
+    "loai_don_hang": "MUA_XE",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-04T20:59:13.290Z"
+  },
+  {
+    "so_don_hang": "SO20260204000035",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-03T21:00:20.149Z"
+  },
+  {
+    "so_don_hang": "SO20260204000034",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-03T19:56:22.769Z"
+  },
+  {
+    "so_don_hang": "SO20260204000033",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-03T19:07:41.863Z"
+  },
+  {
+    "so_don_hang": "SO20260204000032",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "HUY",
+    "created_at": "2026-02-03T19:07:14.372Z"
+  },
+  {
+    "so_don_hang": "SO20260204000031",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "TU_CHOI",
+    "created_at": "2026-02-03T17:55:56.011Z"
+  },
+  {
+    "so_don_hang": "SO20260204000030",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-03T17:54:29.097Z"
+  },
+  {
+    "so_don_hang": "SO20260204000029",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-03T17:53:55.182Z"
+  },
+  {
+    "so_don_hang": "SO20260204000028",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-03T17:51:31.742Z"
+  },
+  {
+    "so_don_hang": "SO20260203000027",
+    "loai_don_hang": "BAN_HANG",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-03T16:16:11.090Z"
+  },
+  {
+    "so_don_hang": "CK20260203-190",
+    "loai_don_hang": "CHUYEN_KHO",
+    "trang_thai": "NHAP",
+    "created_at": "2026-02-03T15:17:41.923Z"
+  }
+]

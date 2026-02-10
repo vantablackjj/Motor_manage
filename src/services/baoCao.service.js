@@ -216,29 +216,50 @@ class BaoCaoService {
     let sql = `
       SELECT 
         ls.*, 
-        COALESCE(k_xuat.ten_kho, ncc_nhap.ten_doi_tac) as kho_xuat, 
-        COALESCE(k_nhap.ten_kho, kh_ban.ten_doi_tac) as kho_nhap,
+        -- Identification of Source (Kho xuat / NCC)
+        COALESCE(
+          k_xuat.ten_kho, 
+          ncc_po.ten_doi_tac, 
+          ncc_hd.ten_doi_tac,
+          CASE WHEN ls.loai_giao_dich IN ('NHAP', 'NHAP_KHO', 'MUA') THEN 'Nhà cung cấp' ELSE NULL END
+        ) as kho_xuat,
+        
+        -- Identification of Destination (Kho nhap / Khach hang)
+        COALESCE(
+          k_nhap.ten_kho, 
+          kh_hd.ten_doi_tac,
+          CASE WHEN ls.loai_giao_dich IN ('XUAT', 'XUAT_KHO', 'BAN', 'BAN_HANG') THEN 'Khách hàng' ELSE NULL END
+        ) as kho_nhap,
+        
         pt.ten_hang_hoa as ten_loai, 
-        (x.thuoc_tinh_rieng->>'ten_mau') as ten_mau
+        COALESCE(x.thuoc_tinh_rieng->>'ten_mau', x.thuoc_tinh_rieng->>'ma_mau') as ten_mau,
+        x.serial_identifier as so_khung
       FROM tm_hang_hoa_lich_su ls
-      -- Determines Source (Warehouse or Supplier)
-      LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
-      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
-      LEFT JOIN dm_doi_tac ncc_nhap ON po.ma_ben_xuat = ncc_nhap.ma_doi_tac
-      
-      -- Determines Destination (Warehouse or Customer)
-      LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
-      LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
-      LEFT JOIN dm_doi_tac kh_ban ON hd.ma_ben_nhap = kh_ban.ma_doi_tac
-
+      -- Junction 1: Basic joins
+      LEFT JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
       LEFT JOIN tm_hang_hoa_serial x ON ls.ma_serial = x.ma_serial
-      JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE (pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang = 'XE')
+      LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
+      LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
+      
+      -- Junction 2: Link to Purchase Order (Source of many imports)
+      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
+      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat = 'DOI_TAC'
+      
+      -- Junction 3: Link to Invoice (Source of sales or alternate purchase tracking)
+      LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
+      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap = 'DOI_TAC'
+
+      WHERE (
+        pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) 
+        OR pt.ma_nhom_hang = 'XE'
+        OR pt.loai_quan_ly = 'SERIAL' -- More inclusive fallback
+      )
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND ls.ngay_giao_dich >= $${params.length}`;
+      sql += ` AND ls.ngay_giao_dich >= $${params.length}::date`;
     }
     if (den_ngay) {
       params.push(den_ngay);
@@ -252,7 +273,8 @@ class BaoCaoService {
       params.push(loai_giao_dich);
       sql += ` AND ls.loai_giao_dich = $${params.length}`;
     }
-    sql += ` ORDER BY ls.ngay_giao_dich DESC`;
+    sql += ` ORDER BY ls.ngay_giao_dich DESC, ls.id DESC`;
+
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -262,27 +284,47 @@ class BaoCaoService {
     let sql = `
       SELECT 
         ls.*, 
-        COALESCE(k_xuat.ten_kho, ncc_nhap.ten_doi_tac) as kho_xuat, 
-        COALESCE(k_nhap.ten_kho, kh_ban.ten_doi_tac) as kho_nhap,
+        -- Identification of Source
+        COALESCE(
+          k_xuat.ten_kho, 
+          ncc_po.ten_doi_tac, 
+          ncc_hd.ten_doi_tac,
+          CASE WHEN ls.loai_giao_dich IN ('NHAP', 'NHAP_KHO', 'MUA') THEN 'Nhà cung cấp' ELSE NULL END
+        ) as kho_xuat, 
+        
+        -- Identification of Destination
+        COALESCE(
+          k_nhap.ten_kho, 
+          kh_hd.ten_doi_tac,
+          CASE WHEN ls.loai_giao_dich IN ('XUAT', 'XUAT_KHO', 'BAN', 'BAN_HANG') THEN 'Khách hàng' ELSE NULL END
+        ) as kho_nhap,
+        
         pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh
       FROM tm_hang_hoa_lich_su ls
-      -- Determines Source
+      -- Basic joins
+      LEFT JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
       LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
-      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
-      LEFT JOIN dm_doi_tac ncc_nhap ON po.ma_ben_xuat = ncc_nhap.ma_doi_tac
-
-      -- Determines Destination
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
+      
+      -- Link to PO (so_chung_tu might be POP...)
+      LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
+      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat = 'DOI_TAC'
+      
+      -- Link to Invoice (so_chung_tu might be PNK... or HD...)
       LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
-      LEFT JOIN dm_doi_tac kh_ban ON hd.ma_ben_nhap = kh_ban.ma_doi_tac
+      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap = 'DOI_TAC'
 
-      JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE (pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) OR pt.ma_nhom_hang IS NULL)
+      WHERE (
+        pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) 
+        OR pt.ma_nhom_hang IS NULL
+      )
+      AND pt.loai_quan_ly != 'SERIAL'
     `;
     const params = [];
     if (tu_ngay) {
       params.push(tu_ngay);
-      sql += ` AND ls.ngay_giao_dich >= $${params.length}`;
+      sql += ` AND ls.ngay_giao_dich >= $${params.length}::date`;
     }
     if (den_ngay) {
       params.push(den_ngay);
@@ -296,7 +338,8 @@ class BaoCaoService {
       params.push(ma_pt);
       sql += ` AND ls.ma_hang_hoa = $${params.length}`;
     }
-    sql += ` ORDER BY ls.ngay_giao_dich DESC`;
+    sql += ` ORDER BY ls.ngay_giao_dich DESC, ls.id DESC`;
+
     const { rows } = await pool.query(sql, params);
     return rows;
   }
