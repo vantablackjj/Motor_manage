@@ -1,0 +1,52 @@
+[
+  {
+    "column_name": "id",
+    "data_type": "integer",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "ma_nhom",
+    "data_type": "character varying",
+    "character_maximum_length": 50
+  },
+  {
+    "column_name": "ten_nhom",
+    "data_type": "character varying",
+    "character_maximum_length": 255
+  },
+  {
+    "column_name": "ma_nhom_cha",
+    "data_type": "character varying",
+    "character_maximum_length": 50
+  },
+  {
+    "column_name": "thong_so_bat_buoc",
+    "data_type": "jsonb",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "thu_tu_hien_thi",
+    "data_type": "integer",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "status",
+    "data_type": "boolean",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "ghi_chu",
+    "data_type": "text",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone",
+    "character_maximum_length": null
+  }
+]

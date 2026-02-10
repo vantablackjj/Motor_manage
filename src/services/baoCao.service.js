@@ -222,18 +222,18 @@ class BaoCaoService {
           ncc_po.ten_doi_tac, 
           ncc_hd.ten_doi_tac,
           CASE WHEN ls.loai_giao_dich IN ('NHAP', 'NHAP_KHO', 'MUA') THEN 'Nhà cung cấp' ELSE NULL END
-        ) as kho_xuat,
+        )::varchar as kho_xuat,
         
         -- Identification of Destination (Kho nhap / Khach hang)
         COALESCE(
           k_nhap.ten_kho, 
           kh_hd.ten_doi_tac,
           CASE WHEN ls.loai_giao_dich IN ('XUAT', 'XUAT_KHO', 'BAN', 'BAN_HANG') THEN 'Khách hàng' ELSE NULL END
-        ) as kho_nhap,
+        )::varchar as kho_nhap,
         
-        pt.ten_hang_hoa as ten_loai, 
-        COALESCE(x.thuoc_tinh_rieng->>'ten_mau', x.thuoc_tinh_rieng->>'ma_mau') as ten_mau,
-        x.serial_identifier as so_khung
+        pt.ten_hang_hoa::varchar as ten_loai, 
+        COALESCE(x.thuoc_tinh_rieng->>'ten_mau', x.thuoc_tinh_rieng->>'ma_mau')::varchar as ten_mau,
+        x.serial_identifier::varchar as so_khung
       FROM tm_hang_hoa_lich_su ls
       -- Junction 1: Basic joins
       LEFT JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
@@ -243,17 +243,17 @@ class BaoCaoService {
       
       -- Junction 2: Link to Purchase Order (Source of many imports)
       LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
-      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat::varchar = 'DOI_TAC'
       
       -- Junction 3: Link to Invoice (Source of sales or alternate purchase tracking)
       LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
-      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat = 'DOI_TAC'
-      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat::varchar = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap::varchar = 'DOI_TAC'
 
       WHERE (
         pt.ma_nhom_hang IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) 
         OR pt.ma_nhom_hang = 'XE'
-        OR pt.loai_quan_ly = 'SERIAL' -- More inclusive fallback
+        OR pt.loai_quan_ly::varchar = 'SERIAL' -- More inclusive fallback
       )
     `;
     const params = [];
@@ -290,16 +290,16 @@ class BaoCaoService {
           ncc_po.ten_doi_tac, 
           ncc_hd.ten_doi_tac,
           CASE WHEN ls.loai_giao_dich IN ('NHAP', 'NHAP_KHO', 'MUA') THEN 'Nhà cung cấp' ELSE NULL END
-        ) as kho_xuat, 
+        )::varchar as kho_xuat, 
         
         -- Identification of Destination
         COALESCE(
           k_nhap.ten_kho, 
           kh_hd.ten_doi_tac,
           CASE WHEN ls.loai_giao_dich IN ('XUAT', 'XUAT_KHO', 'BAN', 'BAN_HANG') THEN 'Khách hàng' ELSE NULL END
-        ) as kho_nhap,
+        )::varchar as kho_nhap,
         
-        pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh
+        pt.ten_hang_hoa::varchar as ten_pt, pt.don_vi_tinh::varchar
       FROM tm_hang_hoa_lich_su ls
       -- Basic joins
       LEFT JOIN tm_hang_hoa pt ON ls.ma_hang_hoa = pt.ma_hang_hoa
@@ -308,18 +308,18 @@ class BaoCaoService {
       
       -- Link to PO (so_chung_tu might be POP...)
       LEFT JOIN tm_don_hang po ON ls.so_chung_tu = po.so_don_hang 
-      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac ncc_po ON po.ma_ben_xuat = ncc_po.ma_doi_tac AND po.loai_ben_xuat::varchar = 'DOI_TAC'
       
       -- Link to Invoice (so_chung_tu might be PNK... or HD...)
       LEFT JOIN tm_hoa_don hd ON ls.so_chung_tu = hd.so_hoa_don 
-      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat = 'DOI_TAC'
-      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac ncc_hd ON hd.ma_ben_xuat = ncc_hd.ma_doi_tac AND hd.loai_ben_xuat::varchar = 'DOI_TAC'
+      LEFT JOIN dm_doi_tac kh_hd ON hd.ma_ben_nhap = kh_hd.ma_doi_tac AND hd.loai_ben_nhap::varchar = 'DOI_TAC'
 
       WHERE (
         pt.ma_nhom_hang NOT IN (SELECT ma_nhom FROM get_nhom_hang_children('XE')) 
         OR pt.ma_nhom_hang IS NULL
       )
-      AND pt.loai_quan_ly != 'SERIAL'
+      AND pt.loai_quan_ly::varchar != 'SERIAL'
     `;
     const params = [];
     if (tu_ngay) {
@@ -458,7 +458,7 @@ class BaoCaoService {
   }
 
   async congNoKhachHang(filters = {}) {
-    const { ma_kh, ma_ncc, tu_ngay, den_ngay, loai_cong_no } = filters;
+    const { ma_kh, ma_ncc, tu_ngay, den_ngay, loai_cong_no, search } = filters;
 
     // If specific type is requested, return only that type
     if (loai_cong_no === "PHAI_TRA") {
@@ -467,12 +467,12 @@ class BaoCaoService {
       // Return only customer debts
       let sql = `
         SELECT 
-          dt.ten_doi_tac as ho_ten, 
-          cn.ma_doi_tac as ma_kh,
-          cn.loai_cong_no,
-          cn.tong_no as tong_phai_tra,
-          cn.tong_da_thanh_toan as da_tra,
-          cn.con_lai,
+          dt.ten_doi_tac::varchar as ho_ten, 
+          cn.ma_doi_tac::varchar as ma_kh,
+          cn.loai_cong_no::varchar,
+          cn.tong_no::numeric as tong_phai_tra,
+          cn.tong_da_thanh_toan::numeric as da_tra,
+          cn.con_lai::numeric,
           cn.updated_at as ngay_cap_nhat
         FROM tm_cong_no_doi_tac cn
         JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
@@ -491,6 +491,10 @@ class BaoCaoService {
         params.push(den_ngay);
         sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
       }
+      if (search) {
+        params.push(`%${search}%`);
+        sql += ` AND (dt.ten_doi_tac ILIKE $${params.length} OR cn.ma_doi_tac ILIKE $${params.length})`;
+      }
       sql += ` ORDER BY cn.con_lai DESC`;
       const { rows } = await pool.query(sql, params);
       return rows;
@@ -499,13 +503,13 @@ class BaoCaoService {
     // Return both customer and supplier debts
     let sqlKhachHang = `
       SELECT 
-        dt.ten_doi_tac as ho_ten, 
-        cn.ma_doi_tac,
-        'KHACH_HANG' as loai_doi_tac,
-        cn.loai_cong_no,
-        cn.tong_no as tong_phai_tra,
-        cn.tong_da_thanh_toan as da_tra,
-        cn.con_lai,
+        dt.ten_doi_tac::varchar as ho_ten, 
+        cn.ma_doi_tac::varchar,
+        'KHACH_HANG'::varchar as loai_doi_tac,
+        cn.loai_cong_no::varchar,
+        cn.tong_no::numeric as tong_phai_tra,
+        cn.tong_da_thanh_toan::numeric as da_tra,
+        cn.con_lai::numeric,
         cn.updated_at as ngay_cap_nhat
       FROM tm_cong_no_doi_tac cn
       JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
@@ -514,13 +518,13 @@ class BaoCaoService {
 
     let sqlNhaCungCap = `
       SELECT 
-        dt.ten_doi_tac as ho_ten, 
-        cn.ma_doi_tac,
-        'NHA_CUNG_CAP' as loai_doi_tac,
-        cn.loai_cong_no,
-        cn.tong_no as tong_phai_tra,
-        cn.tong_da_thanh_toan as da_tra,
-        cn.con_lai,
+        dt.ten_doi_tac::varchar as ho_ten, 
+        cn.ma_doi_tac::varchar,
+        'NHA_CUNG_CAP'::varchar as loai_doi_tac,
+        cn.loai_cong_no::varchar,
+        cn.tong_no::numeric as tong_phai_tra,
+        cn.tong_da_thanh_toan::numeric as da_tra,
+        cn.con_lai::numeric,
         cn.updated_at as ngay_cap_nhat
       FROM tm_cong_no_doi_tac cn
       JOIN dm_doi_tac dt ON cn.ma_doi_tac = dt.ma_doi_tac
@@ -528,33 +532,45 @@ class BaoCaoService {
     `;
 
     const params = [];
-    let filterClause = "";
+    let paramIndex = 0;
 
     if (ma_kh) {
+      paramIndex++;
       params.push(ma_kh);
-      filterClause += ` AND cn.ma_doi_tac = $${params.length}`;
+      sqlKhachHang += ` AND cn.ma_doi_tac = $${paramIndex}`;
     }
     if (ma_ncc && !ma_kh) {
+      // Only apply ma_ncc filter if ma_kh is not present to avoid conflicting filters on ma_doi_tac
+      paramIndex++;
       params.push(ma_ncc);
-      filterClause += ` AND cn.ma_doi_tac = $${params.length}`;
+      sqlNhaCungCap += ` AND cn.ma_doi_tac = $${paramIndex}`;
     }
     if (tu_ngay) {
+      paramIndex++;
       params.push(tu_ngay);
-      filterClause += ` AND cn.updated_at >= $${params.length}`;
+      sqlKhachHang += ` AND cn.updated_at >= $${paramIndex}`;
+      sqlNhaCungCap += ` AND cn.updated_at >= $${paramIndex}`;
     }
     if (den_ngay) {
+      paramIndex++;
       params.push(den_ngay);
-      filterClause += ` AND cn.updated_at < ($${params.length}::date + 1)`;
+      sqlKhachHang += ` AND cn.updated_at < ($${paramIndex}::date + 1)`;
+      sqlNhaCungCap += ` AND cn.updated_at < ($${paramIndex}::date + 1)`;
     }
-
-    sqlKhachHang += filterClause;
-    sqlNhaCungCap += filterClause;
+    if (search) {
+      paramIndex++;
+      params.push(`%${search}%`);
+      sqlKhachHang += ` AND (dt.ten_doi_tac ILIKE $${paramIndex} OR cn.ma_doi_tac ILIKE $${paramIndex})`;
+      sqlNhaCungCap += ` AND (dt.ten_doi_tac ILIKE $${paramIndex} OR cn.ma_doi_tac ILIKE $${paramIndex})`;
+    }
 
     // Combine both queries with UNION ALL
     const combinedSql = `
-      (${sqlKhachHang})
-      UNION ALL
-      (${sqlNhaCungCap})
+      SELECT * FROM (
+        ${sqlKhachHang}
+        UNION ALL
+        ${sqlNhaCungCap}
+      ) as combined
       ORDER BY loai_cong_no DESC, con_lai DESC
     `;
 

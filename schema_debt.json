@@ -1,0 +1,30 @@
+[
+  {
+    "column_name": "id",
+    "data_type": "integer"
+  },
+  {
+    "column_name": "ma_doi_tac",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "loai_cong_no",
+    "data_type": "USER-DEFINED"
+  },
+  {
+    "column_name": "tong_no",
+    "data_type": "numeric"
+  },
+  {
+    "column_name": "tong_da_thanh_toan",
+    "data_type": "numeric"
+  },
+  {
+    "column_name": "con_lai",
+    "data_type": "numeric"
+  },
+  {
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone"
+  }
+]

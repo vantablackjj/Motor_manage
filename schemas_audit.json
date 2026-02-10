@@ -1,0 +1,288 @@
+{
+  "tm_don_hang": [
+    {
+      "column_name": "updated_by",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ngay_duyet",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "created_by",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "nguoi_gui",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ngay_gui",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "id",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "loai_don_hang",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "ngay_dat_hang",
+      "data_type": "date"
+    },
+    {
+      "column_name": "loai_ben_xuat",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "loai_ben_nhap",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "tong_gia_tri",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "chiet_khau",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "vat_percentage",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "thanh_tien",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "so_hoa_don_du_kien",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "so_hoa_don_da_xuat",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "trang_thai",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "so_don_hang",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ghi_chu",
+      "data_type": "text"
+    },
+    {
+      "column_name": "nguoi_duyet",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ma_ben_xuat",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "nguoi_tao",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ma_ben_nhap",
+      "data_type": "character varying"
+    }
+  ],
+  "tm_hoa_don": [
+    {
+      "column_name": "id",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "da_ke_khai_thue",
+      "data_type": "boolean"
+    },
+    {
+      "column_name": "ngay_ke_khai",
+      "data_type": "date"
+    },
+    {
+      "column_name": "thoi_gian_giao",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "trang_thai",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "ngay_lap",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "nguoi_gui_duyet_giao",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ngay_gui_duyet_giao",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "nguoi_duyet_giao",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ngay_duyet_giao",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "updated_by",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "loai_hoa_don",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "lan_thu",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ngay_hoa_don",
+      "data_type": "date"
+    },
+    {
+      "column_name": "loai_ben_xuat",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "loai_ben_nhap",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "column_name": "tong_tien",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "chiet_khau",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "tien_thue_gtgt",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "thanh_tien",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "so_hoa_don",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ghi_chu_duyet_giao",
+      "data_type": "text"
+    },
+    {
+      "column_name": "so_don_hang",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "so_phieu_kho",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ghi_chu",
+      "data_type": "text"
+    },
+    {
+      "column_name": "ma_ben_xuat",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "nguoi_lap",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ma_ben_nhap",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "nguoi_giao",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "nguoi_nhan",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "phuong_tien",
+      "data_type": "character varying"
+    }
+  ],
+  "tm_hang_hoa_lich_su": [
+    {
+      "column_name": "so_luong",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "don_gia",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "thanh_tien",
+      "data_type": "numeric"
+    },
+    {
+      "column_name": "ngay_giao_dich",
+      "data_type": "timestamp without time zone"
+    },
+    {
+      "column_name": "id",
+      "data_type": "integer"
+    },
+    {
+      "column_name": "ma_kho_xuat",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ma_kho_nhap",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "nguoi_thuc_hien",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "dien_giai",
+      "data_type": "text"
+    },
+    {
+      "column_name": "ma_hang_hoa",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "ma_serial",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "loai_giao_dich",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "so_chung_tu",
+      "data_type": "character varying"
+    }
+  ]
+}
