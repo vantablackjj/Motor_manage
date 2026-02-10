@@ -461,9 +461,11 @@ class OrderService {
         }
       }
 
-      // 7.5 Increment Invoice Count on Order
+      // 7.5 Increment Invoice Count on Order (Safe Update)
       await client.query(
-        `UPDATE tm_don_hang SET so_hoa_don_da_xuat = so_hoa_don_da_xuat + 1 WHERE so_don_hang = $1`,
+        `UPDATE tm_don_hang 
+         SET so_hoa_don_da_xuat = LEAST(so_hoa_don_da_xuat + 1, so_hoa_don_du_kien) 
+         WHERE so_don_hang = $1`,
         [order.so_don_hang],
       );
 
