@@ -49,7 +49,7 @@ class ProductCatalogService {
     // Filter by brand (hierarchical - includes all children)
     if (filters.ma_nh) {
       sql += ` AND hh.ma_nhom_hang IN (
-        SELECT x FROM get_nhom_hang_children_v2($${idx++}) as x
+        SELECT ma_nhom FROM get_nhom_hang_children($${idx++})
       )`;
       params.push(filters.ma_nh);
     }
@@ -330,7 +330,7 @@ class ProductCatalogService {
         hh.status
        FROM tm_hang_hoa hh
        WHERE hh.ma_nhom_hang IN (
-         SELECT x FROM get_nhom_hang_children_v2($1) as x
+         SELECT ma_nhom FROM get_nhom_hang_children($1)
        )
        AND hh.status = TRUE
        ORDER BY hh.ten_hang_hoa`,
