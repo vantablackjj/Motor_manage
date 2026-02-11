@@ -20,8 +20,3 @@ ALTER TABLE tm_hang_hoa_serial
   ADD COLUMN IF NOT EXISTS nguoi_duyet INTEGER REFERENCES sys_user(id),
   ADD COLUMN IF NOT EXISTS ngay_duyet TIMESTAMP,
   ADD COLUMN IF NOT EXISTS ly_do_tu_choi TEXT;
-
--- 3. Create index for performance
-CREATE INDEX IF NOT EXISTS idx_tm_hang_hoa_serial_approval 
-  ON tm_hang_hoa_serial(trang_thai) 
-  WHERE trang_thai IN ('NHAP', 'CHO_DUYET');
