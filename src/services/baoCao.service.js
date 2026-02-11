@@ -798,6 +798,56 @@ class BaoCaoService {
     return rows;
   }
 
+  async chiTietMuaHang(filters = {}) {
+    const { ma_ncc, tu_ngay, den_ngay } = filters;
+    let sql = `
+      SELECT 
+        h.so_hoa_don, 
+        h.ngay_hoa_don, 
+        h.so_don_hang,
+        dt.ten_doi_tac as ten_ncc, 
+        dt.dia_chi, 
+        dt.dien_thoai, 
+        dt.ma_so_thue,
+        ct.ma_hang_hoa, 
+        hh.ten_hang_hoa,
+        s.serial_identifier as so_khung,
+        s.thuoc_tinh_rieng->>'so_may' as so_may,
+        ct.don_gia, 
+        ct.so_luong, 
+        ct.thanh_tien,
+        ct.thue_suat,
+        ct.tien_thue,
+        h.loai_hoa_don
+      FROM tm_hoa_don h
+      JOIN dm_doi_tac dt ON h.ma_ben_xuat = dt.ma_doi_tac
+      JOIN tm_hoa_don_chi_tiet ct ON h.so_hoa_don = ct.so_hoa_don
+      LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN tm_hang_hoa_serial s ON ct.ma_serial = s.ma_serial
+      WHERE h.loai_hoa_don IN ('MUA_HANG', 'TRA_HANG_MUA')
+      AND h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'HOAN_THANH')
+    `;
+    const params = [];
+
+    if (ma_ncc) {
+      params.push(ma_ncc);
+      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+    }
+    if (tu_ngay) {
+      params.push(tu_ngay);
+      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
+    }
+    if (den_ngay) {
+      params.push(den_ngay);
+      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
+    }
+
+    sql += ` ORDER BY h.ngay_hoa_don DESC, h.so_hoa_don, hh.ten_hang_hoa`;
+
+    const { rows } = await pool.query(sql, params);
+    return rows;
+  }
+
   // ============================================================
   // DASHBOARD
   // ============================================================

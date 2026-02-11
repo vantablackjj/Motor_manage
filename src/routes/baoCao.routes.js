@@ -17,7 +17,7 @@ router.get(
   "/ton-kho/xe",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.tonKhoXe
+  baoCaoController.tonKhoXe,
 );
 
 /**
@@ -30,7 +30,7 @@ router.get(
   "/ton-kho/phu-tung",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.tonKhoPhuTung
+  baoCaoController.tonKhoPhuTung,
 );
 
 /**
@@ -43,7 +43,7 @@ router.get(
   "/ton-kho/tong-hop",
   authenticate,
   authorize(["QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.tonKhoTongHop
+  baoCaoController.tonKhoTongHop,
 );
 
 // ============================================================
@@ -60,7 +60,7 @@ router.get(
   "/doanh-thu/theo-thang",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.doanhThuTheoThang
+  baoCaoController.doanhThuTheoThang,
 );
 
 /**
@@ -73,7 +73,7 @@ router.get(
   "/doanh-thu/theo-kho",
   authenticate,
   authorize(["QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.doanhThuTheoKho
+  baoCaoController.doanhThuTheoKho,
 );
 
 /**
@@ -86,7 +86,7 @@ router.get(
   "/doanh-thu/theo-san-pham",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.doanhThuTheoSanPham
+  baoCaoController.doanhThuTheoSanPham,
 );
 
 /**
@@ -99,7 +99,7 @@ router.get(
   "/doanh-thu/tong-hop",
   authenticate,
   authorize(["QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.doanhThuTongHop
+  baoCaoController.doanhThuTongHop,
 );
 
 // ============================================================
@@ -116,7 +116,7 @@ router.get(
   "/nhap-xuat/xe",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.nhapXuatXe
+  baoCaoController.nhapXuatXe,
 );
 
 /**
@@ -129,7 +129,7 @@ router.get(
   "/nhap-xuat/phu-tung",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.nhapXuatPhuTung
+  baoCaoController.nhapXuatPhuTung,
 );
 
 /**
@@ -142,7 +142,20 @@ router.get(
   "/nhap-xuat/the-kho",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.theKhoPhuTung
+  baoCaoController.theKhoPhuTung,
+);
+
+/**
+ * @route   GET /api/bao-cao/mua-hang/chi-tiet
+ * @desc    Sổ chi tiết mua hàng theo nhà cung cấp
+ * @access  Private (NHAN_VIEN trở lên)
+ * @query   ma_ncc, tu_ngay, den_ngay
+ */
+router.get(
+  "/mua-hang/chi-tiet",
+  authenticate,
+  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  baoCaoController.chiTietMuaHang,
 );
 
 // ============================================================
@@ -159,7 +172,7 @@ router.get(
   "/chuyen-kho/tong-hop",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.chuyenKhoTongHop
+  baoCaoController.chuyenKhoTongHop,
 );
 
 /**
@@ -172,7 +185,7 @@ router.get(
   "/chuyen-kho/chi-tiet",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.chuyenKhoChiTiet
+  baoCaoController.chuyenKhoChiTiet,
 );
 
 // ============================================================
@@ -189,7 +202,7 @@ router.get(
   "/cong-no/noi-bo",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.congNoNoiBo
+  baoCaoController.congNoNoiBo,
 );
 
 /**
@@ -202,7 +215,7 @@ router.get(
   "/cong-no/khach-hang",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.congNoKhachHang
+  baoCaoController.congNoKhachHang,
 );
 
 // ============================================================
@@ -219,7 +232,7 @@ router.get(
   "/thu-chi/theo-ngay",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.thuChiTheoNgay
+  baoCaoController.thuChiTheoNgay,
 );
 
 /**
@@ -232,7 +245,7 @@ router.get(
   "/thu-chi/tong-hop",
   authenticate,
   authorize(["QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.thuChiTongHop
+  baoCaoController.thuChiTongHop,
 );
 
 // ============================================================
@@ -249,7 +262,7 @@ router.get(
   "/khach-hang/top-mua-hang",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.topKhachHang
+  baoCaoController.topKhachHang,
 );
 
 /**
@@ -262,7 +275,7 @@ router.get(
   "/khach-hang/lich-su-mua-hang",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.lichSuMuaHang
+  baoCaoController.lichSuMuaHang,
 );
 
 // ============================================================
@@ -279,7 +292,7 @@ router.post(
   "/xuat-excel",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.xuatExcel
+  baoCaoController.xuatExcel,
 );
 
 /**
@@ -292,7 +305,7 @@ router.post(
   "/xuat-pdf",
   authenticate,
   authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.xuatPDF
+  baoCaoController.xuatPDF,
 );
 
 // ============================================================
@@ -309,7 +322,7 @@ router.get(
   "/dashboard",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.dashboard
+  baoCaoController.dashboard,
 );
 
 /**
@@ -322,7 +335,7 @@ router.get(
   "/bieu-do/doanh-thu",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.bieuDoDoanhThu
+  baoCaoController.bieuDoDoanhThu,
 );
 
 /**
@@ -335,7 +348,7 @@ router.get(
   "/bieu-do/ton-kho",
   authenticate,
   authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
-  baoCaoController.bieuDoTonKho
+  baoCaoController.bieuDoTonKho,
 );
 
 module.exports = router;

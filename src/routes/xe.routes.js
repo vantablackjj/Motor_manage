@@ -93,6 +93,16 @@ router.get("/:xe_key/lich-su", authenticate, async (req, res, next) => {
   }
 });
 
+// Lấy danh sách xe chờ duyệt
+router.get("/approval/list", authenticate, async (req, res, next) => {
+  try {
+    const data = await Xe.getApprovalList(req.query);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /**
  * =========================
  * POST
@@ -110,6 +120,50 @@ router.post(
       const result = await VehicleService.nhapXeMoi(req.body, req.user.id);
 
       res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Gửi duyệt xe
+router.post("/:xe_key/submit", authenticate, async (req, res, next) => {
+  try {
+    const { xe_key } = req.params;
+    const result = await VehicleService.guiDuyetXe(xe_key, req.user.id);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Duyệt xe
+router.post(
+  "/:xe_key/approve",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const result = await VehicleService.pheDuyetXe(xe_key, req.user.id);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Từ chối xe
+router.post(
+  "/:xe_key/reject",
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const { ly_do } = req.body;
+      const result = await VehicleService.tuChoiXe(xe_key, req.user.id, ly_do);
+      res.json({ success: true, data: result });
     } catch (err) {
       next(err);
     }

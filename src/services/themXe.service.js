@@ -197,18 +197,18 @@ class VehicleService {
       // 8. Tạo xe_key với lock
       const xeKey = await this.generateXeKey(client);
 
-      // 9. Insert xe (tm_hang_hoa_serial)
+      // 9. Insert xe (tm_hang_hoa_serial) - KHỞI TẠO TRẠNG THÁI NHẬP (LOCKED)
       const xeResult = await client.query(
         `
         INSERT INTO tm_hang_hoa_serial (
           ma_serial, ma_hang_hoa, serial_identifier,
           ma_kho_hien_tai, ngay_nhap_kho, 
           gia_von, trang_thai,
-          locked, ghi_chu,
+          locked, locked_reason, ghi_chu,
           thuoc_tinh_rieng,
           created_at, updated_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,false,$8,$9,
+          $1,$2,$3,$4,$5,$6,'NHAP',true,'Đang chờ phê duyệt',$7,$8,
           CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         RETURNING *
@@ -220,7 +220,6 @@ class VehicleService {
           data.ma_kho_hien_tai,
           ngayNhap,
           giaNhap,
-          "TON_KHO",
           data.ghi_chu || null,
           JSON.stringify({
             so_may: data.so_may.trim().toUpperCase(),
@@ -236,7 +235,7 @@ class VehicleService {
           ma_serial, ma_hang_hoa, loai_giao_dich,
           ngay_giao_dich, ma_kho_nhap,
           don_gia, nguoi_thuc_hien, dien_giai
-        ) VALUES ($1,$2,'NHAP_KHO',$3,$4,$5,$6,$7)
+        ) VALUES ($1,$2,'NHAP_LE',$3,$4,$5,$6,$7)
         `,
         [
           xeKey,
@@ -245,9 +244,9 @@ class VehicleService {
           data.ma_kho_hien_tai,
           giaNhap,
           userId,
-          `Nhập kho xe ${loaiXeRes.rows[0].ten_loai} - ${data.so_khung
+          `Khởi tạo nhập xe lẻ ${loaiXeRes.rows[0].ten_loai} - ${data.so_khung
             .trim()
-            .toUpperCase()}`,
+            .toUpperCase()} (Chờ duyệt)`,
         ],
       );
 
@@ -575,6 +574,118 @@ class VehicleService {
     );
 
     return parseInt(result.rows[0].total);
+  }
+
+  /**
+   * ✅ GỬI DUYỆT XE
+   */
+  async guiDuyetXe(xeKey, userId) {
+    const result = await pool.query(
+      `
+      UPDATE tm_hang_hoa_serial
+      SET 
+        trang_thai = 'CHO_DUYET',
+        nguoi_gui_duyet = $2,
+        ngay_gui_duyet = CURRENT_TIMESTAMP,
+        locked_reason = 'Đã gửi duyệt'
+      WHERE ma_serial = $1 AND trang_thai = 'NHAP'
+      RETURNING *
+      `,
+      [xeKey, userId],
+    );
+
+    if (!result.rowCount) {
+      throw {
+        status: 400,
+        message: "Xe không ở trạng thái NHẬP hoặc không tồn tại",
+      };
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * ✅ PHÊ DUYỆT XE
+   */
+  async pheDuyetXe(xeKey, userId) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `
+        UPDATE tm_hang_hoa_serial
+        SET 
+          trang_thai = 'TON_KHO',
+          locked = false,
+          locked_reason = null,
+          nguoi_duyet = $2,
+          ngay_duyet = CURRENT_TIMESTAMP
+        WHERE ma_serial = $1 AND trang_thai = 'CHO_DUYET'
+        RETURNING *
+        `,
+        [xeKey, userId],
+      );
+
+      if (!result.rowCount) {
+        throw { status: 400, message: "Xe không ở trạng thái CHỜ DUYỆT" };
+      }
+
+      const xe = result.rows[0];
+
+      // Ghi lịch sử nhập kho chính thức
+      await client.query(
+        `
+        INSERT INTO tm_hang_hoa_lich_su (
+          ma_serial, ma_hang_hoa, loai_giao_dich,
+          ngay_giao_dich, ma_kho_nhap,
+          don_gia, nguoi_thuc_hien, dien_giai
+        ) VALUES ($1,$2,'NHAP_KHO',CURRENT_TIMESTAMP,$3,$4,$5,$6)
+        `,
+        [
+          xeKey,
+          xe.ma_hang_hoa,
+          xe.ma_kho_hien_tai,
+          xe.gia_von,
+          userId,
+          `Đã phê duyệt nhập kho xe lẻ ${xeKey}`,
+        ],
+      );
+
+      await client.query("COMMIT");
+      return result.rows[0];
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * ✅ TỪ CHỐI XE
+   */
+  async tuChoiXe(xeKey, userId, lyDo) {
+    const result = await pool.query(
+      `
+      UPDATE tm_hang_hoa_serial
+      SET 
+        trang_thai = 'DA_TU_CHOI',
+        nguoi_duyet = $2,
+        ngay_duyet = CURRENT_TIMESTAMP,
+        ly_do_tu_choi = $3,
+        locked_reason = 'Bị từ chối'
+      WHERE ma_serial = $1 AND trang_thai = 'CHO_DUYET'
+      RETURNING *
+      `,
+      [xeKey, userId, lyDo],
+    );
+
+    if (!result.rowCount) {
+      throw { status: 400, message: "Xe không ở trạng thái CHỜ DUYỆT" };
+    }
+
+    return result.rows[0];
   }
 }
 

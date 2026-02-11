@@ -365,6 +365,37 @@ class Xe {
     const result = await query(sql, params);
     return result.rows;
   }
+
+  // Lấy danh sách xe chờ duyệt
+  static async getApprovalList(filters = {}) {
+    let sql = `
+      SELECT 
+        x.ma_serial as xe_key, x.serial_identifier as so_khung, x.ma_hang_hoa as ma_loai_xe,
+        (x.thuoc_tinh_rieng->>'so_may') as so_may, m.ten_mau,
+        hh.ten_hang_hoa as ten_loai, k.ten_kho, x.trang_thai, x.ngay_nhap_kho as ngay_nhap,
+        x.ngay_gui_duyet, u_gui.ho_ten as ten_nguoi_gui,
+        x.ngay_duyet, u_duyet.ho_ten as ten_nguoi_duyet,
+        x.ly_do_tu_choi
+      FROM tm_hang_hoa_serial x
+      INNER JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
+      LEFT JOIN dm_mau m ON (x.thuoc_tinh_rieng->>'ma_mau') = m.ma_mau
+      LEFT JOIN sys_user u_gui ON x.nguoi_gui_duyet = u_gui.id
+      LEFT JOIN sys_user u_duyet ON x.nguoi_duyet = u_duyet.id
+      WHERE x.trang_thai IN ('NHAP', 'CHO_DUYET', 'DA_TU_CHOI')
+    `;
+    const params = [];
+    let idx = 1;
+
+    if (filters.trang_thai) {
+      sql += ` AND x.trang_thai = $${idx++}`;
+      params.push(filters.trang_thai);
+    }
+
+    sql += " ORDER BY x.created_at DESC";
+    const result = await query(sql, params);
+    return result.rows;
+  }
 }
 
 module.exports = Xe;
