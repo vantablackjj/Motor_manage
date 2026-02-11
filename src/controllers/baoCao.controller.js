@@ -307,6 +307,8 @@ class BaoCaoController {
       console.error("Export Excel Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
+  }
+
   // Purchase Details
   async chiTietMuaHang(req, res) {
     try {
@@ -326,99 +328,106 @@ class BaoCaoController {
       let filename = `bao-cao-${Date.now()}.pdf`;
 
       if (loai_bao_cao === "CHI_TIET_MUA_HANG") {
-          const data = await baoCaoService.chiTietMuaHang(params);
-          buffer = await pdfGenerator.generatePurchaseReport(data, params);
-          filename = "So_chi_tiet_mua_hang.pdf";
+        const data = await baoCaoService.chiTietMuaHang(params);
+        buffer = await pdfGenerator.generatePurchaseReport(data, params);
+        filename = "So_chi_tiet_mua_hang.pdf";
       } else {
-          // Reuse logic for data fetching from Excel export
-          let data = [];
-          let columns = [];
-          let title = "BÁO CÁO";
+        // Reuse logic for data fetching from Excel export
+        let data = [];
+        let columns = [];
+        let title = "BÁO CÁO";
 
-          switch (loai_bao_cao) {
-            case "TON_KHO_XE":
-              data = await baoCaoService.tonKhoXe(params);
-              columns = [
-                { header: "Số Khung", key: "so_khung", width: 25 },
-                { header: "Số Máy", key: "so_may", width: 20 },
-                { header: "Loại Xe", key: "ten_loai", width: 25 },
-                { header: "Màu", key: "ten_mau", width: 15 },
-                { header: "Kho", key: "ten_kho", width: 20 },
-                { header: "Giá Nhập", key: "gia_nhap", width: 15 },
-              ];
-              title = "BÁO CÁO TỒN KHO XE";
-              filename = "Bao_cao_ton_kho_xe.pdf";
-              break;
+        switch (loai_bao_cao) {
+          case "TON_KHO_XE":
+            data = await baoCaoService.tonKhoXe(params);
+            columns = [
+              { header: "Số Khung", key: "so_khung", width: 25 },
+              { header: "Số Máy", key: "so_may", width: 20 },
+              { header: "Loại Xe", key: "ten_loai", width: 25 },
+              { header: "Màu", key: "ten_mau", width: 15 },
+              { header: "Kho", key: "ten_kho", width: 20 },
+              { header: "Giá Nhập", key: "gia_nhap", width: 15 },
+            ];
+            title = "BÁO CÁO TỒN KHO XE";
+            filename = "Bao_cao_ton_kho_xe.pdf";
+            break;
 
-            case "TON_KHO_PHU_TUNG":
-              data = await baoCaoService.tonKhoPhuTung(params);
-              columns = [
-                { header: "Mã PT", key: "ma_pt", width: 15 },
-                { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
-                { header: "ĐVT", key: "don_vi_tinh", width: 10 },
-                { header: "Tồn Kho", key: "so_luong_ton", width: 12 },
-                { header: "Kho", key: "ten_kho", width: 20 },
-              ];
-              title = "BÁO CÁO TỒN KHO PHỤ TÙNG";
-              filename = "Bao_cao_ton_kho_phu_tung.pdf";
-              break;
+          case "TON_KHO_PHU_TUNG":
+            data = await baoCaoService.tonKhoPhuTung(params);
+            columns = [
+              { header: "Mã PT", key: "ma_pt", width: 15 },
+              { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
+              { header: "ĐVT", key: "don_vi_tinh", width: 10 },
+              { header: "Tồn Kho", key: "so_luong_ton", width: 12 },
+              { header: "Kho", key: "ten_kho", width: 20 },
+            ];
+            title = "BÁO CÁO TỒN KHO PHỤ TÙNG";
+            filename = "Bao_cao_ton_kho_phu_tung.pdf";
+            break;
 
-            case "DOANH_THU_THANG":
-              data = await baoCaoService.doanhThuTheoThang(params);
-              columns = [
-                { header: "Tháng", key: "thang", width: 10 },
-                { header: "Số Hóa Đơn", key: "so_luong_hd", width: 15 },
-                { header: "Doanh Thu", key: "doanh_thu", width: 20 },
-                { header: "Thực Thu", key: "thuc_thu", width: 20 },
-              ];
-              title = `BÁO CÁO DOANH THU NĂM ${params?.nam || ""}`;
-              filename = "Bao_cao_doanh_thu.pdf";
-              break;
+          case "DOANH_THU_THANG":
+            data = await baoCaoService.doanhThuTheoThang(params);
+            columns = [
+              { header: "Tháng", key: "thang", width: 10 },
+              { header: "Số Hóa Đơn", key: "so_luong_hd", width: 15 },
+              { header: "Doanh Thu", key: "doanh_thu", width: 20 },
+              { header: "Thực Thu", key: "thuc_thu", width: 20 },
+            ];
+            title = `BÁO CÁO DOANH THU NĂM ${params?.nam || ""}`;
+            filename = "Bao_cao_doanh_thu.pdf";
+            break;
 
-            case "CONG_NO_KH":
-              data = await baoCaoService.congNoKhachHang(params);
-              // Handle complex return type for congNoKhachHang
-              if (data.data) data = data.data; 
-              
-              columns = [
-                { header: "Mã KH", key: "ma_kh", width: 15 },
-                { header: "Họ Tên", key: "ho_ten", width: 30 },
-                { header: "Tổng Phải Trả", key: "tong_phai_tra", width: 20 },
-                { header: "Đã Trả", key: "da_tra", width: 20 },
-                { header: "Còn Lại", key: "con_lai", width: 20 },
-              ];
-              title = "BÁO CÁO CÔNG NỢ KHÁCH HÀNG";
-              filename = "Bao_cao_cong_no.pdf";
-              break;
+          case "CONG_NO_KH":
+            data = await baoCaoService.congNoKhachHang(params);
+            // Handle complex return type for congNoKhachHang
+            if (data.data) data = data.data;
 
-            case "THU_CHI":
-              data = await baoCaoService.thuChiTheoNgay(params);
-              columns = [
-                { header: "Ngày", key: "ngay_giao_dich", width: 20 },
-                { header: "Loại", key: "loai", width: 10 },
-                { header: "Số Tiền", key: "so_tien", width: 15 },
-                { header: "Nội Dung", key: "dien_giai", width: 40 },
-                { header: "Kho", key: "ten_kho", width: 20 },
-              ];
-              title = "BÁO CÁO THU CHI";
-              filename = "Bao_cao_thu_chi.pdf";
-              break;
+            columns = [
+              { header: "Mã KH", key: "ma_kh", width: 15 },
+              { header: "Họ Tên", key: "ho_ten", width: 30 },
+              { header: "Tổng Phải Trả", key: "tong_phai_tra", width: 20 },
+              { header: "Đã Trả", key: "da_tra", width: 20 },
+              { header: "Còn Lại", key: "con_lai", width: 20 },
+            ];
+            title = "BÁO CÁO CÔNG NỢ KHÁCH HÀNG";
+            filename = "Bao_cao_cong_no.pdf";
+            break;
 
-            default:
-              return res.status(400).json({
-                success: false,
-                message: `Loại báo cáo '${loai_bao_cao}' chưa được hỗ trợ xuất PDF`,
-              });
-          }
-          
-          buffer = await pdfGenerator.generateGenericPdf(data, columns, title, params);
+          case "THU_CHI":
+            data = await baoCaoService.thuChiTheoNgay(params);
+            columns = [
+              { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+              { header: "Loại", key: "loai", width: 10 },
+              { header: "Số Tiền", key: "so_tien", width: 15 },
+              { header: "Nội Dung", key: "dien_giai", width: 40 },
+              { header: "Kho", key: "ten_kho", width: 20 },
+            ];
+            title = "BÁO CÁO THU CHI";
+            filename = "Bao_cao_thu_chi.pdf";
+            break;
+
+          default:
+            return res.status(400).json({
+              success: false,
+              message: `Loại báo cáo '${loai_bao_cao}' chưa được hỗ trợ xuất PDF`,
+            });
+        }
+
+        buffer = await pdfGenerator.generateGenericPdf(
+          data,
+          columns,
+          title,
+          params,
+        );
       }
 
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
+      );
       res.setHeader("Content-Length", buffer.length);
       res.end(buffer);
-
     } catch (error) {
       console.error("Export PDF Error:", error);
       res.status(500).json({ success: false, message: error.message });
