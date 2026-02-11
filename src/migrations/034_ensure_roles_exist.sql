@@ -9,6 +9,7 @@
 DO $$
 DECLARE
     has_ma_quyen BOOLEAN;
+    role_exists BOOLEAN;
 BEGIN
     -- Check if ma_quyen column exists
     SELECT EXISTS (
@@ -19,16 +20,36 @@ BEGIN
     ) INTO has_ma_quyen;
 
     IF has_ma_quyen THEN
-        -- Insert with ma_quyen column
+        -- Insert with ma_quyen column using ON CONFLICT to handle both constraints
+        -- ADMIN
         INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, status)
-        VALUES 
-            ('ADMIN', 'ADMIN', 'Quản trị viên', TRUE),
-            ('QUAN_LY_CTY', 'QUAN_LY_CTY', 'Quản lý công ty', TRUE),
-            ('QUAN_LY_CHI_NHANH', 'QUAN_LY_CHI_NHANH', 'Quản lý chi nhánh', TRUE),
-            ('NHAN_VIEN', 'NHAN_VIEN', 'Nhân viên', TRUE),
-            ('KHO', 'KHO', 'Nhân viên kho', TRUE)
-        ON CONFLICT (ten_quyen) DO UPDATE 
-        SET mo_ta = EXCLUDED.mo_ta, ma_quyen = EXCLUDED.ma_quyen;
+        VALUES ('ADMIN', 'ADMIN', 'Quản trị viên', TRUE)
+        ON CONFLICT (ma_quyen) DO UPDATE 
+        SET ten_quyen = EXCLUDED.ten_quyen, mo_ta = EXCLUDED.mo_ta, status = EXCLUDED.status;
+        
+        -- QUAN_LY_CTY
+        INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, status)
+        VALUES ('QUAN_LY_CTY', 'QUAN_LY_CTY', 'Quản lý công ty', TRUE)
+        ON CONFLICT (ma_quyen) DO UPDATE 
+        SET ten_quyen = EXCLUDED.ten_quyen, mo_ta = EXCLUDED.mo_ta, status = EXCLUDED.status;
+        
+        -- QUAN_LY_CHI_NHANH
+        INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, status)
+        VALUES ('QUAN_LY_CHI_NHANH', 'QUAN_LY_CHI_NHANH', 'Quản lý chi nhánh', TRUE)
+        ON CONFLICT (ma_quyen) DO UPDATE 
+        SET ten_quyen = EXCLUDED.ten_quyen, mo_ta = EXCLUDED.mo_ta, status = EXCLUDED.status;
+        
+        -- NHAN_VIEN
+        INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, status)
+        VALUES ('NHAN_VIEN', 'NHAN_VIEN', 'Nhân viên', TRUE)
+        ON CONFLICT (ma_quyen) DO UPDATE 
+        SET ten_quyen = EXCLUDED.ten_quyen, mo_ta = EXCLUDED.mo_ta, status = EXCLUDED.status;
+        
+        -- KHO
+        INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, status)
+        VALUES ('KHO', 'KHO', 'Nhân viên kho', TRUE)
+        ON CONFLICT (ma_quyen) DO UPDATE 
+        SET ten_quyen = EXCLUDED.ten_quyen, mo_ta = EXCLUDED.mo_ta, status = EXCLUDED.status;
     ELSE
         -- Insert without ma_quyen column
         INSERT INTO sys_role (ten_quyen, mo_ta, status)
