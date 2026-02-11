@@ -50,7 +50,12 @@ router.use(authenticate);
  */
 router.get(
   "/",
-  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  checkRole(
+    ROLES.NHAN_VIEN,
+    ROLES.QUAN_LY_CHI_NHANH,
+    ROLES.QUAN_LY_CTY,
+    ROLES.ADMIN,
+  ),
   controller.getList,
 );
 

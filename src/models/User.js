@@ -57,7 +57,21 @@ class User {
 
   // Tạo user mới
   static async create(data) {
-    const { username, password, ho_ten, email, dien_thoai, role_id } = data;
+    const { username, password, ho_ten, email, dien_thoai, vai_tro, role_id } =
+      data;
+
+    let targetRoleId = role_id;
+
+    // Nếu truyền vai_tro (string) thì tìm role_id
+    if (vai_tro && !targetRoleId) {
+      const roleRes = await query(
+        "SELECT id FROM sys_role WHERE ten_quyen = $1",
+        [vai_tro.toUpperCase()],
+      );
+      if (roleRes.rows.length > 0) {
+        targetRoleId = roleRes.rows[0].id;
+      }
+    }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -67,25 +81,45 @@ class User {
         username, password_hash, ho_ten, email, dien_thoai, role_id
       ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, username, ho_ten, email, role_id, created_at`,
-      [username, hashedPassword, ho_ten, email, dien_thoai, role_id],
+      [username, hashedPassword, ho_ten, email, dien_thoai, targetRoleId],
     );
 
-    return result.rows[0];
+    const user = result.rows[0];
+    if (user) {
+      user.vai_tro = vai_tro || null;
+    }
+    return user;
   }
 
   // Cập nhật user
   static async update(id, data) {
-    const { ho_ten, email, dien_thoai, role_id } = data;
+    const { ho_ten, email, dien_thoai, role_id, vai_tro } = data;
+
+    let targetRoleId = role_id;
+
+    if (vai_tro && !targetRoleId) {
+      const roleRes = await query(
+        "SELECT id FROM sys_role WHERE ten_quyen = $1",
+        [vai_tro.toUpperCase()],
+      );
+      if (roleRes.rows.length > 0) {
+        targetRoleId = roleRes.rows[0].id;
+      }
+    }
 
     const result = await query(
       `UPDATE sys_user
        SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4
        WHERE id = $5 AND status = TRUE
        RETURNING id, username, ho_ten, email, role_id`,
-      [ho_ten, email, dien_thoai, role_id, id],
+      [ho_ten, email, dien_thoai, targetRoleId, id],
     );
 
-    return result.rows[0];
+    const user = result.rows[0];
+    if (user) {
+      user.vai_tro = vai_tro || null;
+    }
+    return user;
   }
 
   // Đổi mật khẩu

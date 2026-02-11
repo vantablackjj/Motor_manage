@@ -58,9 +58,9 @@ router.post(
   validate(thuChiSchema),
   checkRole(
     ROLES.ADMIN,
+    ROLES.QUAN_LY_CTY,
+    ROLES.QUAN_LY_CHI_NHANH,
     ROLES.NHAN_VIEN,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.QUAN_LY_CHI_NHANH,
   ),
   async (req, res, next) => {
     try {

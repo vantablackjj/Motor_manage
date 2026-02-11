@@ -145,7 +145,12 @@ router.put(
 router.post(
   "/phu-tung/nhap-kho",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkRole(
+    ROLES.ADMIN,
+    ROLES.QUAN_LY_CTY,
+    ROLES.QUAN_LY_CHI_NHANH,
+    ROLES.NHAN_VIEN,
+  ),
   async (req, res, next) => {
     try {
       await PhuTungNhapKhoService.nhapKho({

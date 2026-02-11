@@ -59,7 +59,7 @@ router.get(
 router.get(
   "/doanh-thu/theo-thang",
   authenticate,
-  authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
   baoCaoController.doanhThuTheoThang,
 );
 
@@ -321,7 +321,7 @@ router.post(
 router.get(
   "/dashboard",
   authenticate,
-  authorize(["QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
   baoCaoController.dashboard,
 );
 
