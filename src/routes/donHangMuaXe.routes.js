@@ -4,8 +4,7 @@ const Joi = require("joi");
 
 const controller = require("../controllers/donHangMuaXe.controller");
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
-const { ROLES } = require("../config/constants");
+const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 
 const nhapXeMoiSchema = Joi.object({
@@ -15,7 +14,6 @@ const nhapXeMoiSchema = Joi.object({
   tong_tien: Joi.number(),
 
   nguoi_tao: Joi.string(),
-  nguoi_gui: Joi.string(),
   nguoi_gui: Joi.string(),
   nguoi_duyet: Joi.string(),
   created_at: Joi.date(),
@@ -47,25 +45,17 @@ router.use(authenticate);
 
 /**
  * 1. Lấy danh sách đơn mua
+ * KHO, KE_TOAN, QUAN_LY, ADMIN được xem
  */
-router.get(
-  "/",
-  checkRole(
-    ROLES.NHAN_VIEN,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.QUAN_LY_CTY,
-    ROLES.ADMIN,
-  ),
-  controller.getList,
-);
+router.get("/", checkPermission("purchase_orders", "view"), controller.getList);
 
 /**
  * 2. Tạo đơn mua (header only - legacy)
+ * KHO và ADMIN được tạo đơn mua xe
  */
 router.post(
   "/",
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
-  validate(nhapXeMoiSchema),
+  checkPermission("purchase_orders", "create"),
   validate(nhapXeMoiSchema),
   controller.create,
 );
@@ -76,54 +66,54 @@ router.post(
  */
 router.post(
   "/create-with-details",
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("purchase_orders", "create"),
   validate(createWithDetailsSchema),
   controller.createWithDetails,
 );
 
 /**
- * 2.1 Xóa chi tiết đơn
+ * 2.2 Xóa chi tiết đơn
  */
 router.delete(
   "/:ma_phieu/chi-tiet/:id",
-  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  checkPermission("purchase_orders", "edit"),
   controller.deleteChiTiet,
 );
 
 /**
- * 2. Thêm chi tiết đơn
+ * 2.3 Thêm chi tiết đơn
  */
 router.post(
   "/:ma_phieu/chi-tiet",
-  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  checkPermission("purchase_orders", "edit"),
   validate(chiTietDonHang),
   controller.addChiTiet,
 );
 
 /**
- * 3. Gửi duyệt
+ * 3. Gửi duyệt - người tạo gửi duyệt
  */
 router.post(
   "/:ma_phieu/submit",
-  checkRole(ROLES.NHAN_VIEN, ROLES.ADMIN),
+  checkPermission("purchase_orders", "create"),
   controller.submit,
 );
 
 /**
- * 4. Duyệt đơn
+ * 4. Duyệt đơn - chỉ QUAN_LY, KE_TOAN, ADMIN
  */
 router.post(
   "/:ma_phieu/approve",
-  checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
+  checkPermission("purchase_orders", "approve"),
   controller.approve,
 );
 
 /**
- * 4.1 Từ chối đơn
+ * 4.1 Từ chối đơn - chỉ QUAN_LY, KE_TOAN, ADMIN
  */
 router.post(
   "/:ma_phieu/reject",
-  checkRole(ROLES.QUAN_LY, ROLES.ADMIN),
+  checkPermission("purchase_orders", "approve"),
   controller.reject,
 );
 
@@ -132,16 +122,16 @@ router.post(
  */
 router.get(
   "/:ma_phieu",
-  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  checkPermission("purchase_orders", "view"),
   controller.detail,
 );
 
 /**
- * 6. Nhập kho xe (Receiving)
+ * 6. Nhập kho xe (Receiving) - KHO thực hiện
  */
 router.post(
   "/:ma_phieu/nhap-kho",
-  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  checkPermission("inventory", "import"),
   controller.nhapKho,
 );
 
@@ -150,7 +140,7 @@ router.post(
  */
 router.get(
   "/:ma_phieu/in-don-hang",
-  checkRole(ROLES.NHAN_VIEN, ROLES.QUAN_LY, ROLES.ADMIN),
+  checkPermission("purchase_orders", "view"),
   async (req, res) => {
     try {
       const { ma_phieu } = req.params;

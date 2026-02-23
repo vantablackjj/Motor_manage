@@ -1,10 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 const Joi = require("joi");
-const { ROLES } = require("../config/constants");
 const { sendSuccess, sendError } = require("../ultils/respone");
 
 const thuChiService = require("../services/thuChi.service");
@@ -22,46 +21,54 @@ const thuChiSchema = Joi.object({
   dien_giai: Joi.string().allow("", null).optional(),
 });
 
-router.get("/", authenticate, async (req, res, next) => {
-  try {
-    const data = await thuChiService.getDanhSach(req.query);
-    sendSuccess(res, data, "Lấy danh sách thu chi thành công");
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get("/:so_phieu", authenticate, async (req, res, next) => {
-  try {
-    const { so_phieu } = req.params;
-    console.log(
-      `[ThuChi] GET details for so_phieu: "${so_phieu}" (length: ${so_phieu?.length})`,
-    );
-    const data = await thuChiService.getChiTiet(so_phieu);
-    console.log(
-      `[ThuChi] Result for "${so_phieu}":`,
-      data ? "FOUND" : "NOT FOUND",
-    );
-    if (!data) {
-      return sendError(res, "Số phiếu không tồn tại", 404);
+// GET danh sách - KE_TOAN, QUAN_LY, ADMIN
+router.get(
+  "/",
+  authenticate,
+  checkPermission("payments", "view"),
+  async (req, res, next) => {
+    try {
+      const data = await thuChiService.getDanhSach(req.query);
+      sendSuccess(res, data, "Lấy danh sách thu chi thành công");
+    } catch (err) {
+      next(err);
     }
+  },
+);
 
-    return sendSuccess(res, data, "success");
-  } catch (error) {
-    next(error);
-  }
-});
+// GET chi tiết - KE_TOAN, QUAN_LY, ADMIN
+router.get(
+  "/:so_phieu",
+  authenticate,
+  checkPermission("payments", "view"),
+  async (req, res, next) => {
+    try {
+      const { so_phieu } = req.params;
+      console.log(
+        `[ThuChi] GET details for so_phieu: "${so_phieu}" (length: ${so_phieu?.length})`,
+      );
+      const data = await thuChiService.getChiTiet(so_phieu);
+      console.log(
+        `[ThuChi] Result for "${so_phieu}":`,
+        data ? "FOUND" : "NOT FOUND",
+      );
+      if (!data) {
+        return sendError(res, "Số phiếu không tồn tại", 404);
+      }
 
+      return sendSuccess(res, data, "success");
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST tạo phiếu thu chi - KE_TOAN, QUAN_LY, ADMIN
 router.post(
   "/",
   authenticate,
+  checkPermission("payments", "create"),
   validate(thuChiSchema),
-  checkRole(
-    ROLES.ADMIN,
-    ROLES.QUAN_LY_CTY,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN,
-  ),
   async (req, res, next) => {
     try {
       const data = {
@@ -76,10 +83,11 @@ router.post(
   },
 );
 
+// Gửi duyệt - KE_TOAN, QUAN_LY, ADMIN
 router.post(
   "/:so_phieu/gui-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("payments", "create"),
   async (req, res, next) => {
     try {
       const { so_phieu } = req.params;
@@ -93,10 +101,11 @@ router.post(
   },
 );
 
+// Phê duyệt - chỉ QUAN_LY, KE_TOAN, ADMIN
 router.post(
   "/:so_phieu/phe-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CHI_NHANH, ROLES.QUAN_LY_CTY),
+  checkPermission("payments", "approve"),
   async (req, res, next) => {
     try {
       const { so_phieu } = req.params;
@@ -107,10 +116,11 @@ router.post(
     }
   },
 );
+// Hủy phiếu - QUAN_LY, KE_TOAN, ADMIN
 router.post(
   "/:so_phieu/huy",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CHI_NHANH, ROLES.QUAN_LY_CTY),
+  checkPermission("payments", "edit"),
   async (req, res, next) => {
     try {
       const { ly_do } = req.body;

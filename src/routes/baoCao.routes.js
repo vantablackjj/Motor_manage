@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const baoCaoController = require("../controllers/baoCao.controller");
-const { authenticate, authorize } = require("../middleware/auth");
+const { authenticate } = require("../middleware/auth");
+const {
+  checkPermission,
+  checkAnyPermission,
+} = require("../middleware/permissions");
 
 // ============================================================
 // BÁO CÁO TỒN KHO
@@ -10,39 +14,36 @@ const { authenticate, authorize } = require("../middleware/auth");
 /**
  * @route   GET /api/bao-cao/ton-kho/xe
  * @desc    Báo cáo tồn kho xe theo kho, loại xe, màu
- * @access  Private (NHAN_VIEN trở lên)
- * @query   ma_kho, ma_loai_xe, ma_mau, ngay_tinh
+ * @access  BAN_HANG, KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/ton-kho/xe",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.tonKhoXe,
 );
 
 /**
  * @route   GET /api/bao-cao/ton-kho/phu-tung
  * @desc    Báo cáo tồn kho phụ tùng
- * @access  Private (NHAN_VIEN trở lên)
- * @query   ma_kho, nhom_pt, canh_bao (true/false)
+ * @access  BAN_HANG, KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/ton-kho/phu-tung",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.tonKhoPhuTung,
 );
 
 /**
  * @route   GET /api/bao-cao/ton-kho/tong-hop
  * @desc    Tổng hợp giá trị tồn kho toàn hệ thống
- * @access  Private (QUAN_LY_CTY trở lên)
- * @query   ngay_tinh
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/ton-kho/tong-hop",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.tonKhoTongHop,
 );
 
@@ -53,52 +54,48 @@ router.get(
 /**
  * @route   GET /api/bao-cao/doanh-thu/theo-thang
  * @desc    Báo cáo doanh thu theo tháng
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   nam, ma_kho
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/doanh-thu/theo-thang",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoThang,
 );
 
 /**
  * @route   GET /api/bao-cao/doanh-thu/theo-kho
  * @desc    Báo cáo doanh thu theo kho
- * @access  Private (QUAN_LY_CTY trở lên)
- * @query   tu_ngay, den_ngay
+ * @access  KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/doanh-thu/theo-kho",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoKho,
 );
 
 /**
  * @route   GET /api/bao-cao/doanh-thu/theo-san-pham
  * @desc    Báo cáo doanh thu theo sản phẩm (xe/phụ tùng)
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, loai ('XE' hoặc 'PHU_TUNG')
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/doanh-thu/theo-san-pham",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoSanPham,
 );
 
 /**
  * @route   GET /api/bao-cao/doanh-thu/tong-hop
  * @desc    Tổng hợp doanh thu toàn hệ thống
- * @access  Private (QUAN_LY_CTY trở lên)
- * @query   tu_ngay, den_ngay
+ * @access  KE_TOAN, QUAN_LY, ADMIN (cần view_financial)
  */
 router.get(
   "/doanh-thu/tong-hop",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view_financial"),
   baoCaoController.doanhThuTongHop,
 );
 
@@ -109,52 +106,48 @@ router.get(
 /**
  * @route   GET /api/bao-cao/nhap-xuat/xe
  * @desc    Báo cáo nhập xuất xe
- * @access  Private (NHAN_VIEN trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, loai_giao_dich
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/nhap-xuat/xe",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.nhapXuatXe,
 );
 
 /**
  * @route   GET /api/bao-cao/nhap-xuat/phu-tung
  * @desc    Báo cáo nhập xuất phụ tùng
- * @access  Private (NHAN_VIEN trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, ma_pt
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/nhap-xuat/phu-tung",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.nhapXuatPhuTung,
 );
 
 /**
  * @route   GET /api/bao-cao/nhap-xuat/the-kho
  * @desc    Thẻ kho (xuất nhập tồn) của phụ tùng
- * @access  Private (NHAN_VIEN trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, ma_pt
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/nhap-xuat/the-kho",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.theKhoPhuTung,
 );
 
 /**
  * @route   GET /api/bao-cao/mua-hang/chi-tiet
  * @desc    Sổ chi tiết mua hàng theo nhà cung cấp
- * @access  Private (NHAN_VIEN trở lên)
- * @query   ma_ncc, tu_ngay, den_ngay
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/mua-hang/chi-tiet",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.chiTietMuaHang,
 );
 
@@ -165,26 +158,24 @@ router.get(
 /**
  * @route   GET /api/bao-cao/chuyen-kho/tong-hop
  * @desc    Báo cáo chuyển kho tổng hợp
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   tu_ngay, den_ngay, ma_kho_xuat, ma_kho_nhap
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/chuyen-kho/tong-hop",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.chuyenKhoTongHop,
 );
 
 /**
  * @route   GET /api/bao-cao/chuyen-kho/chi-tiet
  * @desc    Báo cáo chi tiết chuyển kho
- * @access  Private (NHAN_VIEN trở lên)
- * @query   tu_ngay, den_ngay, ma_kho
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/chuyen-kho/chi-tiet",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.chuyenKhoChiTiet,
 );
 
@@ -195,26 +186,24 @@ router.get(
 /**
  * @route   GET /api/bao-cao/cong-no/noi-bo
  * @desc    Báo cáo công nợ nội bộ giữa các kho
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   ma_kho, ngay_tinh
+ * @access  KE_TOAN, QUAN_LY, ADMIN (cần view_financial)
  */
 router.get(
   "/cong-no/noi-bo",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view_financial"),
   baoCaoController.congNoNoiBo,
 );
 
 /**
  * @route   GET /api/bao-cao/cong-no/khach-hang
  * @desc    Báo cáo công nợ khách hàng
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   ma_kho, ma_kh, tu_ngay, den_ngay
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/cong-no/khach-hang",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkAnyPermission(["reports", "view_financial"], ["debt", "view"]),
   baoCaoController.congNoKhachHang,
 );
 
@@ -225,26 +214,24 @@ router.get(
 /**
  * @route   GET /api/bao-cao/thu-chi/theo-ngay
  * @desc    Báo cáo thu chi theo ngày
- * @access  Private (NHAN_VIEN trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, loai ('THU' hoặc 'CHI')
+ * @access  KE_TOAN, QUAN_LY, ADMIN (cần view_financial)
  */
 router.get(
   "/thu-chi/theo-ngay",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view_financial"),
   baoCaoController.thuChiTheoNgay,
 );
 
 /**
  * @route   GET /api/bao-cao/thu-chi/tong-hop
  * @desc    Tổng hợp thu chi theo kho
- * @access  Private (QUAN_LY_CTY trở lên)
- * @query   tu_ngay, den_ngay
+ * @access  KE_TOAN, QUAN_LY, ADMIN (cần view_financial)
  */
 router.get(
   "/thu-chi/tong-hop",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view_financial"),
   baoCaoController.thuChiTongHop,
 );
 
@@ -255,56 +242,52 @@ router.get(
 /**
  * @route   GET /api/bao-cao/khach-hang/top-mua-hang
  * @desc    Top khách hàng mua nhiều nhất
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   tu_ngay, den_ngay, ma_kho, limit
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/khach-hang/top-mua-hang",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.topKhachHang,
 );
 
 /**
  * @route   GET /api/bao-cao/khach-hang/lich-su-mua-hang
  * @desc    Lịch sử mua hàng của khách hàng
- * @access  Private (NHAN_VIEN trở lên)
- * @query   ma_kh, tu_ngay, den_ngay
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/khach-hang/lich-su-mua-hang",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.lichSuMuaHang,
 );
 
 // ============================================================
-// BÁO CÁO XUẤT EXCEL
+// BÁO CÁO XUẤT EXCEL / PDF
 // ============================================================
 
 /**
  * @route   POST /api/bao-cao/xuat-excel
  * @desc    Xuất báo cáo ra file Excel
- * @access  Private (NHAN_VIEN trở lên)
- * @body    { loai_bao_cao, params: {...} }
+ * @access  Tất cả có quyền export
  */
 router.post(
   "/xuat-excel",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "export"),
   baoCaoController.xuatExcel,
 );
 
 /**
  * @route   POST /api/bao-cao/xuat-pdf
  * @desc    Xuất báo cáo ra file PDF
- * @access  Private (NHAN_VIEN trở lên)
- * @body    { loai_bao_cao, params: {...} }
+ * @access  Tất cả có quyền export
  */
 router.post(
   "/xuat-pdf",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "export"),
   baoCaoController.xuatPDF,
 );
 
@@ -314,40 +297,37 @@ router.post(
 
 /**
  * @route   GET /api/bao-cao/dashboard
- * @desc    Dashboard tổng quan (doanh thu, tồn kho, công nợ...)
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   ma_kho, tu_ngay, den_ngay
+ * @desc    Dashboard tổng quan
+ * @access  Tất cả role đã đăng nhập
  */
 router.get(
   "/dashboard",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.dashboard,
 );
 
 /**
  * @route   GET /api/bao-cao/bieu-do/doanh-thu
  * @desc    Dữ liệu biểu đồ doanh thu
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   nam, ma_kho
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/bieu-do/doanh-thu",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.bieuDoDoanhThu,
 );
 
 /**
  * @route   GET /api/bao-cao/bieu-do/ton-kho
  * @desc    Dữ liệu biểu đồ tồn kho
- * @access  Private (QUAN_LY_CHI_NHANH trở lên)
- * @query   ma_kho
+ * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
  */
 router.get(
   "/bieu-do/ton-kho",
   authenticate,
-  authorize(["NHAN_VIEN", "QUAN_LY_CHI_NHANH", "QUAN_LY_CTY", "ADMIN"]),
+  checkPermission("reports", "view"),
   baoCaoController.bieuDoTonKho,
 );
 

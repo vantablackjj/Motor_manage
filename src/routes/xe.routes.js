@@ -2,11 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const Xe = require("../services/xe.service");
-const VehicleService = require("../services/themXe.service"); // Add this
+const VehicleService = require("../services/themXe.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
-const { checkRole } = require("../middleware/roleCheck");
-const { ROLES } = require("../config/constants");
+const { checkPermission } = require("../middleware/permissions");
 const Joi = require("joi");
 
 const themXeSchema = Joi.object({
@@ -36,72 +35,97 @@ const capNhatXeSchema = Joi.object({
  * =========================
  */
 
-// Lấy xe theo xe_key
-router.get("/:xe_key", authenticate, async (req, res, next) => {
-  try {
-    const { xe_key } = req.params;
-    const xe = await Xe.getByXeKey(xe_key);
+// Lấy xe theo xe_key - tất cả role đã login đều xem được
+router.get(
+  "/:xe_key",
+  authenticate,
+  checkPermission("products", "view"),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const xe = await Xe.getByXeKey(xe_key);
 
-    if (!xe) {
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy xe",
-      });
+      if (!xe) {
+        return res.status(404).json({
+          success: false,
+          message: "Không tìm thấy xe",
+        });
+      }
+
+      res.json({ success: true, data: xe });
+    } catch (err) {
+      next(err);
     }
+  },
+);
 
-    res.json({ success: true, data: xe });
-  } catch (err) {
-    next(err);
-  }
-});
+// Lấy tồn kho theo kho - KHO, BAN_HANG, QUAN_LY, KE_TOAN, ADMIN
+router.get(
+  "/kho/:ma_kho",
+  authenticate,
+  checkPermission("inventory", "view"),
+  async (req, res, next) => {
+    try {
+      const { ma_kho } = req.params;
+      const filters = req.query;
 
-// Lấy tồn kho theo kho
-router.get("/kho/:ma_kho", authenticate, async (req, res, next) => {
-  try {
-    const { ma_kho } = req.params;
-    const filters = req.query;
+      const data = await Xe.getTonKho(ma_kho, filters);
 
-    const data = await Xe.getTonKho(ma_kho, filters);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Alias cho tồn kho (theo yêu cầu user)
-router.get("/ton-kho/:ma_kho", authenticate, async (req, res, next) => {
-  try {
-    const { ma_kho } = req.params;
-    const filters = req.query;
-    const data = await Xe.getTonKho(ma_kho, filters);
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-});
+// Alias cho tồn kho
+router.get(
+  "/ton-kho/:ma_kho",
+  authenticate,
+  checkPermission("inventory", "view"),
+  async (req, res, next) => {
+    try {
+      const { ma_kho } = req.params;
+      const filters = req.query;
+      const data = await Xe.getTonKho(ma_kho, filters);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Lấy lịch sử xe
-router.get("/:xe_key/lich-su", authenticate, async (req, res, next) => {
-  try {
-    const { xe_key } = req.params;
-    const data = await Xe.getLichSu(xe_key);
+router.get(
+  "/:xe_key/lich-su",
+  authenticate,
+  checkPermission("products", "view"),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const data = await Xe.getLichSu(xe_key);
 
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-});
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-// Lấy danh sách xe chờ duyệt
-router.get("/approval/list", authenticate, async (req, res, next) => {
-  try {
-    const data = await Xe.getApprovalList(req.query);
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-});
+// Lấy danh sách xe chờ duyệt - QUAN_LY và ADMIN mới được duyệt
+router.get(
+  "/approval/list",
+  authenticate,
+  checkPermission("products", "view"),
+  async (req, res, next) => {
+    try {
+      const data = await Xe.getApprovalList(req.query);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * =========================
@@ -109,11 +133,11 @@ router.get("/approval/list", authenticate, async (req, res, next) => {
  * =========================
  */
 
-// Tạo xe mới
+// Tạo xe mới - KHO, QUAN_LY, ADMIN
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("inventory", "import"),
   validate(themXeSchema),
   async (req, res, next) => {
     try {
@@ -126,22 +150,27 @@ router.post(
   },
 );
 
-// Gửi duyệt xe
-router.post("/:xe_key/submit", authenticate, async (req, res, next) => {
-  try {
-    const { xe_key } = req.params;
-    const result = await VehicleService.guiDuyetXe(xe_key, req.user.id);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    next(err);
-  }
-});
+// Gửi duyệt xe - ai tạo thì gửi duyệt
+router.post(
+  "/:xe_key/submit",
+  authenticate,
+  checkPermission("inventory", "import"),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const result = await VehicleService.guiDuyetXe(xe_key, req.user.id);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-// Duyệt xe
+// Duyệt xe - chỉ QUAN_LY và ADMIN
 router.post(
   "/:xe_key/approve",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("products", "approve"),
   async (req, res, next) => {
     try {
       const { xe_key } = req.params;
@@ -153,11 +182,11 @@ router.post(
   },
 );
 
-// Từ chối xe
+// Từ chối xe - chỉ QUAN_LY và ADMIN
 router.post(
   "/:xe_key/reject",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("products", "approve"),
   async (req, res, next) => {
     try {
       const { xe_key } = req.params;
@@ -176,10 +205,11 @@ router.post(
  * =========================
  */
 
-// Cập nhật xe
+// Cập nhật xe - KHO, QUAN_LY, ADMIN
 router.put(
   "/:xe_key",
   authenticate,
+  checkPermission("products", "edit"),
   validate(capNhatXeSchema),
   async (req, res, next) => {
     try {
@@ -199,31 +229,41 @@ router.put(
 );
 
 // Khóa xe
-router.put("/:xe_key/lock", authenticate, async (req, res, next) => {
-  try {
-    const { xe_key } = req.params;
-    const { ma_phieu, ly_do } = req.body;
+router.put(
+  "/:xe_key/lock",
+  authenticate,
+  checkPermission("inventory", "import"),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
+      const { ma_phieu, ly_do } = req.body;
 
-    const xe = await Xe.lock(xe_key, ma_phieu, ly_do);
+      const xe = await Xe.lock(xe_key, ma_phieu, ly_do);
 
-    res.json({ success: true, data: xe });
-  } catch (err) {
-    next(err);
-  }
-});
+      res.json({ success: true, data: xe });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Mở khóa xe
-router.put("/:xe_key/unlock", authenticate, async (req, res, next) => {
-  try {
-    const { xe_key } = req.params;
+router.put(
+  "/:xe_key/unlock",
+  authenticate,
+  checkPermission("inventory", "import"),
+  async (req, res, next) => {
+    try {
+      const { xe_key } = req.params;
 
-    const xe = await Xe.unlock(xe_key);
+      const xe = await Xe.unlock(xe_key);
 
-    res.json({ success: true, data: xe });
-  } catch (err) {
-    next(err);
-  }
-});
+      res.json({ success: true, data: xe });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * =========================
@@ -232,19 +272,24 @@ router.put("/:xe_key/unlock", authenticate, async (req, res, next) => {
  */
 
 // Mở khóa theo phiếu
-router.put("/unlock/phieu/:ma_phieu", authenticate, async (req, res, next) => {
-  try {
-    const { ma_phieu } = req.params;
-    const data = await Xe.unlockByPhieu(ma_phieu);
+router.put(
+  "/unlock/phieu/:ma_phieu",
+  authenticate,
+  checkPermission("inventory", "import"),
+  async (req, res, next) => {
+    try {
+      const { ma_phieu } = req.params;
+      const data = await Xe.unlockByPhieu(ma_phieu);
 
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-});
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-// Kiểm tra trùng
-router.post("/check-duplicate", async (req, res, next) => {
+// Kiểm tra trùng - không cần phân quyền đặc biệt, chỉ cần đăng nhập
+router.post("/check-duplicate", authenticate, async (req, res, next) => {
   try {
     const { so_khung, so_may, exclude_id } = req.body;
     if (!so_khung || !so_may) {

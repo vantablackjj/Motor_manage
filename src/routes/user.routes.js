@@ -2,11 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 const { sendSuccess } = require("../ultils/respone");
 
-const { ROLES } = require("../config/constants");
 const userService = require("../services/user.service");
 
 const Joi = require("joi");
@@ -44,12 +43,13 @@ const changePasswordSchema = Joi.object({
 
 /**
  * GET /users
- * Query: vai_tro, ma_kho, trang_thai
+ * Xem danh sách user - QUAN_LY và ADMIN
+ * KE_TOAN chỉ xem (readonly)
  */
 router.get(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "view"),
   async (req, res, next) => {
     try {
       const users = await userService.getAll(req.query);
@@ -57,16 +57,17 @@ router.get(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * GET /users/:id
+ * Xem chi tiết user - QUAN_LY và ADMIN
  */
 router.get(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "view"),
   async (req, res, next) => {
     try {
       const user = await userService.getById(req.params.id);
@@ -74,16 +75,17 @@ router.get(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * POST /users
+ * Tạo user mới - chỉ QUAN_LY và ADMIN
  */
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "create"),
   validate(createUserSchema),
   async (req, res, next) => {
     try {
@@ -92,16 +94,17 @@ router.post(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * PUT /users/:id
+ * Cập nhật user - chỉ QUAN_LY và ADMIN
  */
 router.put(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "edit"),
   validate(updateUserSchema),
   async (req, res, next) => {
     try {
@@ -110,16 +113,17 @@ router.put(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * PATCH /users/:id/deactivate
+ * Vô hiệu hóa user - chỉ ADMIN
  */
 router.patch(
   "/:id/deactivate",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "delete"),
   async (req, res, next) => {
     try {
       await userService.deactivate(req.params.id);
@@ -127,16 +131,17 @@ router.patch(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * PATCH /users/:id/activate
+ * Kích hoạt user - chỉ ADMIN
  */
 router.patch(
   "/:id/activate",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users", "delete"),
   async (req, res, next) => {
     try {
       await userService.activate(req.params.id);
@@ -144,11 +149,12 @@ router.patch(
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 /**
  * PATCH /users/:id/change-password
+ * Đổi mật khẩu - bản thân user (không cần quyền đặc biệt)
  */
 router.patch(
   "/:id/change-password",
@@ -159,13 +165,13 @@ router.patch(
       await userService.changePassword(
         req.params.id,
         req.body.oldPassword,
-        req.body.newPassword
+        req.body.newPassword,
       );
       sendSuccess(res, null, "Đổi mật khẩu thành công");
     } catch (err) {
       next(err);
     }
-  }
+  },
 );
 
 module.exports = router;

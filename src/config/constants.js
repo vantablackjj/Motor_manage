@@ -1,12 +1,16 @@
 module.exports = {
-  // User roles
+  // User roles - Hệ thống 5 role theo yêu cầu mentor
   ROLES: {
-    ADMIN: "ADMIN",
-    QUAN_LY_CTY: "QUAN_LY_CTY",
-    QUAN_LY_CHI_NHANH: "QUAN_LY_CHI_NHANH",
-    NHAN_VIEN: "NHAN_VIEN",
-    KHO: "KHO",
-    QUAN_LY: "QUAN_LY_CTY", // Fallback for old code
+    ADMIN: "ADMIN", // Quản trị viên - Toàn quyền
+    BAN_HANG: "BAN_HANG", // Nhân viên bán hàng
+    KHO: "KHO", // Nhân viên kho
+    KE_TOAN: "KE_TOAN", // Kế toán
+    QUAN_LY: "QUAN_LY", // Quản lý
+
+    // Legacy support (deprecated)
+    QUAN_LY_CTY: "QUAN_LY", // Fallback to QUAN_LY
+    QUAN_LY_CHI_NHANH: "QUAN_LY", // Fallback to QUAN_LY
+    NHAN_VIEN: "BAN_HANG", // Fallback to BAN_HANG
   },
 
   // Transaction status
@@ -28,7 +32,16 @@ module.exports = {
     HU_HONG: "HU_HONG",
   },
 
-  // Transaction types
+  // Order types (for tm_don_hang table - enum_loai_don_hang)
+  // Use these for filtering/creating orders
+  LOAI_DON_HANG: {
+    MUA_HANG: "MUA_HANG", // Purchase Order
+    BAN_HANG: "BAN_HANG", // Sales Order
+    CHUYEN_KHO: "CHUYEN_KHO", // Transfer Order
+  },
+
+  // Warehouse transaction types (for tm_phieu_kho table - enum_loai_phieu_kho)
+  // These are NOT order types - they represent warehouse movements
   LOAI_GIAO_DICH: {
     NHAP_KHO: "NHAP_KHO",
     XUAT_KHO: "XUAT_KHO",

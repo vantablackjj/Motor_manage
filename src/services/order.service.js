@@ -585,7 +585,16 @@ class OrderService {
     const values = [];
     let idx = 1;
 
+    // Validate loai_don_hang enum value
+    const validOrderTypes = ["MUA_HANG", "BAN_HANG", "CHUYEN_KHO"];
     if (loai_don_hang) {
+      if (!validOrderTypes.includes(loai_don_hang)) {
+        throw new Error(
+          `Invalid loai_don_hang value: "${loai_don_hang}". ` +
+            `Valid values are: ${validOrderTypes.join(", ")}. ` +
+            `Note: XUAT_KHO is a warehouse transaction type (loai_phieu_kho), not an order type (loai_don_hang).`,
+        );
+      }
       conditions.push(`d.loai_don_hang = $${idx++}`);
       values.push(loai_don_hang);
     }

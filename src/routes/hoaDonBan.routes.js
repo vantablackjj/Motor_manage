@@ -2,14 +2,13 @@ const express = require("express");
 const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../ultils/respone");
 
 const hoaDonBanService = require("../services/hoaDonBan.service");
 const PdfService = require("../services/pdf.service");
 const Joi = require("joi");
-const { ROLES } = require("../config/constants");
 
 /* =====================================================
    JOI SCHEMA
@@ -43,11 +42,12 @@ const themPhuTungSchema = Joi.object({
 /**
  * POST /hoa-don-ban
  * Tạo hóa đơn bán (header)
+ * BAN_HANG, QUAN_LY, ADMIN
  */
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "create"),
   validate(createHoaDonSchema),
   async (req, res) => {
     try {
@@ -66,64 +66,76 @@ router.post(
 
 /**
  * GET /hoa-don-ban
- * Danh sách hóa đơn
+ * Danh sách hóa đơn - BAN_HANG được xem đơn của mình, QUAN_LY/KE_TOAN/ADMIN xem tất cả
  */
-router.get("/", authenticate, async (req, res) => {
-  try {
-    const result = await hoaDonBanService.getDanhSach(req.query);
-    return sendSuccess(res, result, "Lấy danh sách hóa đơn thành công");
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
+router.get(
+  "/",
+  authenticate,
+  checkPermission("sales_orders", "view"),
+  async (req, res) => {
+    try {
+      const result = await hoaDonBanService.getDanhSach(req.query);
+      return sendSuccess(res, result, "Lấy danh sách hóa đơn thành công");
+    } catch (err) {
+      return sendError(res, err.message);
+    }
+  },
+);
 
 /**
  * GET /hoa-don-ban/:so_hd
  * Chi tiết hóa đơn
  */
-router.get("/:so_hd", authenticate, async (req, res) => {
-  try {
-    const result = await hoaDonBanService.getById(req.params.so_hd);
+router.get(
+  "/:so_hd",
+  authenticate,
+  checkPermission("sales_orders", "view"),
+  async (req, res) => {
+    try {
+      const result = await hoaDonBanService.getById(req.params.so_hd);
 
-    return sendSuccess(res, result, "Lấy hóa đơn thành công");
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
+      return sendSuccess(res, result, "Lấy hóa đơn thành công");
+    } catch (err) {
+      return sendError(res, err.message);
+    }
+  },
+);
 
 /**
  * GET /hoa-don-ban/:so_hd/in-hoa-don
  * In hóa đơn (PDF)
  */
-router.get("/:so_hd/in-hoa-don", authenticate, async (req, res) => {
-  try {
-    const { so_hd } = req.params;
+router.get(
+  "/:so_hd/in-hoa-don",
+  authenticate,
+  checkPermission("invoices", "view"),
+  async (req, res) => {
+    try {
+      const { so_hd } = req.params;
 
-    // Check if invoice exists and get data
-    const invoiceData = await hoaDonBanService.getById(so_hd);
-    if (!invoiceData) {
-      return sendError(res, "Hóa đơn không tồn tại");
-    }
+      const invoiceData = await hoaDonBanService.getById(so_hd);
+      if (!invoiceData) {
+        return sendError(res, "Hóa đơn không tồn tại");
+      }
 
-    // Generate PDF
-    await PdfService.generateInvoicePdf(invoiceData, res);
-  } catch (err) {
-    console.error("PDF Error:", err);
-    // If headers sent, we can't send JSON error, but stream might be corrupted
-    if (!res.headersSent) {
-      return sendError(res, "Lỗi khi tạo file PDF: " + err.message);
+      await PdfService.generateInvoicePdf(invoiceData, res);
+    } catch (err) {
+      console.error("PDF Error:", err);
+      if (!res.headersSent) {
+        return sendError(res, "Lỗi khi tạo file PDF: " + err.message);
+      }
     }
-  }
-});
+  },
+);
 
 /**
  * POST /hoa-don-ban/:so_hd/xe
- * Thêm xe vào hóa đơn
+ * Thêm xe vào hóa đơn - BAN_HANG, QUAN_LY, ADMIN
  */
 router.post(
   "/:so_hd/xe",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "create"),
   validate(themXeSchema),
   async (req, res) => {
     try {
@@ -141,12 +153,12 @@ router.post(
 
 /**
  * POST /hoa-don-ban/:so_hd/phu-tung
- * Thêm phụ tùng vào hóa đơn
+ * Thêm phụ tùng vào hóa đơn - BAN_HANG, QUAN_LY, ADMIN
  */
 router.post(
   "/:so_hd/phu-tung",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "create"),
   validate(themPhuTungSchema),
   async (req, res) => {
     try {
@@ -163,12 +175,12 @@ router.post(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/gui-duyet
- * Gửi duyệt hóa đơn
+ * Gửi duyệt hóa đơn - BAN_HANG, QUAN_LY, ADMIN
  */
 router.patch(
   "/:so_hd/gui-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "create"),
   async (req, res) => {
     try {
       const result = await hoaDonBanService.guiDuyet(
@@ -185,12 +197,12 @@ router.patch(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/phe-duyet
- * Phê duyệt hóa đơn
+ * Phê duyệt hóa đơn - chỉ QUAN_LY, KE_TOAN, ADMIN
  */
 router.patch(
   "/:so_hd/phe-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("sales_orders", "approve"),
   async (req, res) => {
     try {
       const result = await hoaDonBanService.pheDuyet(
@@ -204,14 +216,15 @@ router.patch(
     }
   },
 );
+
 /**
  * PATCH /hoa-don-ban/:so_hd/tu-choi
- * Từ chối hóa đơn (quản lý)
+ * Từ chối hóa đơn - chỉ QUAN_LY, KE_TOAN, ADMIN
  */
 router.patch(
   "/:so_hd/tu-choi",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("sales_orders", "approve"),
   async (req, res) => {
     try {
       const result = await hoaDonBanService.tuChoi(
@@ -232,12 +245,12 @@ router.patch(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/huy
- * Hủy hóa đơn (nhân viên tạo / admin)
+ * Hủy hóa đơn - BAN_HANG (hủy đơn của mình), ADMIN
  */
 router.patch(
   "/:so_hd/huy",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "edit"),
   async (req, res) => {
     try {
       const { ly_do } = req.body;
@@ -258,13 +271,15 @@ router.patch(
     }
   },
 );
+
 /**
  * DELETE /hoa-don-ban/:so_hd/chi-tiet/:stt
+ * Xóa chi tiết hóa đơn - BAN_HANG, QUAN_LY, ADMIN
  */
 router.delete(
   "/:so_hd/chi-tiet/:stt",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN),
+  checkPermission("sales_orders", "edit"),
   async (req, res) => {
     try {
       const { so_hd, stt } = req.params;
@@ -284,12 +299,12 @@ router.delete(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/gui-duyet-giao
- * Gửi duyệt giao hàng (sau khi đã xuất kho)
+ * Gửi duyệt giao hàng - BAN_HANG, QUAN_LY, ADMIN
  */
 router.patch(
   "/:so_hd/gui-duyet-giao",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("sales_orders", "edit"),
   async (req, res) => {
     try {
       const result = await hoaDonBanService.guiDuyetGiao(
@@ -306,12 +321,12 @@ router.patch(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/phe-duyet-giao
- * Phê duyệt giao hàng (quản lý)
+ * Phê duyệt giao hàng - chỉ QUAN_LY, ADMIN
  */
 router.patch(
   "/:so_hd/phe-duyet-giao",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CHI_NHANH, ROLES.QUAN_LY_CTY),
+  checkPermission("sales_orders", "approve"),
   async (req, res) => {
     try {
       const { ghi_chu } = req.body;
@@ -330,12 +345,12 @@ router.patch(
 
 /**
  * PATCH /hoa-don-ban/:so_hd/xac-nhan-da-giao
- * Xác nhận đã giao hàng (sau khi đã duyệt)
+ * Xác nhận đã giao hàng - BAN_HANG, QUAN_LY, ADMIN
  */
 router.patch(
   "/:so_hd/xac-nhan-da-giao",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.NHAN_VIEN, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("sales_orders", "edit"),
   async (req, res) => {
     try {
       const result = await hoaDonBanService.xacNhanDaGiao(

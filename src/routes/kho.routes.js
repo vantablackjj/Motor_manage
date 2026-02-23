@@ -1,12 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../ultils/respone");
 const Kho = require("../services/kho.service");
 const Joi = require("joi");
-const { ROLES } = require("../config/constants");
 
 // Validation schemas
 const createKhoSchema = Joi.object({
@@ -70,11 +69,11 @@ router.get("/:id", authenticate, async (req, res, next) => {
   }
 });
 
-// POST /api/v1/kho - Tạo kho mới
+// POST tạo kho mới - chỉ QUAN_LY, ADMIN
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("warehouses", "create"),
   validate(createKhoSchema),
   async (req, res, next) => {
     try {
@@ -86,11 +85,11 @@ router.post(
   },
 );
 
-// PUT /api/v1/kho/:ma_kho - Cập nhật kho
+// PUT cập nhật kho - QUAN_LY, ADMIN
 router.put(
   "/:ma_kho",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("warehouses", "edit"),
   validate(updateKhoSchema),
   async (req, res, next) => {
     try {
@@ -108,11 +107,11 @@ router.put(
   },
 );
 
-// DELETE /api/v1/kho/:ma_kho - Xóa kho (soft delete)
+// DELETE xóa kho (soft delete) - chỉ ADMIN
 router.delete(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("warehouses", "delete"),
   async (req, res, next) => {
     try {
       const { id } = req.params;
