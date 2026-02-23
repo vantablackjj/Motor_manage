@@ -3,14 +3,23 @@
 -- Description: Gộp và chuẩn hóa hệ thống role, xử lý triệt để lỗi Unique Constraint
 -- =====================================================
 
--- 1. Đảm bảo cột ma_quyen tồn tại
+-- 1. Đảm bảo cột ma_quyen tồn tại trong sys_role và vai_tro trong sys_user
 DO $$
 BEGIN
+    -- Thêm ma_quyen vào sys_role
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'sys_role' AND column_name = 'ma_quyen'
     ) THEN
         ALTER TABLE sys_role ADD COLUMN ma_quyen VARCHAR(50) UNIQUE;
+    END IF;
+
+    -- Thêm vai_tro vào sys_user
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'sys_user' AND column_name = 'vai_tro'
+    ) THEN
+        ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
     END IF;
 END $$;
 

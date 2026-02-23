@@ -79,10 +79,18 @@ class User {
 
     const result = await query(
       `INSERT INTO sys_user (
-        username, password_hash, ho_ten, email, dien_thoai, role_id
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, username, ho_ten, email, role_id, created_at`,
-      [username, hashedPassword, ho_ten, email, dien_thoai, targetRoleId],
+        username, password_hash, ho_ten, email, dien_thoai, role_id, vai_tro
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, username, ho_ten, email, role_id, vai_tro, created_at`,
+      [
+        username,
+        hashedPassword,
+        ho_ten,
+        email,
+        dien_thoai,
+        targetRoleId,
+        vai_tro,
+      ],
     );
 
     const user = result.rows[0];
@@ -111,10 +119,10 @@ class User {
 
     const result = await query(
       `UPDATE sys_user
-       SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4
-       WHERE id = $5
-       RETURNING id, username, ho_ten, email, role_id`,
-      [ho_ten, email, dien_thoai, targetRoleId, id],
+       SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4, vai_tro = $5
+       WHERE id = $6
+       RETURNING id, username, ho_ten, email, role_id, vai_tro`,
+      [ho_ten, email, dien_thoai, targetRoleId, vai_tro, id],
     );
 
     const user = result.rows[0];
