@@ -5,7 +5,7 @@ class User {
   // Lấy user theo username
   static async getByUsername(username) {
     const result = await query(
-      `SELECT u.*, r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro, r.permissions
+      `SELECT u.*, r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro, r.permissions, u.role_id
        FROM sys_user u
        LEFT JOIN sys_role r ON u.role_id = r.id
        WHERE u.username = $1`,
@@ -17,7 +17,7 @@ class User {
   // Lấy user theo ID
   static async getById(id) {
     const result = await query(
-      `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho,
+      `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho, u.role_id,
               r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro, r.permissions,
               u.status, u.created_at, u.updated_at
        FROM sys_user u
