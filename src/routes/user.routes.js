@@ -37,6 +37,10 @@ const changePasswordSchema = Joi.object({
   newPassword: Joi.string().min(6).required(),
 });
 
+const resetPasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).required(),
+});
+
 /* ======================
  * ROUTES
  * ====================== */
@@ -186,6 +190,25 @@ router.patch(
         req.body.newPassword,
       );
       sendSuccess(res, null, "Đổi mật khẩu thành công");
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /users/:id/reset-password
+ * Reset mật khẩu - chỉ QUAN_LY và ADMIN (yêu cầu quyền edit)
+ */
+router.post(
+  "/:id/reset-password",
+  authenticate,
+  checkPermission("users", "edit"),
+  validate(resetPasswordSchema),
+  async (req, res, next) => {
+    try {
+      await userService.resetPassword(req.params.id, req.body.newPassword);
+      sendSuccess(res, null, "Đặt lại mật khẩu thành công");
     } catch (err) {
       next(err);
     }

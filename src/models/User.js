@@ -167,6 +167,21 @@ class User {
     return true;
   }
 
+  // Reset mật khẩu (dành cho Admin/Manager) - Không cần mật khẩu cũ
+  static async resetPassword(id, newPassword) {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const result = await query(
+      "UPDATE sys_user SET password_hash = $1 WHERE id = $2 RETURNING id, username",
+      [hashedPassword, id],
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error("User không tồn tại");
+    }
+
+    return result.rows[0];
+  }
+
   // Update last login
   static async updateLastLogin(id) {
     await query(

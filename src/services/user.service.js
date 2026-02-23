@@ -4,7 +4,7 @@ class UserService {
   static async getByUsername(username) {
     return User.getByUsername(username);
   }
- static async updateLastLogin(userId) {
+  static async updateLastLogin(userId) {
     return User.updateLastLogin(userId);
   }
   static async getById(id) {
@@ -34,6 +34,10 @@ class UserService {
 
   static async changePassword(id, oldPassword, newPassword) {
     return User.changePassword(id, oldPassword, newPassword);
+  }
+
+  static async resetPassword(id, newPassword) {
+    return User.resetPassword(id, newPassword);
   }
 
   static async deactivate(id) {
