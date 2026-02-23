@@ -32,7 +32,9 @@ class User {
   static async getAll(filters = {}) {
     let sql = `
       SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai,
-             r.ten_quyen as vai_tro, u.status, u.created_at
+             COALESCE(r.ma_quyen, u.vai_tro) as vai_tro,
+             COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro,
+             u.role_id, u.status, u.created_at
       FROM sys_user u
       LEFT JOIN sys_role r ON u.role_id = r.id
       WHERE 1=1
@@ -41,8 +43,8 @@ class User {
     const params = [];
 
     if (filters.vai_tro) {
-      params.push(filters.vai_tro);
-      sql += ` AND r.ten_quyen = $${params.length}`;
+      params.push(filters.vai_tro.toUpperCase());
+      sql += ` AND (r.ma_quyen = $${params.length} OR r.ten_quyen = $${params.length} OR u.vai_tro = $${params.length})`;
     }
 
     if (filters.status !== undefined) {
@@ -50,7 +52,7 @@ class User {
       sql += ` AND u.status = $${params.length}`;
     }
 
-    sql += " ORDER BY u.created_at DESC";
+    sql += " ORDER BY u.id ASC";
 
     const result = await query(sql, params);
     return result.rows;
