@@ -1,5 +1,10 @@
 const express = require("express");
 const router = express.Router();
+
+// Import các middleware
+const { authenticate } = require("../middleware/auth");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
+
 // Import các routes
 const authRoutes = require("./auth.routes");
 const khoRoutes = require("./kho.routes");
@@ -26,8 +31,14 @@ const bulkExportRoutes = require("./bulkExport.routes");
 const baoCaoRoutes = require("./baoCao.routes");
 const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
-// Mount routes
+
+// 1. PUBLIC ROUTES (Không cần đăng nhập)
 router.use("/auth", authRoutes);
+
+// 2. PROTECTED ROUTES (Cần đăng nhập & Cách ly kho)
+router.use(authenticate);
+router.use(warehouseIsolation);
+
 router.use("/kho", khoRoutes);
 router.use("/phu-tung", phuTungRoutes);
 router.use("/ton-kho", tonKhoRoutes);
@@ -53,4 +64,5 @@ router.use("/export", bulkExportRoutes);
 router.use("/bao-cao", baoCaoRoutes);
 router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
+
 module.exports = router;

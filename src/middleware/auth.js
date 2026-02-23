@@ -44,6 +44,7 @@ const authenticate = async (req, res, next) => {
       username: user.username,
       ho_ten: user.ho_ten,
       vai_tro: user.vai_tro,
+      ma_kho: user.ma_kho,
     };
 
     next();

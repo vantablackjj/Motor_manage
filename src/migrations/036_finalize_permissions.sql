@@ -23,6 +23,14 @@ BEGIN
     ) THEN
         ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
     END IF;
+
+    -- Thêm ma_kho vào sys_user (để gán user vào 1 kho chính)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'sys_user' AND column_name = 'ma_kho'
+    ) THEN
+        ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50) REFERENCES sys_kho(ma_kho);
+    END IF;
 END $$;
 
 -- =====================================================
@@ -67,24 +75,23 @@ SET
     permissions = EXCLUDED.permissions,
     status      = EXCLUDED.status;
 
--- BAN_HANG: Nhân viên bán hàng
--- Quyền hạn: Xem hàng hóa, khách hàng, tạo đơn hàng/hóa đơn, xem tồn kho.
--- Hạn chế: Không xem giá nhập, không xóa dữ liệu, không quản lý nhân sự.
+-- BAN_HANG: Nhân viên bán hàng (Nâng cấp thành nhân viên nghiệp vụ tổng hợp)
+-- Quyền hạn: Quản lý trọn gói từ mua hàng, bán hàng đến nhập xuất kho và xem báo cáo.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'BAN_HANG',
-    'Nhân viên bán hàng',
-    'Quản lý đơn bán hàng, hóa đơn và thông tin khách hàng',
+    'Nhân viên nghiệp vụ',
+    'Quản lý đơn mua hàng, bán hàng, hóa đơn và quy trình nhập xuất kho',
     '{
-        "users":           {"view": false, "create": false, "edit": false, "delete": false},
+        "users":           {"view": true,  "create": false, "edit": false, "delete": false},
         "roles":           {"view": false, "create": false, "edit": false, "delete": false},
         "warehouses":      {"view": true,  "create": false, "edit": false, "delete": false},
-        "products":        {"view": true,  "create": false, "edit": false, "delete": false, "approve": false, "view_cost": false},
+        "products":        {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false, "view_cost": true},
         "partners":        {"view": true,  "create": true,  "edit": true,  "delete": false},
-        "purchase_orders": {"view": false, "create": false, "edit": false, "delete": false, "approve": false},
+        "purchase_orders": {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false},
         "sales_orders":    {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false},
         "invoices":        {"view": true,  "create": true,  "edit": true,  "delete": false},
-        "inventory":       {"view": true,  "import": false, "export": true, "transfer": false, "adjust": false},
+        "inventory":       {"view": true,  "import": true,  "export": true, "transfer": true, "adjust": false},
         "debt":            {"view": true,  "create": true,  "edit": false, "delete": false},
         "payments":        {"view": true,  "create": true,  "edit": false, "delete": false, "approve": false},
         "reports":         {"view": true,  "export": true,  "view_financial": false},
@@ -99,9 +106,9 @@ SET
     permissions = EXCLUDED.permissions,
     status      = EXCLUDED.status;
 
+
 -- KHO: Nhân viên kho
 -- Quyền hạn: Quản lý hàng hóa, kho bãi, nhập/xuất/chuyển kho, tạo đơn mua.
--- Hạn chế: Không xem báo cáo tài chính, không xóa đối tác hay hóa đơn.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'KHO',
@@ -114,7 +121,7 @@ VALUES (
         "products":        {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false, "view_cost": true},
         "partners":        {"view": true,  "create": true,  "edit": true,  "delete": false},
         "purchase_orders": {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false},
-        "sales_orders":    {"view": true,  "create": false, "edit": false, "delete": false, "approve": false},
+        "sales_orders":    {"view": true,  "create": false, "edit": true,  "delete": false, "approve": false},
         "invoices":        {"view": true,  "create": true,  "edit": false, "delete": false},
         "inventory":       {"view": true,  "import": true,  "export": true, "transfer": true, "adjust": true},
         "debt":            {"view": false, "create": false, "edit": false, "delete": false},

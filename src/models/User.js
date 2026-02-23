@@ -17,7 +17,7 @@ class User {
   // Lấy user theo ID
   static async getById(id) {
     const result = await query(
-      `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai,
+      `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho,
               r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro, r.permissions,
               u.status, u.created_at, u.updated_at
        FROM sys_user u
@@ -31,7 +31,7 @@ class User {
   // Lấy tất cả users
   static async getAll(filters = {}) {
     let sql = `
-      SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai,
+      SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho,
              COALESCE(r.ma_quyen, u.vai_tro) as vai_tro,
              COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro,
              u.role_id, u.status, u.created_at
@@ -47,6 +47,11 @@ class User {
       sql += ` AND (r.ma_quyen = $${params.length} OR r.ten_quyen = $${params.length} OR u.vai_tro = $${params.length})`;
     }
 
+    if (filters.ma_kho) {
+      params.push(filters.ma_kho);
+      sql += ` AND u.ma_kho = $${params.length}`;
+    }
+
     if (filters.status !== undefined) {
       params.push(filters.status);
       sql += ` AND u.status = $${params.length}`;
@@ -60,8 +65,16 @@ class User {
 
   // Tạo user mới
   static async create(data) {
-    const { username, password, ho_ten, email, dien_thoai, vai_tro, role_id } =
-      data;
+    const {
+      username,
+      password,
+      ho_ten,
+      email,
+      dien_thoai,
+      vai_tro,
+      role_id,
+      ma_kho,
+    } = data;
 
     let targetRoleId = role_id;
 
@@ -81,9 +94,9 @@ class User {
 
     const result = await query(
       `INSERT INTO sys_user (
-        username, password_hash, ho_ten, email, dien_thoai, role_id, vai_tro
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, username, ho_ten, email, role_id, vai_tro, created_at`,
+        username, password_hash, ho_ten, email, dien_thoai, role_id, vai_tro, ma_kho
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, username, ho_ten, email, role_id, vai_tro, ma_kho, created_at`,
       [
         username,
         hashedPassword,
@@ -92,6 +105,7 @@ class User {
         dien_thoai,
         targetRoleId,
         vai_tro,
+        ma_kho,
       ],
     );
 
@@ -104,7 +118,7 @@ class User {
 
   // Cập nhật user
   static async update(id, data) {
-    const { ho_ten, email, dien_thoai, role_id, vai_tro } = data;
+    const { ho_ten, email, dien_thoai, role_id, vai_tro, ma_kho } = data;
 
     let targetRoleId = role_id;
 
@@ -121,10 +135,10 @@ class User {
 
     const result = await query(
       `UPDATE sys_user
-       SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4, vai_tro = $5
-       WHERE id = $6
-       RETURNING id, username, ho_ten, email, role_id, vai_tro`,
-      [ho_ten, email, dien_thoai, targetRoleId, vai_tro, id],
+       SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4, vai_tro = $5, ma_kho = $6
+       WHERE id = $7
+       RETURNING id, username, ho_ten, email, role_id, vai_tro, ma_kho`,
+      [ho_ten, email, dien_thoai, targetRoleId, vai_tro, ma_kho, id],
     );
 
     const user = result.rows[0];
