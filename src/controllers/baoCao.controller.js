@@ -24,7 +24,7 @@ class BaoCaoController {
 
   async tonKhoTongHop(req, res) {
     try {
-      const data = await baoCaoService.tonKhoTongHop();
+      const data = await baoCaoService.tonKhoTongHop(req.query);
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });

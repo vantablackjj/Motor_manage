@@ -37,6 +37,29 @@ router.use("/auth", authRoutes);
 
 // 2. PROTECTED ROUTES (Cần đăng nhập & Cách ly kho)
 router.use(authenticate);
+
+// Intercept warehouse parameters to enforce isolation for BAN_HANG/KHO roles
+const warehouseParams = [
+  "ma_kho",
+  "ma_kho_nhap",
+  "ma_kho_xuat",
+  "kho_id",
+  "tu_ma_kho",
+  "den_ma_kho",
+];
+warehouseParams.forEach((paramName) => {
+  router.param(paramName, (req, res, next, val) => {
+    const { ROLES } = require("../config/constants");
+    if (req.user && [ROLES.BAN_HANG, ROLES.KHO].includes(req.user.vai_tro)) {
+      if (val !== req.user.ma_kho) {
+        // Override the parameter with the user's assigned warehouse
+        req.params[paramName] = req.user.ma_kho;
+      }
+    }
+    next();
+  });
+});
+
 router.use(warehouseIsolation);
 
 router.use("/kho", khoRoutes);

@@ -1,0 +1,10 @@
+[
+  "id",
+  "status",
+  "created_at",
+  "updated_at",
+  "permissions",
+  "ten_quyen",
+  "mo_ta",
+  "ma_quyen"
+]

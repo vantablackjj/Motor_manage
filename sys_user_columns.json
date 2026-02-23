@@ -1,0 +1,18 @@
+[
+  "id",
+  "status",
+  "role_id",
+  "created_at",
+  "updated_at",
+  "created_by",
+  "updated_by",
+  "deleted_at",
+  "vai_tro",
+  "username",
+  "password_hash",
+  "ho_ten",
+  "email",
+  "dien_thoai",
+  "avatar_url",
+  "ma_kho"
+]

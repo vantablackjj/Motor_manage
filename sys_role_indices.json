@@ -1,0 +1,17 @@
+[
+  {
+    "index_name": "sys_role_pkey",
+    "column_name": "id",
+    "is_unique": true
+  },
+  {
+    "index_name": "sys_role_ten_quyen_key",
+    "column_name": "ten_quyen",
+    "is_unique": true
+  },
+  {
+    "index_name": "idx_sys_role_status",
+    "column_name": "status",
+    "is_unique": false
+  }
+]
