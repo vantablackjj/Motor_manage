@@ -19,11 +19,30 @@ async function startServer() {
     await pool.query("SELECT NOW()");
     logger.info("✅ Database connected successfully");
 
-    // Tự động chạy Migration trước khi start server
-    logger.info("Running migrations...");
+    // LỰC LƯỢNG CƯỠNG ÉP: Đảm bảo cột ma_kho tồn tại
+    // Điều này khắc phục lỗi "column u.ma_kho does not exist" ngay lập tức
+    try {
+      logger.info("Checking/Fixing sys_user structure...");
+      await pool.query(`
+        DO $$
+        BEGIN
+            -- Thêm cột mà không cần REFERENCES để tránh lỗi khóa ngoại nếu bảng sys_kho chưa chuẩn
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
+                ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'vai_tro') THEN
+                ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
+            END IF;
+        END $$;
+      `);
+      logger.info("✅ sys_user structure verified");
+    } catch (dbErr) {
+      logger.error("❌ Failed to force update sys_user structure", dbErr);
+    }
+
+    // Tự động chạy Migration
+    logger.info("Running migrations runner...");
     const runner = new MigrationRunner();
-    // Chúng ta không gọi runner.run() trực tiếp vì nó đóng pool.end() ở cuối
-    // Nên ta copy logic run() nhưng không đóng pool
     await runner.createMigrationsTable();
     const executedMigrations = await runner.getExecutedMigrations();
     const migrationFiles = await runner.getMigrationFiles();
