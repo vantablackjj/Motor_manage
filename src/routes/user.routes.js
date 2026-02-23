@@ -126,8 +126,8 @@ router.patch(
   checkPermission("users", "delete"),
   async (req, res, next) => {
     try {
-      await userService.deactivate(req.params.id);
-      sendSuccess(res, null, "Đã vô hiệu hóa user");
+      const user = await userService.deactivate(req.params.id);
+      sendSuccess(res, user, "Đã vô hiệu hóa user");
     } catch (err) {
       next(err);
     }
@@ -144,8 +144,8 @@ router.patch(
   checkPermission("users", "delete"),
   async (req, res, next) => {
     try {
-      await userService.activate(req.params.id);
-      sendSuccess(res, null, "Đã kích hoạt user");
+      const user = await userService.activate(req.params.id);
+      sendSuccess(res, user, "Đã kích hoạt user");
     } catch (err) {
       next(err);
     }

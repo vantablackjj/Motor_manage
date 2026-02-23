@@ -20,6 +20,14 @@ END $$;
 -- Upsert đầy đủ 5 roles với permissions chi tiết
 -- =====================================================
 
+-- Đồng bộ ma_quyen cho các role cũ dựa trên ten_quyen trước khi UPSERT
+-- Việc này giúp tránh lỗi UNIQUE constraint trên ten_quyen khi INSERT
+UPDATE sys_role SET ma_quyen = 'ADMIN' WHERE (ten_quyen = 'Quản trị viên' OR ten_quyen = 'ADMIN') AND ma_quyen IS NULL;
+UPDATE sys_role SET ma_quyen = 'KHO' WHERE (ten_quyen = 'KHO' OR ten_quyen = 'Nhân viên kho') AND ma_quyen IS NULL;
+UPDATE sys_role SET ma_quyen = 'KE_TOAN' WHERE (ten_quyen = 'KE_TOAN' OR ten_quyen = 'Kế toán') AND ma_quyen IS NULL;
+UPDATE sys_role SET ma_quyen = 'BAN_HANG' WHERE (ten_quyen = 'BAN_HANG' OR ten_quyen = 'Nhân viên bán hàng' OR ten_quyen = 'NHAN_VIEN') AND ma_quyen IS NULL;
+UPDATE sys_role SET ma_quyen = 'QUAN_LY' WHERE (ten_quyen = 'QUAN_LY' OR ten_quyen = 'Quản lý' OR ten_quyen = 'QUAN_LY_CTY' OR ten_quyen = 'QUAN_LY_CHI_NHANH') AND ma_quyen IS NULL;
+
 -- ADMIN: Toàn quyền hệ thống
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (

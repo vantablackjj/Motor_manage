@@ -5,10 +5,10 @@ class User {
   // Lấy user theo username
   static async getByUsername(username) {
     const result = await query(
-      `SELECT u.*, r.ten_quyen as vai_tro
+      `SELECT u.*, r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro
        FROM sys_user u
        LEFT JOIN sys_role r ON u.role_id = r.id
-       WHERE u.username = $1 AND u.status = TRUE`,
+       WHERE u.username = $1`,
       [username],
     );
     return result.rows[0];
@@ -18,10 +18,11 @@ class User {
   static async getById(id) {
     const result = await query(
       `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai,
-              r.ten_quyen as vai_tro, u.created_at, u.updated_at
+              r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro,
+              u.status, u.created_at, u.updated_at
        FROM sys_user u
        LEFT JOIN sys_role r ON u.role_id = r.id
-       WHERE u.id = $1 AND u.status = TRUE`,
+       WHERE u.id = $1`,
       [id],
     );
     return result.rows[0];
@@ -62,10 +63,10 @@ class User {
 
     let targetRoleId = role_id;
 
-    // Nếu truyền vai_tro (string) thì tìm role_id
+    // Nếu truyền vai_tro (string) thì tìm role_id theo ma_quyen hoặc ten_quyen
     if (vai_tro && !targetRoleId) {
       const roleRes = await query(
-        "SELECT id FROM sys_role WHERE ten_quyen = $1",
+        "SELECT id FROM sys_role WHERE ma_quyen = $1 OR ten_quyen = $1",
         [vai_tro.toUpperCase()],
       );
       if (roleRes.rows.length > 0) {
@@ -97,9 +98,10 @@ class User {
 
     let targetRoleId = role_id;
 
+    // Tìm role_id theo ma_quyen hoặc ten_quyen
     if (vai_tro && !targetRoleId) {
       const roleRes = await query(
-        "SELECT id FROM sys_role WHERE ten_quyen = $1",
+        "SELECT id FROM sys_role WHERE ma_quyen = $1 OR ten_quyen = $1",
         [vai_tro.toUpperCase()],
       );
       if (roleRes.rows.length > 0) {
@@ -110,7 +112,7 @@ class User {
     const result = await query(
       `UPDATE sys_user
        SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4
-       WHERE id = $5 AND status = TRUE
+       WHERE id = $5
        RETURNING id, username, ho_ten, email, role_id`,
       [ho_ten, email, dien_thoai, targetRoleId, id],
     );
@@ -166,7 +168,8 @@ class User {
   // Vô hiệu hóa user
   static async deactivate(id) {
     const result = await query(
-      "UPDATE sys_user SET status = FALSE WHERE id = $1 RETURNING *",
+      `UPDATE sys_user SET status = FALSE WHERE id = $1 
+       RETURNING id, username, ho_ten, status, created_at`,
       [id],
     );
     return result.rows[0];
@@ -175,7 +178,8 @@ class User {
   // Kích hoạt user
   static async activate(id) {
     const result = await query(
-      "UPDATE sys_user SET status = TRUE WHERE id = $1 RETURNING *",
+      `UPDATE sys_user SET status = TRUE WHERE id = $1 
+       RETURNING id, username, ho_ten, status, created_at`,
       [id],
     );
     return result.rows[0];
