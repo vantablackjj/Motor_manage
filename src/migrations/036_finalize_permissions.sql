@@ -68,8 +68,8 @@ SET
     status      = EXCLUDED.status;
 
 -- BAN_HANG: Nhân viên bán hàng
--- Tập trung vào: bán hàng, khách hàng, xem tồn kho
--- KHÔNG có quyền: mua hàng, tài chính nội bộ, quản lý user, cài đặt
+-- Quyền hạn: Xem hàng hóa, khách hàng, tạo đơn hàng/hóa đơn, xem tồn kho.
+-- Hạn chế: Không xem giá nhập, không xóa dữ liệu, không quản lý nhân sự.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'BAN_HANG',
@@ -83,10 +83,10 @@ VALUES (
         "partners":        {"view": true,  "create": true,  "edit": true,  "delete": false},
         "purchase_orders": {"view": false, "create": false, "edit": false, "delete": false, "approve": false},
         "sales_orders":    {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false},
-        "invoices":        {"view": true,  "create": true,  "edit": false, "delete": false},
+        "invoices":        {"view": true,  "create": true,  "edit": true,  "delete": false},
         "inventory":       {"view": true,  "import": false, "export": true, "transfer": false, "adjust": false},
         "debt":            {"view": true,  "create": true,  "edit": false, "delete": false},
-        "payments":        {"view": false, "create": false, "edit": false, "delete": false, "approve": false},
+        "payments":        {"view": true,  "create": true,  "edit": false, "delete": false, "approve": false},
         "reports":         {"view": true,  "export": true,  "view_financial": false},
         "settings":        {"view": false, "edit": false}
     }'::jsonb,
@@ -100,23 +100,23 @@ SET
     status      = EXCLUDED.status;
 
 -- KHO: Nhân viên kho
--- Tập trung vào: nhập xuất kho, chuyển kho, tồn kho, đơn mua xe
--- KHÔNG có quyền: bán hàng, tài chính, báo cáo tài chính
+-- Quyền hạn: Quản lý hàng hóa, kho bãi, nhập/xuất/chuyển kho, tạo đơn mua.
+-- Hạn chế: Không xem báo cáo tài chính, không xóa đối tác hay hóa đơn.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'KHO',
     'Nhân viên kho',
-    'Quản lý nhập xuất kho, chuyển kho và theo dõi tồn kho xe',
+    'Quản lý nhập xuất kho, chuyển kho và theo dõi tồn kho hàng hóa',
     '{
         "users":           {"view": false, "create": false, "edit": false, "delete": false},
         "roles":           {"view": false, "create": false, "edit": false, "delete": false},
-        "warehouses":      {"view": true,  "create": false, "edit": false, "delete": false},
-        "products":        {"view": true,  "create": false, "edit": false, "delete": false, "approve": false, "view_cost": false},
-        "partners":        {"view": true,  "create": false, "edit": false, "delete": false},
-        "purchase_orders": {"view": true,  "create": true,  "edit": false, "delete": false, "approve": false},
+        "warehouses":      {"view": true,  "create": true,  "edit": true,  "delete": false},
+        "products":        {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false, "view_cost": true},
+        "partners":        {"view": true,  "create": true,  "edit": true,  "delete": false},
+        "purchase_orders": {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": false},
         "sales_orders":    {"view": true,  "create": false, "edit": false, "delete": false, "approve": false},
         "invoices":        {"view": true,  "create": true,  "edit": false, "delete": false},
-        "inventory":       {"view": true,  "import": true,  "export": true, "transfer": true, "adjust": false},
+        "inventory":       {"view": true,  "import": true,  "export": true, "transfer": true, "adjust": true},
         "debt":            {"view": false, "create": false, "edit": false, "delete": false},
         "payments":        {"view": false, "create": false, "edit": false, "delete": false, "approve": false},
         "reports":         {"view": true,  "export": true,  "view_financial": false},
@@ -132,8 +132,8 @@ SET
     status      = EXCLUDED.status;
 
 -- KE_TOAN: Kế toán
--- Tập trung vào: tài chính, công nợ, thanh toán, báo cáo tài chính
--- Có thể xem mọi thứ, approve tài chính, KHÔNG tạo/chuyển kho
+-- Quyền hạn: Quản lý tiền tệ, công nợ, hóa đơn, báo cáo tài chính.
+-- Có quyền xem chi phí (view_cost) và duyệt thanh toán/đơn hàng.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'KE_TOAN',
@@ -145,10 +145,10 @@ VALUES (
         "warehouses":      {"view": true,  "create": false, "edit": false, "delete": false},
         "products":        {"view": true,  "create": false, "edit": true,  "delete": false, "approve": false, "view_cost": true},
         "partners":        {"view": true,  "create": true,  "edit": true,  "delete": false},
-        "purchase_orders": {"view": true,  "create": false, "edit": true,  "delete": false, "approve": true},
+        "purchase_orders": {"view": true,  "create": true,  "edit": true,  "delete": false, "approve": true},
         "sales_orders":    {"view": true,  "create": false, "edit": true,  "delete": false, "approve": true},
-        "invoices":        {"view": true,  "create": false, "edit": true,  "delete": false},
-        "inventory":       {"view": true,  "import": false, "export": false, "transfer": false, "adjust": true},
+        "invoices":        {"view": true,  "create": true,  "edit": true,  "delete": false},
+        "inventory":       {"view": true,  "import": true,  "export": true, "transfer": false, "adjust": false},
         "debt":            {"view": true,  "create": true,  "edit": true,  "delete": true},
         "payments":        {"view": true,  "create": true,  "edit": true,  "delete": true,  "approve": true},
         "reports":         {"view": true,  "export": true,  "view_financial": true},
@@ -164,8 +164,8 @@ SET
     status      = EXCLUDED.status;
 
 -- QUAN_LY: Quản lý
--- Giám sát toàn diện + phê duyệt mọi nghiệp vụ
--- Gần như ADMIN nhưng KHÔNG xóa dữ liệu quan trọng, KHÔNG quản lý roles
+-- Giám sát toàn hệ thống, phê duyệt các đơn hàng và thanh toán.
+-- Hạn chế quyền xóa hệ thống so với Admin.
 INSERT INTO sys_role (ma_quyen, ten_quyen, mo_ta, permissions, status)
 VALUES (
     'QUAN_LY',
@@ -194,6 +194,7 @@ SET
     mo_ta       = EXCLUDED.mo_ta,
     permissions = EXCLUDED.permissions,
     status      = EXCLUDED.status;
+
 
 -- =====================================================
 -- Gán role mặc định cho users chưa có role

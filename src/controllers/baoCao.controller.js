@@ -260,15 +260,32 @@ class BaoCaoController {
           break;
 
         case "CONG_NO_KH":
-          data = await baoCaoService.congNoKhachHang(params);
+          const resKH = await baoCaoService.congNoKhachHang(params);
+          data = Array.isArray(resKH) ? resKH : resKH.data || [];
           columns = [
-            { header: "Mã KH", key: "ma_kh", width: 15 },
+            { header: "Mã ĐT", key: "ma_doi_tac", width: 15 },
             { header: "Họ Tên", key: "ho_ten", width: 30 },
-            { header: "Tổng Phải Trả", key: "tong_phai_tra", width: 20 },
+            { header: "Loại DT", key: "loai_doi_tac", width: 15 },
+            { header: "Loại Nợ", key: "loai_cong_no", width: 15 },
+            { header: "Tổng Nợ", key: "tong_phai_tra", width: 20 },
             { header: "Đã Trả", key: "da_tra", width: 20 },
             { header: "Còn Lại", key: "con_lai", width: 20 },
+            { header: "Cập Nhật", key: "ngay_cap_nhat", width: 20 },
           ];
-          filename = "Bao_cao_cong_no_khach_hang.xlsx";
+          filename = "Bao_cao_cong_no_doi_tac.xlsx";
+          break;
+
+        case "CONG_NO_NOI_BO":
+          data = await baoCaoService.congNoNoiBo(params);
+          columns = [
+            { header: "Kho Nợ", key: "kho_no", width: 20 },
+            { header: "Kho Có", key: "kho_co", width: 20 },
+            { header: "Tổng Nợ", key: "tong_no", width: 20 },
+            { header: "Đã Trả", key: "da_tra", width: 20 },
+            { header: "Còn Lại", key: "con_lai", width: 20 },
+            { header: "Cập Nhật", key: "updated_at", width: 20 },
+          ];
+          filename = "Bao_cao_cong_no_noi_bo.xlsx";
           break;
 
         case "THU_CHI":
@@ -281,7 +298,73 @@ class BaoCaoController {
             { header: "Nội Dung", key: "dien_giai", width: 40 },
             { header: "Kho", key: "ten_kho", width: 20 },
           ];
-          filename = "Bao_cao_thu_chi.xlsx";
+          filename = "Bao_cao_thu_chi_chi_tiet.xlsx";
+          break;
+
+        case "THU_CHI_TONG_HOP":
+          data = await baoCaoService.thuChiTongHop(params);
+          columns = [
+            { header: "Kho", key: "ten_kho", width: 25 },
+            { header: "Tổng Thu", key: "tong_thu", width: 20 },
+            { header: "Tổng Chi", key: "tong_chi", width: 20 },
+            { header: "Chênh Lệch", key: "chenh_lech", width: 20 },
+          ];
+          // Tính chênh lệch cho Excel
+          data = data.map((item) => ({
+            ...item,
+            chenh_lech:
+              (parseFloat(item.tong_thu) || 0) -
+              (parseFloat(item.tong_chi) || 0),
+          }));
+          filename = "Bao_cao_thu_chi_tong_hop.xlsx";
+          break;
+
+        case "CHI_TIET_MUA_HANG":
+          data = await baoCaoService.chiTietMuaHang(params);
+          columns = [
+            { header: "Ngày HĐ", key: "ngay_hoa_don", width: 15 },
+            { header: "Số HĐ", key: "so_hoa_don", width: 15 },
+            { header: "Nhà Cung Cấp", key: "ten_ncc", width: 30 },
+            { header: "Sản Phẩm", key: "ten_hang_hoa", width: 30 },
+            { header: "Số Khung", key: "so_khung", width: 20 },
+            { header: "Số Máy", key: "so_may", width: 20 },
+            { header: "Số Lượng", key: "so_luong", width: 10 },
+            { header: "Đơn Giá", key: "don_gia", width: 15 },
+            { header: "Thành Tiền", key: "thanh_tien", width: 20 },
+          ];
+          filename = "So_chi_tiet_mua_hang.xlsx";
+          break;
+
+        case "NHAP_XUAT_XE":
+          data = await baoCaoService.nhapXuatXe(params);
+          columns = [
+            { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+            { header: "Số Chứng Từ", key: "so_chung_tu", width: 20 },
+            { header: "Tên Loại", key: "ten_loai", width: 25 },
+            { header: "Số Khung", key: "so_khung", width: 25 },
+            { header: "Màu", key: "ten_mau", width: 15 },
+            { header: "Loại GD", key: "loai_giao_dich", width: 15 },
+            { header: "Kho Xuất", key: "kho_xuat", width: 20 },
+            { header: "Kho Nhập", key: "kho_nhap", width: 20 },
+            { header: "Người Thực Hiện", key: "nguoi_thuc_hien", width: 20 },
+          ];
+          filename = "Bao_cao_nhap_xuat_xe.xlsx";
+          break;
+
+        case "NHAP_XUAT_PHU_TUNG":
+          data = await baoCaoService.nhapXuatPhuTung(params);
+          columns = [
+            { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+            { header: "Số Chứng Từ", key: "so_chung_tu", width: 20 },
+            { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
+            { header: "ĐVT", key: "don_vi_tinh", width: 10 },
+            { header: "Số Lượng", key: "so_luong", width: 12 },
+            { header: "Loại GD", key: "loai_giao_dich", width: 15 },
+            { header: "Kho Xuất", key: "kho_xuat", width: 20 },
+            { header: "Kho Nhập", key: "kho_nhap", width: 20 },
+            { header: "Người Thực Hiện", key: "nguoi_thuc_hien", width: 20 },
+          ];
+          filename = "Bao_cao_nhap_xuat_phu_tung.xlsx";
           break;
 
         default:
@@ -319,20 +402,18 @@ class BaoCaoController {
     }
   }
 
-  // ... previous methods ...
-
   async xuatPDF(req, res) {
     try {
       const { loai_bao_cao, params } = req.body;
       let buffer;
       let filename = `bao-cao-${Date.now()}.pdf`;
 
-      if (loai_bao_cao === "CHI_TIET_MUA_HANG") {
+      // Special handling for legacy PDF reports
+      if (loai_bao_cao === "CHI_TIET_MUA_HANG_LEGACY") {
         const data = await baoCaoService.chiTietMuaHang(params);
         buffer = await pdfGenerator.generatePurchaseReport(data, params);
         filename = "So_chi_tiet_mua_hang.pdf";
       } else {
-        // Reuse logic for data fetching from Excel export
         let data = [];
         let columns = [];
         let title = "BÁO CÁO";
@@ -378,19 +459,29 @@ class BaoCaoController {
             break;
 
           case "CONG_NO_KH":
-            data = await baoCaoService.congNoKhachHang(params);
-            // Handle complex return type for congNoKhachHang
-            if (data.data) data = data.data;
-
+            const resKH = await baoCaoService.congNoKhachHang(params);
+            data = Array.isArray(resKH) ? resKH : resKH.data || [];
             columns = [
-              { header: "Mã KH", key: "ma_kh", width: 15 },
+              { header: "Mã KH", key: "ma_doi_tac", width: 15 },
               { header: "Họ Tên", key: "ho_ten", width: 30 },
-              { header: "Tổng Phải Trả", key: "tong_phai_tra", width: 20 },
+              { header: "Tổng Nợ", key: "tong_phai_tra", width: 20 },
               { header: "Đã Trả", key: "da_tra", width: 20 },
               { header: "Còn Lại", key: "con_lai", width: 20 },
             ];
-            title = "BÁO CÁO CÔNG NỢ KHÁCH HÀNG";
+            title = "BÁO CÁO CÔNG NỢ ĐỐI TÁC";
             filename = "Bao_cao_cong_no.pdf";
+            break;
+
+          case "CONG_NO_NOI_BO":
+            data = await baoCaoService.congNoNoiBo(params);
+            columns = [
+              { header: "Kho Nợ", key: "kho_no", width: 20 },
+              { header: "Kho Có", key: "kho_co", width: 20 },
+              { header: "Tổng Nợ", key: "tong_no", width: 20 },
+              { header: "Còn Lại", key: "con_lai", width: 20 },
+            ];
+            title = "BÁO CÁO CÔNG NỢ NỘI BỘ";
+            filename = "Bao_cao_cong_no_noi_bo.pdf";
             break;
 
           case "THU_CHI":
@@ -402,8 +493,63 @@ class BaoCaoController {
               { header: "Nội Dung", key: "dien_giai", width: 40 },
               { header: "Kho", key: "ten_kho", width: 20 },
             ];
-            title = "BÁO CÁO THU CHI";
+            title = "BÁO CÁO THU CHI CHI TIẾT";
             filename = "Bao_cao_thu_chi.pdf";
+            break;
+
+          case "THU_CHI_TONG_HOP":
+            data = await baoCaoService.thuChiTongHop(params);
+            columns = [
+              { header: "Kho", key: "ten_kho", width: 25 },
+              { header: "Tổng Thu", key: "tong_thu", width: 20 },
+              { header: "Tổng Chi", key: "tong_chi", width: 20 },
+            ];
+            title = "BÁO CÁO TỔNG HỢP THU CHI";
+            filename = "Bao_cao_thu_chi_tong_hop.pdf";
+            break;
+
+          case "CHI_TIET_MUA_HANG":
+            data = await baoCaoService.chiTietMuaHang(params);
+            columns = [
+              { header: "Ngày HĐ", key: "ngay_hoa_don", width: 15 },
+              { header: "Số HĐ", key: "so_hoa_don", width: 15 },
+              { header: "NCC", key: "ten_ncc", width: 30 },
+              { header: "Sản phẩm", key: "ten_hang_hoa", width: 30 },
+              { header: "SL", key: "so_luong", width: 12 },
+              { header: "Thành tiền", key: "thanh_tien", width: 20 },
+            ];
+            title = "SỔ CHI TIẾT MUA HÀNG";
+            filename = "So_chi_tiet_mua_hang.pdf";
+            break;
+
+          case "NHAP_XUAT_XE":
+            data = await baoCaoService.nhapXuatXe(params);
+            columns = [
+              { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+              { header: "Số Chứng Từ", key: "so_chung_tu", width: 20 },
+              { header: "Tên Loại", key: "ten_loai", width: 25 },
+              { header: "Số Khung", key: "so_khung", width: 25 },
+              { header: "Màu", key: "ten_mau", width: 15 },
+              { header: "Kho Xuất", key: "kho_xuat", width: 20 },
+              { header: "Kho Nhập", key: "kho_nhap", width: 20 },
+            ];
+            title = "BÁO CÁO NHẬP XUẤT XE";
+            filename = "Bao_cao_nhap_xuat_xe.pdf";
+            break;
+
+          case "NHAP_XUAT_PHU_TUNG":
+            data = await baoCaoService.nhapXuatPhuTung(params);
+            columns = [
+              { header: "Ngày", key: "ngay_giao_dich", width: 20 },
+              { header: "Số Chứng Từ", key: "so_chung_tu", width: 20 },
+              { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
+              { header: "ĐVT", key: "don_vi_tinh", width: 10 },
+              { header: "Số Lượng", key: "so_luong", width: 12 },
+              { header: "Kho Xuất", key: "kho_xuat", width: 20 },
+              { header: "Kho Nhập", key: "kho_nhap", width: 20 },
+            ];
+            title = "BÁO CÁO NHẬP XUẤT PHỤ TÙNG";
+            filename = "Bao_cao_nhap_xuat_phu_tung.pdf";
             break;
 
           default:

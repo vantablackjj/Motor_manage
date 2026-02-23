@@ -61,6 +61,24 @@ router.get(
 );
 
 /**
+ * GET /users/:id/permissions
+ * Lấy danh sách quyền của user
+ */
+router.get("/:id/permissions", authenticate, async (req, res, next) => {
+  try {
+    const user = await userService.getById(req.params.id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User không tồn tại" });
+    }
+    sendSuccess(res, user.permissions || {}, "Lấy danh sách quyền thành công");
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /users/:id
  * Xem chi tiết user - QUAN_LY và ADMIN
  */
