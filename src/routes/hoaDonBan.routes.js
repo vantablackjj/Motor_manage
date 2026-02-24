@@ -20,6 +20,8 @@ const createHoaDonSchema = Joi.object({
   ma_kho_xuat: Joi.string().required(),
   ma_kh: Joi.string().required(),
   ghi_chu: Joi.string().allow(null, ""),
+  chiet_khau: Joi.number().min(0).default(0),
+  vat_percentage: Joi.number().min(0).max(100).default(0),
 });
 
 // Thêm xe vào hóa đơn
@@ -352,6 +354,37 @@ router.delete(
         res,
         result,
         `Xóa chi tiết hóa đơn ${so_hd} thành công`,
+      );
+    } catch (err) {
+      return sendError(res, err.message);
+    }
+  },
+);
+
+/**
+ * PATCH /hoa-don-ban/:so_hd/cap-nhat-tai-chinh
+ * Cập nhật VAT & chiết khấu - chỉ khi hóa đơn ở trạng thái NHAP
+ * Role: BAN_HANG, QUAN_LY, ADMIN
+ */
+router.patch(
+  "/:so_hd/cap-nhat-tai-chinh",
+  authenticate,
+  checkPermission("sales_orders", "edit"),
+  validate(
+    Joi.object({
+      chiet_khau: Joi.number().min(0),
+      vat_percentage: Joi.number().min(0).max(100),
+      ghi_chu: Joi.string().allow(null, ""),
+    }).min(1), // Ít nhất 1 field cần được gửi
+  ),
+  async (req, res) => {
+    try {
+      const { so_hd } = req.params;
+      const result = await hoaDonBanService.updateVatChietKhau(so_hd, req.body);
+      return sendSuccess(
+        res,
+        result,
+        "Cập nhật thông tin tài chính thành công",
       );
     } catch (err) {
       return sendError(res, err.message);

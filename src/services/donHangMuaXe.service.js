@@ -15,6 +15,16 @@ class DonHangMuaXeService {
     }
   }
 
+  /**
+   * Tính lại thanh_tien từ tong_gia_tri, chiet_khau, vat_percentage
+   * thanh_tien = (tong_gia_tri - chiet_khau) * (1 + vat_percentage/100)
+   */
+  _calcThanhTien(tongGiaTri, chietKhau, vatPercentage) {
+    const base = Number(tongGiaTri || 0) - Number(chietKhau || 0);
+    const vat = (base * Number(vatPercentage || 0)) / 100;
+    return base + vat;
+  }
+
   _validateCreateDetail(data) {
     if (!data.ma_loai_xe || !data.so_luong || !data.don_gia) {
       throw { status: 400, message: "Thiếu dữ liệu chi tiết đơn" };
@@ -98,6 +108,8 @@ class DonHangMuaXeService {
 
     return withTransaction(pool, async (client) => {
       const soPhieu = await this._generateSoPhieu(client);
+      const chietKhau = Number(data.chiet_khau || 0);
+      const vatPercentage = Number(data.vat_percentage || 0);
 
       const result = await client.query(
         `
@@ -109,9 +121,13 @@ class DonHangMuaXeService {
           ma_ben_xuat,
           loai_ben_xuat,
           tong_gia_tri,
+          chiet_khau,
+          vat_percentage,
+          thanh_tien,
           trang_thai,
           nguoi_tao,
           loai_don_hang,
+          ghi_chu,
           created_at
         ) VALUES (
           $1,
@@ -123,12 +139,25 @@ class DonHangMuaXeService {
           0,
           $4,
           $5,
+          0,
+          $6,
+          $7,
           'MUA_XE',
+          $8,
           NOW()
         )
         RETURNING *
         `,
-        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId],
+        [
+          soPhieu,
+          data.ma_kho_nhap,
+          data.ma_ncc,
+          chietKhau,
+          vatPercentage,
+          TRANG_THAI.NHAP,
+          userId,
+          data.ghi_chu || null,
+        ],
       );
 
       return result.rows[0];
@@ -160,6 +189,8 @@ class DonHangMuaXeService {
     return withTransaction(pool, async (client) => {
       // 1. Generate so_phieu
       const soPhieu = await this._generateSoPhieu(client);
+      const chietKhau = Number(data.chiet_khau || 0);
+      const vatPercentage = Number(data.vat_percentage || 0);
 
       // 2. Insert order header
       const headerResult = await client.query(
@@ -172,9 +203,13 @@ class DonHangMuaXeService {
           ma_ben_xuat,
           loai_ben_xuat,
           tong_gia_tri,
+          chiet_khau,
+          vat_percentage,
+          thanh_tien,
           trang_thai,
           nguoi_tao,
           loai_don_hang,
+          ghi_chu,
           created_at
         ) VALUES (
           $1,
@@ -186,25 +221,37 @@ class DonHangMuaXeService {
           0,
           $4,
           $5,
+          0,
+          $6,
+          $7,
           'MUA_XE',
+          $8,
           NOW()
         )
         RETURNING *
         `,
-        [soPhieu, data.ma_kho_nhap, data.ma_ncc, TRANG_THAI.NHAP, userId],
+        [
+          soPhieu,
+          data.ma_kho_nhap,
+          data.ma_ncc,
+          chietKhau,
+          vatPercentage,
+          TRANG_THAI.NHAP,
+          userId,
+          data.ghi_chu || null,
+        ],
       );
 
       const header = headerResult.rows[0];
 
       // 3. Insert all detail items
       const chiTietResults = [];
-      let tongTien = 0;
+      let tongGiaTri = 0;
 
       for (let i = 0; i < data.chi_tiet.length; i++) {
         const item = data.chi_tiet[i];
         const stt = i + 1;
-        const thanhTien = Number(item.so_luong) * Number(item.don_gia);
-        tongTien += thanhTien;
+        tongGiaTri += Number(item.so_luong) * Number(item.don_gia);
 
         const yeuCauDacBiet = item.ma_mau
           ? JSON.stringify({ ma_mau: item.ma_mau })
@@ -236,21 +283,29 @@ class DonHangMuaXeService {
         chiTietResults.push(detailResult.rows[0]);
       }
 
-      // 4. Update tong_tien in header
+      // 4. Cập nhật tong_gia_tri và thanh_tien (đã trừ CK, cộng VAT)
+      const thanhTien = this._calcThanhTien(
+        tongGiaTri,
+        chietKhau,
+        vatPercentage,
+      );
       await client.query(
         `
         UPDATE tm_don_hang
-        SET tong_gia_tri = $2
+        SET tong_gia_tri = $2,
+            thanh_tien   = $3
         WHERE so_don_hang = $1
         `,
-        [soPhieu, tongTien],
+        [soPhieu, tongGiaTri, thanhTien],
       );
 
       // 5. Return complete order with details
       return {
         ...header,
-        tong_gia_tri: tongTien, // Update value for consistency
-        tong_tien: tongTien,
+        tong_gia_tri: tongGiaTri,
+        chiet_khau: chietKhau,
+        vat_percentage: vatPercentage,
+        thanh_tien: thanhTien,
         chi_tiet: chiTietResults,
       };
     });
@@ -295,7 +350,7 @@ class DonHangMuaXeService {
         ],
       );
 
-      // cập nhật tổng tiền header
+      // Cập nhật tong_gia_tri và tính lại thanh_tien (trừ CK, cộng VAT)
       await client.query(
         `
         UPDATE tm_don_hang
@@ -303,6 +358,14 @@ class DonHangMuaXeService {
           SELECT COALESCE(SUM(thanh_tien), 0)
           FROM tm_don_hang_chi_tiet
           WHERE so_don_hang = $1
+        ),
+        thanh_tien = (
+          (SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+          - COALESCE(chiet_khau, 0)
+          + (
+            (SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+            - COALESCE(chiet_khau, 0)
+          ) * COALESCE(vat_percentage, 0) / 100
         )
         WHERE so_don_hang = $1
         `,
@@ -341,6 +404,14 @@ class DonHangMuaXeService {
           SELECT COALESCE(SUM(thanh_tien), 0)
           FROM tm_don_hang_chi_tiet
           WHERE so_don_hang = $1
+        ),
+        thanh_tien = (
+          (SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+          - COALESCE(chiet_khau, 0)
+          + (
+            (SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+            - COALESCE(chiet_khau, 0)
+          ) * COALESCE(vat_percentage, 0) / 100
         )
         WHERE so_don_hang = $1
         `,
@@ -754,19 +825,37 @@ class DonHangMuaXeService {
         throw new Error("Không có xe nào được nhập thành công");
       }
 
+      // 4. Tính VAT & chiết khấu theo tỉ lệ từ đơn hàng gốc
+      const orderForVat = await client.query(
+        `SELECT tong_gia_tri, chiet_khau, vat_percentage FROM tm_don_hang WHERE so_don_hang = $1`,
+        [so_don_hang],
+      );
+      const orderFinancial = orderForVat.rows[0] || {};
+      const orderTotal =
+        Number(orderFinancial.tong_gia_tri) || tongTienHienTai || 1;
+      const ratio = tongTienHienTai / orderTotal; // Tỉ lệ lô nhập này / tổng đơn
+      const invChietKhau = Number(orderFinancial.chiet_khau || 0) * ratio;
+      const vatPercentage = Number(orderFinancial.vat_percentage || 0);
+      const invBase = tongTienHienTai - invChietKhau;
+      const invTienThueGtgt = (invBase * vatPercentage) / 100;
+      const invThanhTien = invBase + invTienThueGtgt;
+
       // 4. Tạo Header Hóa đơn (tm_hoa_don) - PHẢI TRƯỚC CHI TIẾT
       await client.query(
         `INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_tien, thanh_tien, trang_thai, nguoi_lap
-        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $5, 'DA_THANH_TOAN', $6)`,
+          tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap
+        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $6, $7, $8, 'DA_THANH_TOAN', $9)`,
         [
           soPhieuNhapKho,
           so_don_hang,
           order.ma_ben_xuat, // NCC
           order.ma_ben_nhap, // Kho nhập
           tongTienHienTai,
+          invChietKhau,
+          invTienThueGtgt,
+          invThanhTien,
           userId,
         ],
       );
@@ -782,13 +871,13 @@ class DonHangMuaXeService {
         );
       }
 
-      // 5. Ghi nhận công nợ (SỬ DỤNG MÃ HÓA ĐƠN)
+      // 5. Ghi nhận công nợ — dùng thanh_tien SAU khi trừ CK và cộng VAT
       await CongNoService.recordDoiTacDebt(client, {
         ma_doi_tac: order.ma_ben_xuat,
         loai_cong_no: "PHAI_TRA",
         so_hoa_don: soPhieuNhapKho,
         ngay_phat_sinh: new Date(),
-        so_tien: tongTienHienTai,
+        so_tien: invThanhTien,
         ghi_chu: `Nhập ${invoiceDetails.length} xe theo phiếu ${soPhieuNhapKho} (Đơn: ${so_don_hang})`,
       });
 

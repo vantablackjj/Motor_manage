@@ -16,7 +16,17 @@ class HoaDonBanService {
 
   // Tạo hóa đơn bán
   async taoHoaDon(data) {
-    const { ngay_ban, ma_kho_xuat, ma_kh, nguoi_tao, ghi_chu } = data;
+    const {
+      ngay_ban,
+      ma_kho_xuat,
+      ma_kh,
+      nguoi_tao,
+      ghi_chu,
+      chiet_khau,
+      vat_percentage,
+    } = data;
+    const ck = Number(chiet_khau || 0);
+    const vat = Number(vat_percentage || 0);
 
     const client = await pool.connect();
     try {
@@ -28,10 +38,13 @@ class HoaDonBanService {
         `INSERT INTO tm_hoa_don (
           so_hoa_don, ngay_hoa_don, ma_ben_xuat, loai_ben_xuat,
           ma_ben_nhap, loai_ben_nhap, loai_hoa_don,
+          chiet_khau, tien_thue_gtgt,
+          tong_tien, thanh_tien,
           trang_thai, ghi_chu
-        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'BAN_HANG', $5, $6)
+        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'BAN_HANG',
+                  $5, $6, 0, 0, $7, $8)
         RETURNING *`,
-        [so_hd, ngay_ban, ma_kho_xuat, ma_kh, "NHAP", ghi_chu],
+        [so_hd, ngay_ban, ma_kho_xuat, ma_kh, ck, vat, "NHAP", ghi_chu],
       );
 
       await client.query("COMMIT");
@@ -39,6 +52,57 @@ class HoaDonBanService {
         ...result.rows[0],
         so_hd: result.rows[0].so_hoa_don,
       };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Cập nhật VAT & chiết khấu cho hóa đơn (chỉ được khi trạng thái NHAP)
+  async updateVatChietKhau(so_hd, data) {
+    const { chiet_khau, vat_percentage, ghi_chu } = data;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const hdRes = await client.query(
+        `SELECT trang_thai FROM tm_hoa_don WHERE so_hoa_don = $1`,
+        [so_hd],
+      );
+      if (!hdRes.rows[0]) throw new Error("Hóa đơn không tồn tại");
+      if (hdRes.rows[0].trang_thai !== "NHAP") {
+        throw new Error(
+          `Không thể sửa hóa đơn ở trạng thái ${hdRes.rows[0].trang_thai}`,
+        );
+      }
+
+      // Cập nhật và tính lại thanh_tien = (tong_tien - CK) * (1 + VAT%)
+      const result = await client.query(
+        `UPDATE tm_hoa_don
+         SET
+           chiet_khau       = COALESCE($1, chiet_khau),
+           tien_thue_gtgt   = CASE
+             WHEN $2 IS NOT NULL THEN
+               (tong_tien - COALESCE($1, chiet_khau)) * $2 / 100
+             ELSE tien_thue_gtgt
+           END,
+           thanh_tien       = (
+             (tong_tien - COALESCE($1, chiet_khau))
+             + (tong_tien - COALESCE($1, chiet_khau))
+               * COALESCE($2, tien_thue_gtgt / NULLIF(tong_tien - chiet_khau, 0) * 100, 0)
+               / 100
+           ),
+           ghi_chu          = COALESCE($3, ghi_chu),
+           updated_at       = CURRENT_TIMESTAMP
+         WHERE so_hoa_don = $4
+         RETURNING *`,
+        [chiet_khau ?? null, vat_percentage ?? null, ghi_chu ?? null, so_hd],
+      );
+
+      await client.query("COMMIT");
+      return result.rows[0];
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

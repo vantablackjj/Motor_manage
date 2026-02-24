@@ -16,22 +16,42 @@ class DonHangMuaService {
 
   // Tạo đơn hàng mua mới
   async taoDonHang(data) {
-    const { ngay_dat_hang, ma_kho_nhap, ma_ncc, nguoi_tao, dien_giai } = data;
+    const {
+      ngay_dat_hang,
+      ma_kho_nhap,
+      ma_ncc,
+      nguoi_tao,
+      dien_giai,
+      chiet_khau,
+      vat_percentage,
+    } = data;
 
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
       const so_phieu = await this._generateSoPhieu(client);
+      const ck = Number(chiet_khau || 0);
+      const vat = Number(vat_percentage || 0);
 
       const result = await client.query(
         `INSERT INTO tm_don_hang (
           so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
           ma_ben_xuat, loai_ben_xuat, loai_don_hang,
+          tong_gia_tri, chiet_khau, vat_percentage, thanh_tien,
           trang_thai, ghi_chu
-        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'MUA_HANG', $5, $6)
+        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'MUA_HANG', 0, $5, $6, 0, $7, $8)
         RETURNING *`,
-        [so_phieu, ngay_dat_hang, ma_kho_nhap, ma_ncc, "NHAP", dien_giai],
+        [
+          so_phieu,
+          ngay_dat_hang,
+          ma_kho_nhap,
+          ma_ncc,
+          ck,
+          vat,
+          "NHAP",
+          dien_giai,
+        ],
       );
 
       await client.query("COMMIT");
@@ -88,11 +108,19 @@ class DonHangMuaService {
         [ma_phieu, stt, ma_pt, so_luong, don_gia],
       );
 
-      // Update tổng tiền
+      // Cập nhật tong_gia_tri và thanh_tien (đã trừ CK, cộng VAT)
       await client.query(
         `UPDATE tm_don_hang
-         SET tong_gia_tri = (SELECT SUM(thanh_tien) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1),
-             thanh_tien = (SELECT SUM(thanh_tien) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+         SET tong_gia_tri = (
+               SELECT COALESCE(SUM(thanh_tien), 0)
+               FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1),
+             thanh_tien = (
+               (SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+               - COALESCE(chiet_khau, 0)
+               + ((SELECT COALESCE(SUM(thanh_tien), 0) FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1)
+                  - COALESCE(chiet_khau, 0)
+                 ) * COALESCE(vat_percentage, 0) / 100
+             )
          WHERE so_don_hang = $1`,
         [ma_phieu],
       );
@@ -194,18 +222,35 @@ class DonHangMuaService {
       }
 
       // 4. Tạo Header Hóa đơn (tm_hoa_don) - BẮT BUỘC để tránh lỗi FK công nợ
+      // Tính VAT & chiết khấu theo tỉ lệ lô nhập này
+      const orderForVat = await client.query(
+        `SELECT tong_gia_tri, chiet_khau, vat_percentage FROM tm_don_hang WHERE so_don_hang = $1`,
+        [don.so_don_hang],
+      );
+      const oFin = orderForVat.rows[0] || {};
+      const orderTotal = Number(oFin.tong_gia_tri) || tong_thanh_tien_nhap || 1;
+      const ratio = tong_thanh_tien_nhap / orderTotal;
+      const invChietKhau = Number(oFin.chiet_khau || 0) * ratio;
+      const vatPct = Number(oFin.vat_percentage || 0);
+      const invBase = tong_thanh_tien_nhap - invChietKhau;
+      const invTienThueGtgt = (invBase * vatPct) / 100;
+      const invThanhTien = invBase + invTienThueGtgt;
+
       await client.query(
         `INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_tien, thanh_tien, trang_thai, nguoi_lap
-        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $5, 'DA_THANH_TOAN', $6)`,
+          tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap
+        ) VALUES ($1, 'MUA_HANG', $2, CURRENT_DATE, $3, 'DOI_TAC', $4, 'KHO', $5, $6, $7, $8, 'DA_THANH_TOAN', $9)`,
         [
           soPhieuNhapKho,
           don.so_don_hang,
           don.ma_ncc,
           don.ma_kho_nhap,
           tong_thanh_tien_nhap,
+          invChietKhau,
+          invTienThueGtgt,
+          invThanhTien,
           nguoi_nhap,
         ],
       );
@@ -322,7 +367,7 @@ class DonHangMuaService {
           loai_cong_no: "PHAI_TRA",
           so_hoa_don: soPhieuNhapKho,
           ngay_phat_sinh: new Date(),
-          so_tien: tong_thanh_tien_nhap,
+          so_tien: invThanhTien, // công nợ theo thanh_tien sau VAT & CK
           ghi_chu: `Nhập kho phụ tùng theo phiếu ${soPhieuNhapKho} (Đơn: ${don.so_don_hang})`,
         });
       }
