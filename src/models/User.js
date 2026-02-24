@@ -118,18 +118,30 @@ class User {
 
   // Cập nhật user
   static async update(id, data) {
-    const { ho_ten, email, dien_thoai, role_id, vai_tro, ma_kho } = data;
+    // 1. Lấy thông tin hiện tại
+    const existing = await this.getById(id);
+    if (!existing) {
+      return null;
+    }
 
-    let targetRoleId = role_id;
+    // 2. Merge data (ưu tiên fields trong data, nếu undefined thì lấy từ existing)
+    const ho_ten = data.ho_ten !== undefined ? data.ho_ten : existing.ho_ten;
+    const email = data.email !== undefined ? data.email : existing.email;
+    const dien_thoai =
+      data.dien_thoai !== undefined ? data.dien_thoai : existing.dien_thoai;
+    let role_id = data.role_id !== undefined ? data.role_id : existing.role_id;
+    let vai_tro = data.vai_tro !== undefined ? data.vai_tro : existing.vai_tro;
+    const ma_kho = data.ma_kho !== undefined ? data.ma_kho : existing.ma_kho;
 
-    // Tìm role_id theo ma_quyen hoặc ten_quyen
-    if (vai_tro && !targetRoleId) {
+    // 3. Nếu có cập nhật vai_tro bằng string, cần resolve role_id mới
+    if (data.vai_tro && data.role_id === undefined) {
       const roleRes = await query(
         "SELECT id FROM sys_role WHERE ma_quyen = $1 OR ten_quyen = $1",
-        [vai_tro.toUpperCase()],
+        [data.vai_tro.toUpperCase()],
       );
       if (roleRes.rows.length > 0) {
-        targetRoleId = roleRes.rows[0].id;
+        role_id = roleRes.rows[0].id;
+        vai_tro = data.vai_tro;
       }
     }
 
@@ -138,12 +150,12 @@ class User {
        SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4, vai_tro = $5, ma_kho = $6
        WHERE id = $7
        RETURNING id, username, ho_ten, email, role_id, vai_tro, ma_kho`,
-      [ho_ten, email, dien_thoai, targetRoleId, vai_tro, ma_kho, id],
+      [ho_ten, email, dien_thoai, role_id, vai_tro, ma_kho, id],
     );
 
     const user = result.rows[0];
-    if (user) {
-      user.vai_tro = vai_tro || null;
+    if (user && vai_tro) {
+      user.vai_tro = vai_tro;
     }
     return user;
   }

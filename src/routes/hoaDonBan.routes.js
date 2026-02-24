@@ -83,6 +83,63 @@ router.get(
 );
 
 /**
+ * GET /hoa-don-ban/new-hd
+ * Lấy mã hóa đơn mới (sử dụng cho giao diện tạo mới)
+ */
+router.get(
+  "/new-hd",
+  authenticate,
+  checkPermission("sales_orders", "create"),
+  async (req, res) => {
+    try {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query(`
+          SELECT 'HD' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_hd')::text, 6, '0') AS so_hd
+        `);
+        return sendSuccess(res, { so_hd: rows[0].so_hd });
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      return sendError(res, err.message);
+    }
+  },
+);
+
+/**
+ * GET /hoa-don-ban/create
+ * Lấy dữ liệu khởi tạo cho trang tạo mới hóa đơn
+ */
+router.get(
+  "/create",
+  authenticate,
+  checkPermission("sales_orders", "create"),
+  async (req, res) => {
+    try {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query(`
+          SELECT 'HD' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_hd')::text, 6, '0') AS so_hd
+        `);
+        return sendSuccess(res, {
+          so_hd: rows[0].so_hd,
+          ngay_ban: new Date(),
+          nguoi_tao: req.user.username,
+          trang_thai: "NHAP",
+          chi_tiet_xe: [],
+          chi_tiet_pt: [],
+        });
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      return sendError(res, err.message);
+    }
+  },
+);
+
+/**
  * GET /hoa-don-ban/:so_hd
  * Chi tiết hóa đơn
  */
@@ -92,11 +149,16 @@ router.get(
   checkPermission("sales_orders", "view"),
   async (req, res) => {
     try {
-      const result = await hoaDonBanService.getById(req.params.so_hd);
+      const { so_hd } = req.params;
 
+      // Xử lý các case đặc biệt (đã có route riêng ở trên)
+      if (so_hd === "create" || so_hd === "new-hd") return;
+
+      const result = await hoaDonBanService.getById(so_hd);
       return sendSuccess(res, result, "Lấy hóa đơn thành công");
     } catch (err) {
-      return sendError(res, err.message);
+      const status = err.message.includes("Không tìm thấy") ? 404 : 500;
+      return sendError(res, err.message, status);
     }
   },
 );

@@ -213,6 +213,39 @@ router.get("/me", authenticate, async (req, res, next) => {
 });
 
 /**
+ * @route   PUT /api/auth/me
+ * @desc    Cập nhật thông tin cá nhân
+ * @access  Private
+ */
+router.put(
+  "/me",
+  authenticate,
+  validate(
+    Joi.object({
+      ho_ten: Joi.string().max(200),
+      email: Joi.string().email().allow("", null),
+      dien_thoai: Joi.string().max(50).allow("", null),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const { ho_ten, email, dien_thoai } = req.body;
+
+      // Chỉ cập nhật các trường thông tin cá nhân, không cho phép đổi vai_tro, role_id hay ma_kho qua đây
+      const updatedUser = await User.update(req.user.id, {
+        ho_ten,
+        email,
+        dien_thoai,
+      });
+
+      sendSuccess(res, updatedUser, "Cập nhật thông tin cá nhân thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
  * @route   PUT /api/v1/auth/change-password
  * @desc    Đổi mật khẩu
  * @access  Private

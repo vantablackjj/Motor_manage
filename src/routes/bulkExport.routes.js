@@ -1,11 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const BulkExportController = require("../controllers/bulkExport.controller");
-const { authenticate, authorize } = require("../middleware/auth");
+const { checkPermission } = require("../middleware/permissions");
 
-// Tất cả các route export đều yêu cầu đăng nhập và quyền ADMIN
+// Tất cả các route export đều yêu cầu đăng nhập
 router.use(authenticate);
-router.use(authorize(["ADMIN"]));
+
+// Middleware kiểm tra quyền export chung cho cả module
+const checkExportPermission = checkPermission("reports", "export");
+
+router.use(checkExportPermission);
 
 // --- MASTER DATA ---
 router.get("/brand", BulkExportController.exportBrands);
