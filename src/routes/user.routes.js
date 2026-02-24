@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
+const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 const { sendSuccess } = require("../ultils/respone");
 
@@ -94,6 +95,26 @@ router.get(
     try {
       const user = await userService.getById(req.params.id);
       sendSuccess(res, user);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /users/:id/warehouses
+ * Lấy danh sách quyền kho của user - ADMIN hoặc QUAN_LY (vì họ được view users)
+ */
+router.get(
+  "/:id/warehouses",
+  authenticate,
+  checkRole("ADMIN"),
+  async (req, res, next) => {
+    try {
+      const permissions = await userService.getWarehousePermissions(
+        req.params.id,
+      );
+      sendSuccess(res, permissions);
     } catch (err) {
       next(err);
     }
