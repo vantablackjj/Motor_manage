@@ -1,0 +1,478 @@
+[
+  {
+    "id": 1,
+    "ma_quyen": "ADMIN",
+    "ten_quyen": "Quản trị viên",
+    "permissions": {
+      "debt": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "roles": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "users": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "reports": {
+        "view": true,
+        "export": true,
+        "view_financial": true
+      },
+      "invoices": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "partners": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "payments": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "approve": true
+      },
+      "products": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "approve": true,
+        "view_cost": true
+      },
+      "settings": {
+        "edit": true,
+        "view": true
+      },
+      "inventory": {
+        "view": true,
+        "adjust": true,
+        "export": true,
+        "import": true,
+        "transfer": true
+      },
+      "warehouses": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true
+      },
+      "sales_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "approve": true
+      },
+      "purchase_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "approve": true
+      }
+    }
+  },
+  {
+    "id": 2,
+    "ma_quyen": "KHO",
+    "ten_quyen": "Nhân viên kho",
+    "permissions": {
+      "debt": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false
+      },
+      "roles": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false
+      },
+      "users": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false
+      },
+      "reports": {
+        "view": true,
+        "export": true,
+        "view_financial": false
+      },
+      "invoices": {
+        "edit": false,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "partners": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "payments": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false,
+        "approve": false
+      },
+      "products": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false,
+        "view_cost": true
+      },
+      "settings": {
+        "edit": false,
+        "view": false
+      },
+      "inventory": {
+        "view": true,
+        "adjust": true,
+        "export": true,
+        "import": true,
+        "transfer": true
+      },
+      "warehouses": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "sales_orders": {
+        "edit": true,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true,
+        "approve": false
+      },
+      "purchase_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false
+      }
+    }
+  },
+  {
+    "id": 3,
+    "ma_quyen": "KE_TOAN",
+    "ten_quyen": "Kế toán",
+    "permissions": {
+      "debt": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "export": true
+      },
+      "roles": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false
+      },
+      "users": {
+        "edit": false,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true
+      },
+      "reports": {
+        "view": true,
+        "export": true,
+        "view_financial": true
+      },
+      "invoices": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "partners": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "payments": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "export": true,
+        "approve": true
+      },
+      "products": {
+        "edit": true,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true,
+        "approve": false,
+        "view_cost": true
+      },
+      "settings": {
+        "edit": false,
+        "view": true,
+        "export": true
+      },
+      "inventory": {
+        "view": true,
+        "adjust": false,
+        "export": true,
+        "import": true,
+        "transfer": false
+      },
+      "warehouses": {
+        "edit": false,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true
+      },
+      "sales_orders": {
+        "edit": true,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true,
+        "approve": true
+      },
+      "purchase_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": true
+      }
+    }
+  },
+  {
+    "id": 6,
+    "ma_quyen": "QUAN_LY",
+    "ten_quyen": "Quản lý",
+    "permissions": {
+      "debt": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "roles": {
+        "edit": false,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true
+      },
+      "users": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "reports": {
+        "view": true,
+        "export": true,
+        "view_financial": true
+      },
+      "invoices": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "partners": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": true,
+        "export": true
+      },
+      "payments": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": true
+      },
+      "products": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": true,
+        "view_cost": true
+      },
+      "settings": {
+        "edit": true,
+        "view": true,
+        "export": true
+      },
+      "inventory": {
+        "view": true,
+        "adjust": true,
+        "export": true,
+        "import": true,
+        "transfer": true
+      },
+      "warehouses": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "sales_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": true
+      },
+      "purchase_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": true
+      }
+    }
+  },
+  {
+    "id": 4,
+    "ma_quyen": "BAN_HANG",
+    "ten_quyen": "Nhân viên nghiệp vụ",
+    "permissions": {
+      "debt": {
+        "edit": false,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "roles": {
+        "edit": false,
+        "view": false,
+        "create": false,
+        "delete": false
+      },
+      "users": {
+        "edit": false,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true
+      },
+      "reports": {
+        "view": true,
+        "export": true,
+        "view_financial": false
+      },
+      "invoices": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "partners": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true
+      },
+      "payments": {
+        "edit": false,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false
+      },
+      "products": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false,
+        "view_cost": true
+      },
+      "settings": {
+        "edit": false,
+        "view": false
+      },
+      "inventory": {
+        "view": true,
+        "adjust": false,
+        "export": true,
+        "import": true,
+        "transfer": true
+      },
+      "warehouses": {
+        "edit": false,
+        "view": true,
+        "create": false,
+        "delete": false,
+        "export": true
+      },
+      "sales_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false
+      },
+      "purchase_orders": {
+        "edit": true,
+        "view": true,
+        "create": true,
+        "delete": false,
+        "export": true,
+        "approve": false
+      }
+    }
+  }
+]
