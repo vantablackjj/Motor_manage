@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const BulkExportController = require("../controllers/bulkExport.controller");
+const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
 
 // Tất cả các route export đều yêu cầu đăng nhập
