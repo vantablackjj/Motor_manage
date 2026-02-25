@@ -42,7 +42,11 @@ app.use(
     origin: (origin, callback) => {
       // Cho phép request không có origin (ví dụ: curl, mobile app, Postman)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+      if (
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.includes("*") ||
+        origin.endsWith(".vercel.app") // Cho phép các domain preview tự động của Vercel
+      ) {
         return callback(null, true);
       }
       callback(new Error(`CORS: Origin '${origin}' không được phép`));
