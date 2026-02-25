@@ -31,6 +31,7 @@ const bulkExportRoutes = require("./bulkExport.routes");
 const baoCaoRoutes = require("./baoCao.routes");
 const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
+const notificationRoutes = require("./notification.routes");
 
 // 1. PUBLIC ROUTES (Không cần đăng nhập)
 router.use("/auth", authRoutes);
@@ -87,5 +88,6 @@ router.use("/export", bulkExportRoutes);
 router.use("/bao-cao", baoCaoRoutes);
 router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
+router.use("/notifications", notificationRoutes);
 
 module.exports = router;

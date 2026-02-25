@@ -6,6 +6,7 @@ const { query, pool } = require("../config/database");
 const WarehouseService = require("./warehouse.service");
 const CongNoService = require("./congNo.service");
 const ThuChiService = require("./thuChi.service");
+const NotificationService = require("./notification.service");
 
 class OrderService {
   /**
@@ -101,7 +102,21 @@ class OrderService {
       }
 
       await client.query("COMMIT");
-      return orderRows[0];
+      const order = orderRows[0];
+
+      // Notify about new order
+      let title = "Đơn hàng mới";
+      if (order.loai_don_hang === "MUA_HANG") title = "Đơn mua hàng mới";
+      if (order.loai_don_hang === "BAN_HANG") title = "Đơn bán hàng mới";
+
+      NotificationService.notifyManagers(
+        title,
+        `Đơn hàng ${so_don_hang} đã được tạo bởi ${nguoi_tao}.`,
+        `/orders/view/${so_don_hang}`,
+        "SYSTEM",
+      ).catch((err) => console.error("Notification Error:", err));
+
+      return order;
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -793,7 +808,7 @@ class OrderService {
       );
     }
 
-    const res = await pool.query(
+    const updatedOrderResult = await pool.query(
       `UPDATE tm_don_hang 
        SET 
         trang_thai = $1::enum_trang_thai_don_hang, 
@@ -807,7 +822,18 @@ class OrderService {
       [status, userId, idOrNo],
     );
 
-    return res.rows[0];
+    const updatedOrder = updatedOrderResult.rows[0];
+
+    // Notify about status change
+    NotificationService.notifyUser(
+      updatedOrder.nguoi_tao,
+      "Trạng thái đơn hàng thay đổi",
+      `Đơn hàng ${updatedOrder.so_don_hang} đã chuyển sang trạng thái: ${status}`,
+      `/orders/view/${updatedOrder.so_don_hang}`,
+      "SYSTEM",
+    ).catch((err) => console.error("Notification Error:", err));
+
+    return updatedOrder;
   }
 
   // Manual Payment for Orders/Invoices (Thanh toán công nợ Mua Hàng)

@@ -29,6 +29,7 @@
     "pdfkit-table": "^0.1.99",
     "pg": "^8.11.3",
     "pg-copy-streams": "^7.0.0",
+    "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "winston": "^3.11.0",

@@ -2,10 +2,13 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
+const http = require("http");
+const { Server } = require("socket.io");
 const app = require("./src/app");
 const logger = require("./src/ultils/logger");
 const { pool } = require("./src/config/database");
 const MigrationRunner = require("./src/ultils/migrationRunner");
+const NotificationService = require("./src/services/notification.service");
 
 const PORT = process.env.PORT || 3000;
 
@@ -20,13 +23,11 @@ async function startServer() {
     logger.info("✅ Database connected successfully");
 
     // LỰC LƯỢNG CƯỠNG ÉP: Đảm bảo cột ma_kho tồn tại
-    // Điều này khắc phục lỗi "column u.ma_kho does not exist" ngay lập tức
     try {
       logger.info("Checking/Fixing sys_user structure...");
       await pool.query(`
         DO $$
         BEGIN
-            -- Thêm cột mà không cần REFERENCES để tránh lỗi khóa ngoại nếu bảng sys_kho chưa chuẩn
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
                 ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);
             END IF;
@@ -60,7 +61,34 @@ async function startServer() {
       logger.info("No pending migrations");
     }
 
-    const server = app.listen(PORT, () => {
+    // Initialize HTTP Server and Socket.io
+    const server = http.createServer(app);
+    const io = new Server(server, {
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"],
+        credentials: true,
+      },
+    });
+
+    NotificationService.setIo(io);
+
+    io.on("connection", (socket) => {
+      logger.info(`🔌 New client connected: ${socket.id}`);
+
+      socket.on("join", (user_id) => {
+        if (user_id) {
+          socket.join(`user_${user_id}`);
+          logger.info(`👤 User ${user_id} joined their private room`);
+        }
+      });
+
+      socket.on("disconnect", () => {
+        logger.info(`🔌 Client disconnected: ${socket.id}`);
+      });
+    });
+
+    server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
     });
 

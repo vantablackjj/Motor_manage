@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const CongNoService = require("./congNo.service");
+const NotificationService = require("./notification.service");
 
 class VehicleService {
   /**
@@ -253,6 +254,15 @@ class VehicleService {
       await client.query("COMMIT");
 
       const fullData = await this.getXeDetail(xeKey);
+
+      // Notify Managers about new vehicle needing approval
+      NotificationService.notifyManagers(
+        "Xe mới chờ duyệt",
+        `Nhân viên đã nhập xe mới: ${fullData.ten_loai} (SK: ${fullData.so_khung}). Vui lòng phê duyệt.`,
+        `/approval/vehicle/${xeKey}`,
+        "APPROVAL",
+      ).catch((err) => console.error("Notification Error:", err));
+
       return {
         success: true,
         data: fullData,
@@ -601,7 +611,17 @@ class VehicleService {
       };
     }
 
-    return result.rows[0];
+    const updatedXe = result.rows[0];
+
+    // Notify Managers about vehicle submission
+    NotificationService.notifyManagers(
+      "Yêu cầu duyệt xe",
+      `Xe ${xeKey} đã được gửi yêu cầu phê duyệt.`,
+      `/approval/vehicle/${xeKey}`,
+      "APPROVAL",
+    ).catch((err) => console.error("Notification Error:", err));
+
+    return updatedXe;
   }
 
   /**
@@ -653,7 +673,20 @@ class VehicleService {
       );
 
       await client.query("COMMIT");
-      return result.rows[0];
+      const approvedXe = result.rows[0];
+
+      // Notify the person who submitted the vehicle
+      if (approvedXe.nguoi_gui_duyet) {
+        NotificationService.notifyUser(
+          approvedXe.nguoi_gui_duyet,
+          "Xe đã được duyệt",
+          `Xe ${xeKey} của bạn đã được quản lý phê duyệt nhập kho.`,
+          `/inventory/vehicle/${xeKey}`,
+          "APPROVAL",
+        ).catch((err) => console.error("Notification Error:", err));
+      }
+
+      return approvedXe;
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -685,7 +718,20 @@ class VehicleService {
       throw { status: 400, message: "Xe không ở trạng thái CHỜ DUYỆT" };
     }
 
-    return result.rows[0];
+    const rejectedXe = result.rows[0];
+
+    // Notify the person who submitted the vehicle
+    if (rejectedXe.nguoi_gui_duyet) {
+      NotificationService.notifyUser(
+        rejectedXe.nguoi_gui_duyet,
+        "Xe bị từ chối duyệt",
+        `Xe ${xeKey} đã bị từ chối. Lý do: ${lyDo}`,
+        `/inventory/vehicle/${xeKey}`,
+        "APPROVAL",
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
+    return rejectedXe;
   }
 }
 

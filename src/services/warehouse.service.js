@@ -3,6 +3,7 @@
 // Handles both SERIAL (units) and BATCH (lo) goods
 
 const { query, pool } = require("../config/database");
+const NotificationService = require("./notification.service");
 
 class WarehouseService {
   /**
@@ -174,6 +175,24 @@ class WarehouseService {
         nguoi_thuc_hien,
         dien_giai: ghi_chu,
       });
+
+      // Check stock levels after exit
+      const stockInfo = result.rows[0];
+      if (stockInfo.so_luong_ton <= stockInfo.so_luong_toi_thieu) {
+        // Get product name
+        const prod = await client.query(
+          "SELECT ten_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = $1",
+          [ma_hang_hoa],
+        );
+        const ten_hang_hoa = prod.rows[0]?.ten_hang_hoa || ma_hang_hoa;
+
+        NotificationService.notifyManagers(
+          "Cảnh báo tồn kho thấp",
+          `Sản phẩm ${ten_hang_hoa} (${ma_hang_hoa}) tại kho ${ma_kho} đã chạm ngưỡng tối thiểu (${stockInfo.so_luong_ton}/${stockInfo.so_luong_toi_thieu}).`,
+          `/inventory/parts/${ma_hang_hoa}`,
+          "INVENTORY",
+        ).catch((err) => console.error("Notification Error:", err));
+      }
     }
   }
 
