@@ -6,6 +6,7 @@ const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../ultils/respone");
 
+const { pool } = require("../config/database");
 const hoaDonBanService = require("../services/hoaDonBan.service");
 const PdfService = require("../services/pdf.service");
 const Joi = require("joi");

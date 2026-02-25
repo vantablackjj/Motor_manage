@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { validate } = require("../middleware/validation");
 const { authenticate } = require("../middleware/auth");
 const { checkRole } = require("../middleware/roleCheck");
@@ -11,9 +12,59 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
 } = require("../middleware/auth");
+const { query } = require("../config/database");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
 const logger = require("../ultils/logger");
+
+// ============================================================
+// REFRESH TOKEN HELPERS (lưu/kiểm tra/thu hồi token trong DB)
+// ============================================================
+
+/** Lưu refresh token vào DB (lưu hash SHA-256, không lưu plain text) */
+const saveRefreshToken = async (userId, token, req) => {
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(
+    Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 ngày
+  );
+  await query(
+    `INSERT INTO sys_refresh_token (user_id, token_hash, expires_at, user_agent, ip_address)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, tokenHash, expiresAt, req.headers["user-agent"] || null, req.ip],
+  );
+  return tokenHash;
+};
+
+/** Kiểm tra refresh token có hợp lệ (tồn tại, chưa revoked, chưa hết hạn) */
+const validateRefreshTokenInDB = async (token) => {
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const result = await query(
+    `SELECT * FROM sys_refresh_token
+     WHERE token_hash = $1
+       AND revoked_at IS NULL
+       AND expires_at > NOW()`,
+    [tokenHash],
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+};
+
+/** Thu hồi refresh token khi logout */
+const revokeRefreshToken = async (token) => {
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  await query(
+    `UPDATE sys_refresh_token SET revoked_at = NOW() WHERE token_hash = $1`,
+    [tokenHash],
+  );
+};
+
+/** Thu hồi tất cả refresh token của 1 user (đổi mật khẩu, deactivate) */
+const revokeAllUserTokens = async (userId) => {
+  await query(
+    `UPDATE sys_refresh_token SET revoked_at = NOW()
+     WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId],
+  );
+};
 
 // ============================================================
 // VALIDATION SCHEMAS
@@ -71,6 +122,12 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
       return sendError(res, "Tên đăng nhập hoặc mật khẩu không đúng", 401);
     }
 
+    // Kiểm tra tài khoản có bị deactivate không
+    if (user.status === false || user.status === "false") {
+      logger.warn(`Login failed: Account deactivated - ${username}`);
+      return sendError(res, "Tài khoản đã bị vô hiệu hóa", 403);
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
@@ -82,6 +139,14 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
     // Generate tokens
     const accessToken = generateToken(user);
     const refreshToken = generateRefreshToken(user);
+
+    // Lưu refresh token vào DB để hỗ trợ revoke khi logout
+    try {
+      await saveRefreshToken(user.id, refreshToken, req);
+    } catch (tokenErr) {
+      // Nếu bảng chưa tồn tại (migration chưa chạy) thì bỏ qua, không block login
+      logger.warn("Could not save refresh token to DB:", tokenErr.message);
+    }
 
     // Update last login
     await User.updateLastLogin(user.id);
@@ -152,10 +217,40 @@ router.post(
     try {
       const { refresh_token } = req.body;
 
-      // Verify refresh token
-      const decoded = verifyRefreshToken(refresh_token);
+      // Bước 1: Verify JWT signature và expiry
+      let decoded;
+      try {
+        decoded = verifyRefreshToken(refresh_token);
+      } catch (err) {
+        if (err.name === "TokenExpiredError") {
+          return sendError(
+            res,
+            "Refresh token đã hết hạn. Vui lòng đăng nhập lại",
+            401,
+          );
+        }
+        return sendError(res, "Refresh token không hợp lệ", 401);
+      }
 
-      // Get user
+      // Bước 2: Kiểm tra token có trong DB và chưa bị thu hồi
+      try {
+        const dbToken = await validateRefreshTokenInDB(refresh_token);
+        if (!dbToken) {
+          logger.warn(
+            `Refresh token not found or revoked for user ID: ${decoded.id}`,
+          );
+          return sendError(
+            res,
+            "Refresh token đã bị thu hồi hoặc không hợp lệ. Vui lòng đăng nhập lại",
+            401,
+          );
+        }
+      } catch (dbErr) {
+        // Nếu bảng chưa tạo (migration chưa chạy), vẫn cho phép refresh
+        logger.warn("Could not validate refresh token in DB:", dbErr.message);
+      }
+
+      // Bước 3: Lấy user và cấp access token mới
       const user = await User.getById(decoded.id);
 
       if (!user) {
@@ -175,9 +270,6 @@ router.post(
         "Token refreshed successfully",
       );
     } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        return sendError(res, "Refresh token expired. Please login again", 401);
-      }
       next(error);
     }
   },
@@ -260,9 +352,23 @@ router.put(
 
       await User.changePassword(req.user.id, old_password, new_password);
 
+      // Thu hồi tất cả refresh token cũ khi đổi mật khẩu (force logout thiết bị khác)
+      try {
+        await revokeAllUserTokens(req.user.id);
+      } catch (dbErr) {
+        logger.warn(
+          "Could not revoke tokens after password change:",
+          dbErr.message,
+        );
+      }
+
       logger.info(`Password changed: ${req.user.username}`);
 
-      sendSuccess(res, null, "Đổi mật khẩu thành công");
+      sendSuccess(
+        res,
+        null,
+        "Đổi mật khẩu thành công. Vui lòng đăng nhập lại trên các thiết bị khác.",
+      );
     } catch (error) {
       if (error.message === "Mật khẩu cũ không đúng") {
         return sendError(res, error.message, 400);
@@ -279,8 +385,18 @@ router.put(
  */
 router.post("/logout", authenticate, async (req, res, next) => {
   try {
-    logger.info(`User logged out: ${req.user.username}`);
+    // Thu hồi refresh token khỏi DB nếu client gửi kèm
+    const { refresh_token } = req.body;
+    if (refresh_token) {
+      try {
+        await revokeRefreshToken(refresh_token);
+        logger.info(`Refresh token revoked for user: ${req.user.username}`);
+      } catch (dbErr) {
+        logger.warn("Could not revoke refresh token:", dbErr.message);
+      }
+    }
 
+    logger.info(`User logged out: ${req.user.username}`);
     sendSuccess(res, null, "Đăng xuất thành công");
   } catch (error) {
     next(error);

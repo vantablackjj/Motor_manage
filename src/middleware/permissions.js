@@ -7,6 +7,61 @@ const { query } = require("../config/database");
 const { sendError } = require("../ultils/respone");
 const { ROLES } = require("../config/constants");
 
+// ─── Permission Cache ─────────────────────────────────────────────────────────
+// Cache permissions theo role_id để tránh query DB mỗi request
+// TTL: 5 phút (300_000 ms)
+const PERMISSION_CACHE_TTL = 5 * 60 * 1000;
+const permissionCache = new Map(); // roleId → { permissions, expiresAt }
+
+/**
+ * Lấy permissions từ cache hoặc DB
+ */
+const fetchPermissions = async (roleId) => {
+  const cached = permissionCache.get(roleId);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.permissions;
+  }
+
+  const result = await query(`SELECT permissions FROM sys_role WHERE id = $1`, [
+    roleId,
+  ]);
+
+  if (result.rows.length === 0) return null;
+
+  const permissions = result.rows[0].permissions;
+  permissionCache.set(roleId, {
+    permissions,
+    expiresAt: Date.now() + PERMISSION_CACHE_TTL,
+  });
+
+  return permissions;
+};
+
+/**
+ * Xóa cache của một role (gọi sau khi cập nhật quyền role)
+ * @param {number|string} [roleId] - ID của role cần xóa cache; bỏ qua để xóa toàn bộ
+ */
+const clearPermissionCache = (roleId) => {
+  if (roleId !== undefined) {
+    permissionCache.delete(roleId);
+  } else {
+    permissionCache.clear();
+  }
+};
+
+// Tự dọn cache hết hạn mỗi 10 phút để tránh memory leak
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, val] of permissionCache.entries()) {
+      if (now >= val.expiresAt) permissionCache.delete(key);
+    }
+  },
+  10 * 60 * 1000,
+);
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
+
 /**
  * Middleware kiểm tra quyền theo module và action
  * @param {string} module - Tên module (vd: 'products', 'sales_orders', 'inventory')
@@ -26,17 +81,11 @@ const checkPermission = (module, action) => {
         return next();
       }
 
-      // Lấy permissions từ role
-      const result = await query(
-        `SELECT permissions FROM sys_role WHERE id = $1`,
-        [user.role_id],
-      );
+      const permissions = await fetchPermissions(user.role_id);
 
-      if (result.rows.length === 0) {
+      if (!permissions) {
         return sendError(res, "Role not found", 403);
       }
-
-      const permissions = result.rows[0].permissions;
 
       // Kiểm tra quyền cụ thể
       if (!permissions[module] || !permissions[module][action]) {
@@ -72,21 +121,15 @@ const checkAnyPermission = (...permissionPairs) => {
         return next();
       }
 
-      // Lấy permissions từ role
-      const result = await query(
-        `SELECT permissions FROM sys_role WHERE id = $1`,
-        [user.role_id],
-      );
+      const permissions = await fetchPermissions(user.role_id);
 
-      if (result.rows.length === 0) {
+      if (!permissions) {
         return sendError(res, "Role not found", 403);
       }
 
-      const permissions = result.rows[0].permissions;
-
       // Kiểm tra xem có ít nhất 1 quyền được thỏa mãn
-      const hasPermission = permissionPairs.some(([module, action]) => {
-        return permissions[module] && permissions[module][action];
+      const hasPermission = permissionPairs.some(([mod, act]) => {
+        return permissions[mod] && permissions[mod][act];
       });
 
       if (!hasPermission) {
@@ -122,21 +165,15 @@ const checkAllPermissions = (...permissionPairs) => {
         return next();
       }
 
-      // Lấy permissions từ role
-      const result = await query(
-        `SELECT permissions FROM sys_role WHERE id = $1`,
-        [user.role_id],
-      );
+      const permissions = await fetchPermissions(user.role_id);
 
-      if (result.rows.length === 0) {
+      if (!permissions) {
         return sendError(res, "Role not found", 403);
       }
 
-      const permissions = result.rows[0].permissions;
-
       // Kiểm tra xem có tất cả các quyền
-      const missingPermissions = permissionPairs.filter(([module, action]) => {
-        return !permissions[module] || !permissions[module][action];
+      const missingPermissions = permissionPairs.filter(([mod, act]) => {
+        return !permissions[mod] || !permissions[mod][act];
       });
 
       if (missingPermissions.length > 0) {
@@ -159,15 +196,8 @@ const checkAllPermissions = (...permissionPairs) => {
  * Dùng trong controller để kiểm tra điều kiện phức tạp
  */
 const getUserPermissions = async (userId, roleId) => {
-  const result = await query(`SELECT permissions FROM sys_role WHERE id = $1`, [
-    roleId,
-  ]);
-
-  if (result.rows.length === 0) {
-    return {};
-  }
-
-  return result.rows[0].permissions;
+  const permissions = await fetchPermissions(roleId);
+  return permissions || {};
 };
 
 /**
@@ -195,4 +225,5 @@ module.exports = {
   checkAllPermissions,
   getUserPermissions,
   attachPermissions,
+  clearPermissionCache,
 };
