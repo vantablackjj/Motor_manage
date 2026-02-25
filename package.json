@@ -32,6 +32,7 @@
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
+    "web-push": "^3.6.7",
     "winston": "^3.11.0",
     "xlsx": "^0.18.5"
   },

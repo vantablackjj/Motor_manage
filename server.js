@@ -9,6 +9,7 @@ const logger = require("./src/utils/logger");
 const { pool } = require("./src/config/database");
 const MigrationRunner = require("./src/utils/migrationRunner");
 const NotificationService = require("./src/services/notification.service");
+const PushNotificationService = require("./src/services/pushNotification.service");
 
 const PORT = process.env.PORT || 3000;
 
@@ -21,6 +22,9 @@ async function startServer() {
     // Kết nối thử DB
     await pool.query("SELECT NOW()");
     logger.info("✅ Database connected successfully");
+
+    // Khởi tạo VAPID cho Web Push Notifications
+    PushNotificationService.init();
 
     // LỰC LƯỢNG CƯỠNG ÉP: Đảm bảo cột ma_kho tồn tại
     try {

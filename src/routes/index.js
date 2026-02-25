@@ -32,9 +32,15 @@ const baoCaoRoutes = require("./baoCao.routes");
 const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
 const notificationRoutes = require("./notification.routes");
+const pushRoutes = require("./push.routes");
 
 // 1. PUBLIC ROUTES (Không cần đăng nhập)
 router.use("/auth", authRoutes);
+// vapid-public-key là public vì FE cần key trước khi user login để setup subscription
+router.get(
+  "/push/vapid-public-key",
+  require("../controllers/push.controller").getVapidPublicKey,
+);
 
 // 2. PROTECTED ROUTES (Cần đăng nhập & Cách ly kho)
 router.use(authenticate);
@@ -89,5 +95,6 @@ router.use("/bao-cao", baoCaoRoutes);
 router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/push", pushRoutes);
 
 module.exports = router;

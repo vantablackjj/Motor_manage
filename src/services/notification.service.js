@@ -1,5 +1,13 @@
 const Notification = require("../models/Notification");
 const { query } = require("../config/database");
+// Lazy-require để tránh circular dependency (push service cũng có thể dùng notification)
+let PushNotificationService = null;
+const getPushService = () => {
+  if (!PushNotificationService) {
+    PushNotificationService = require("./pushNotification.service");
+  }
+  return PushNotificationService;
+};
 
 class NotificationService {
   static io = null;
@@ -11,10 +19,25 @@ class NotificationService {
   static async createNotification(data) {
     const notification = await Notification.create(data);
 
-    // Push via socket if available
+    // 1. Real-time via Socket.io (chỉ hoạt động khi user đang mở tab)
     if (this.io) {
       this.io.to(`user_${data.user_id}`).emit("new_notification", notification);
     }
+
+    // 2. Web Push (hoạt động kể cả khi user ĐÓNG tab / tắt màn hình)
+    // Không await để không block response — lỗi push sẽ chỉ log, không throw
+    getPushService()
+      .sendToUser(data.user_id, {
+        title: data.title,
+        body: data.content,
+        url: data.link || "/",
+        tag: `notification-${notification.id}`,
+        data: { notification_id: notification.id, link: data.link },
+      })
+      .catch((err) => {
+        const logger = require("../utils/logger");
+        logger.error("Push notification background error:", err.message);
+      });
 
     return notification;
   }

@@ -20,9 +20,21 @@ class DonHangMuaXeService {
    * thanh_tien = (tong_gia_tri - chiet_khau) * (1 + vat_percentage/100)
    */
   _calcThanhTien(tongGiaTri, chietKhau, vatPercentage) {
-    const base = Number(tongGiaTri || 0) - Number(chietKhau || 0);
-    const vat = (base * Number(vatPercentage || 0)) / 100;
-    return base + vat;
+    const total = Number(tongGiaTri || 0);
+    const ck = Number(chietKhau || 0);
+    const vat = Number(vatPercentage || 0);
+
+    // Chiết khấu không được vượt quá tổng giá trị
+    if (ck > total && total > 0) {
+      throw {
+        status: 400,
+        message: `Chiết khấu (${ck}) không được lớn hơn tổng giá trị đơn hàng (${total})`,
+      };
+    }
+
+    const base = total - ck;
+    const vatAmount = (base * vat) / 100;
+    return base + vatAmount;
   }
 
   _validateCreateDetail(data) {
@@ -108,55 +120,41 @@ class DonHangMuaXeService {
 
     return withTransaction(pool, async (client) => {
       const soPhieu = await this._generateSoPhieu(client);
-      const chietKhau = Number(data.chiet_khau || 0);
-      const vatPercentage = Number(data.vat_percentage || 0);
+      const chietKhau = Number(data.chiet_khau ?? 0);
+      const vatPercentage = Number(data.vat_percentage ?? 0);
+      // Đơn tạo riêng (không có chi tiết) thì tong_gia_tri = 0, sau này thêm chi tiết sẽ update
+      const tongGiaTri = 0;
+      const thanhTien = this._calcThanhTien(
+        tongGiaTri,
+        chietKhau,
+        vatPercentage,
+      );
 
       const result = await client.query(
         `
         INSERT INTO tm_don_hang (
-          so_don_hang,
-          ngay_dat_hang,
-          ma_ben_nhap,
-          loai_ben_nhap,
-          ma_ben_xuat,
-          loai_ben_xuat,
-          tong_gia_tri,
-          chiet_khau,
-          vat_percentage,
-          thanh_tien,
-          trang_thai,
-          nguoi_tao,
-          loai_don_hang,
-          ghi_chu,
-          created_at
+          so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
+          ma_ben_xuat, loai_ben_xuat, tong_gia_tri, chiet_khau,
+          vat_percentage, thanh_tien, trang_thai, nguoi_tao, loai_don_hang, ghi_chu, created_at
         ) VALUES (
-          $1,
-          CURRENT_DATE,
-          $2,
-          'KHO',
-          $3,
-          'DOI_TAC',
-          0,
-          $4,
-          $5,
-          0,
-          $6,
-          $7,
-          'MUA_XE',
-          $8,
-          NOW()
+          $1, COALESCE($9::date, CURRENT_DATE), $2, 'KHO',
+          $3, 'DOI_TAC', $4, $5,
+          $6, $7, $8, $10, 'MUA_XE', $11, NOW()
         )
         RETURNING *
         `,
         [
-          soPhieu,
-          data.ma_kho_nhap,
-          data.ma_ncc,
-          chietKhau,
-          vatPercentage,
-          TRANG_THAI.NHAP,
-          userId,
-          data.ghi_chu || null,
+          soPhieu, // $1
+          data.ma_kho_nhap, // $2
+          data.ma_ncc, // $3
+          tongGiaTri, // $4
+          chietKhau, // $5
+          vatPercentage, // $6
+          thanhTien, // $7
+          TRANG_THAI.NHAP, // $8
+          data.ngay_dat_hang || null, // $9
+          String(userId), // $10
+          data.ghi_chu || null, // $11
         ],
       );
 
@@ -169,10 +167,8 @@ class DonHangMuaXeService {
    * ========================= */
 
   async createDonHangWithDetails(data, userId) {
-    // Validate header
     this._validateCreateHeader(data);
 
-    // Validate chi_tiet array
     if (
       !data.chi_tiet ||
       !Array.isArray(data.chi_tiet) ||
@@ -181,131 +177,88 @@ class DonHangMuaXeService {
       throw { status: 400, message: "Chi tiết đơn hàng không được để trống" };
     }
 
-    // Validate each detail item
     for (const item of data.chi_tiet) {
       this._validateCreateDetail(item);
     }
 
     return withTransaction(pool, async (client) => {
-      // 1. Generate so_phieu
       const soPhieu = await this._generateSoPhieu(client);
-      const chietKhau = Number(data.chiet_khau || 0);
-      const vatPercentage = Number(data.vat_percentage || 0);
 
-      // 2. Insert order header
+      // Dùng ?? thay || để không bị falsy khi giá trị hợp lệ là 0
+      const chietKhau = Number(data.chiet_khau ?? 0);
+      const vatPercentage = Number(data.vat_percentage ?? 0);
+
+      // Tính tổng giá trị từ chi tiết TRƯỚC khi INSERT header
+      // → loại bỏ pattern "INSERT với 0 rồi UPDATE" vốn gây ra nhiều nhầm lẫn
+      let tongGiaTri = 0;
+      for (const item of data.chi_tiet) {
+        tongGiaTri += Number(item.so_luong) * Number(item.don_gia);
+      }
+
+      // thanh_tien = (tong_gia_tri - chiet_khau) * (1 + vat%/100)
+      const thanhTien = this._calcThanhTien(
+        tongGiaTri,
+        chietKhau,
+        vatPercentage,
+      );
+
+      // INSERT header 1 lần với giá trị đầy đủ và chính xác
       const headerResult = await client.query(
-        `
-        INSERT INTO tm_don_hang (
-          so_don_hang,
-          ngay_dat_hang,
-          ma_ben_nhap,
-          loai_ben_nhap,
-          ma_ben_xuat,
-          loai_ben_xuat,
-          tong_gia_tri,
-          chiet_khau,
-          vat_percentage,
-          thanh_tien,
-          trang_thai,
-          nguoi_tao,
-          loai_don_hang,
-          ghi_chu,
-          created_at
+        `INSERT INTO tm_don_hang (
+          so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
+          ma_ben_xuat, loai_ben_xuat, tong_gia_tri, chiet_khau,
+          vat_percentage, thanh_tien, trang_thai, nguoi_tao,
+          loai_don_hang, ghi_chu, created_at
         ) VALUES (
-          $1,
-          CURRENT_DATE,
-          $2,
-          'KHO',
-          $3,
-          'DOI_TAC',
-          0,
-          $4,
-          $5,
-          0,
-          $6,
-          $7,
-          'MUA_XE',
-          $8,
-          NOW()
+          $1, COALESCE($9::date, CURRENT_DATE), $2, 'KHO',
+          $3, 'DOI_TAC', $4, $5,
+          $6, $7, $8, $10,
+          'MUA_XE', $11, NOW()
         )
-        RETURNING *
-        `,
+        RETURNING *`,
         [
-          soPhieu,
-          data.ma_kho_nhap,
-          data.ma_ncc,
-          chietKhau,
-          vatPercentage,
-          TRANG_THAI.NHAP,
-          userId,
-          data.ghi_chu || null,
+          soPhieu, // $1  so_don_hang
+          data.ma_kho_nhap, // $2  ma_ben_nhap
+          data.ma_ncc, // $3  ma_ben_xuat
+          tongGiaTri, // $4  tong_gia_tri
+          chietKhau, // $5  chiet_khau
+          vatPercentage, // $6  vat_percentage
+          thanhTien, // $7  thanh_tien
+          TRANG_THAI.NHAP, // $8  trang_thai
+          data.ngay_dat_hang || null, // $9  ngay_dat_hang (optional)
+          String(userId), // $10 nguoi_tao
+          data.ghi_chu || null, // $11 ghi_chu
         ],
       );
 
-      const header = headerResult.rows[0];
-
-      // 3. Insert all detail items
+      // INSERT tất cả chi tiết đơn hàng
       const chiTietResults = [];
-      let tongGiaTri = 0;
-
       for (let i = 0; i < data.chi_tiet.length; i++) {
         const item = data.chi_tiet[i];
-        const stt = i + 1;
-        tongGiaTri += Number(item.so_luong) * Number(item.don_gia);
-
         const yeuCauDacBiet = item.ma_mau
           ? JSON.stringify({ ma_mau: item.ma_mau })
           : "{}";
 
-        // NOTE: thanh_tien is GENERATED STORED column in new schema, do not insert it
         const detailResult = await client.query(
-          `
-            INSERT INTO tm_don_hang_chi_tiet (
-              so_don_hang,
-              stt,
-              ma_hang_hoa,
-              yeu_cau_dac_biet,
-              so_luong_dat,
-              don_gia
-            ) VALUES ($1,$2,$3,$4::jsonb,$5,$6)
-            RETURNING *
-            `,
+          `INSERT INTO tm_don_hang_chi_tiet (
+              so_don_hang, stt, ma_hang_hoa, yeu_cau_dac_biet, so_luong_dat, don_gia
+            ) VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+            RETURNING *`,
           [
             soPhieu,
-            stt,
+            i + 1,
             item.ma_loai_xe,
             yeuCauDacBiet,
             item.so_luong,
             item.don_gia,
           ],
         );
-
         chiTietResults.push(detailResult.rows[0]);
       }
 
-      // 4. Cập nhật tong_gia_tri và thanh_tien (đã trừ CK, cộng VAT)
-      const thanhTien = this._calcThanhTien(
-        tongGiaTri,
-        chietKhau,
-        vatPercentage,
-      );
-      await client.query(
-        `
-        UPDATE tm_don_hang
-        SET tong_gia_tri = $2,
-            thanh_tien   = $3
-        WHERE so_don_hang = $1
-        `,
-        [soPhieu, tongGiaTri, thanhTien],
-      );
-
-      // 5. Return complete order with details
+      // Trả về toàn bộ header từ DB (RETURNING *) — authoritative, không cần merge JS
       return {
-        ...header,
-        tong_gia_tri: tongGiaTri,
-        chiet_khau: chietKhau,
-        vat_percentage: vatPercentage,
-        thanh_tien: thanhTien,
+        ...headerResult.rows[0],
         chi_tiet: chiTietResults,
       };
     });
