@@ -84,6 +84,26 @@ class OrderService {
       // Insert Details
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        let final_ma_hang_hoa = item.ma_hang_hoa;
+        let final_yeu_cau_dac_biet = item.yeu_cau_dac_biet || {};
+
+        // Auto-resolve serial if provided as ma_hang_hoa for Vehicles
+        if (
+          item.loai_hang === "XE" ||
+          (final_ma_hang_hoa && final_ma_hang_hoa.startsWith("XE"))
+        ) {
+          const serialCheck = await client.query(
+            "SELECT ma_hang_hoa FROM tm_hang_hoa_serial WHERE ma_serial = $1",
+            [final_ma_hang_hoa],
+          );
+          if (serialCheck.rowCount > 0) {
+            final_ma_hang_hoa = serialCheck.rows[0].ma_hang_hoa;
+            if (!final_yeu_cau_dac_biet.ma_serial) {
+              final_yeu_cau_dac_biet.ma_serial = item.ma_hang_hoa;
+            }
+          }
+        }
+
         await client.query(
           `
           INSERT INTO tm_don_hang_chi_tiet (
@@ -93,10 +113,10 @@ class OrderService {
           [
             so_don_hang,
             i + 1,
-            item.ma_hang_hoa,
+            final_ma_hang_hoa,
             item.so_luong_dat,
             item.don_gia,
-            JSON.stringify(item.yeu_cau_dac_biet || {}),
+            JSON.stringify(final_yeu_cau_dac_biet),
           ],
         );
       }
@@ -163,7 +183,24 @@ class OrderService {
       );
       const nextStt = sttRes.rows[0].next_stt;
 
-      // 3. Insert item
+      // 3. Resolve ma_hang_hoa if it's a vehicle serial
+      let final_ma_hang_hoa = ma_hang_hoa;
+      let final_yeu_cau_dac_biet = yeu_cau_dac_biet || {};
+
+      if (loai_hang === "XE" || (ma_hang_hoa && ma_hang_hoa.startsWith("XE"))) {
+        const serialCheck = await client.query(
+          "SELECT ma_hang_hoa FROM tm_hang_hoa_serial WHERE ma_serial = $1",
+          [ma_hang_hoa],
+        );
+        if (serialCheck.rowCount > 0) {
+          final_ma_hang_hoa = serialCheck.rows[0].ma_hang_hoa;
+          if (!final_yeu_cau_dac_biet.ma_serial) {
+            final_yeu_cau_dac_biet.ma_serial = ma_hang_hoa;
+          }
+        }
+      }
+
+      // 4. Insert item
       await client.query(
         `INSERT INTO tm_don_hang_chi_tiet (
           so_don_hang, stt, ma_hang_hoa, so_luong_dat, don_gia, yeu_cau_dac_biet
@@ -171,10 +208,10 @@ class OrderService {
         [
           order.so_don_hang,
           nextStt,
-          ma_hang_hoa,
+          final_ma_hang_hoa,
           so_luong_dat,
           don_gia,
-          JSON.stringify(yeu_cau_dac_biet || {}),
+          JSON.stringify(final_yeu_cau_dac_biet),
         ],
       );
 

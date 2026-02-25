@@ -35,29 +35,46 @@ const warehouseIsolation = (req, res, next) => {
       );
     }
 
-    const warehouseFields = [
-      "ma_kho",
-      "ma_kho_nhap",
-      "ma_kho_xuat",
-      "kho_id",
-      "ma_kho_hien_tai",
-      "ma_ben_nhap",
-      "ma_ben_xuat",
-      "fromKho",
-      "toKho",
-      "tu_ma_kho",
-      "den_ma_kho",
+    const singularFields = ["ma_kho", "kho_id", "ma_kho_hien_tai"];
+    const pairFields = [
+      ["ma_kho_xuat", "ma_kho_nhap"],
+      ["ma_ben_xuat", "ma_ben_nhap"],
+      ["tu_ma_kho", "den_ma_kho"],
+      ["fromKho", "toKho"],
     ];
 
     const forceWarehouse = (obj) => {
       if (!obj || typeof obj !== "object") return;
-      warehouseFields.forEach((field) => {
+
+      // 1. Handle singular fields
+      singularFields.forEach((field) => {
         if (obj[field]) obj[field] = user.ma_kho;
       });
-      // Always inject primary ma_kho to be sure
+
+      // 2. Handle pair fields (Source/Destination)
+      // For transfers, we allow xuat/nhap to be different, but at least one MUST be the user's warehouse
+      pairFields.forEach(([xuat, nhap]) => {
+        const hasXuat = !!obj[xuat];
+        const hasNhap = !!obj[nhap];
+
+        if (hasXuat && hasNhap) {
+          // If both are provided, at least one must belong to the user
+          if (obj[xuat] !== user.ma_kho && obj[nhap] !== user.ma_kho) {
+            // If neither matches, force the 'near' side based on context or default to source
+            // For security, if they are restricted, they can only initiate from their warehouse
+            obj[xuat] = user.ma_kho;
+          }
+        } else if (hasXuat) {
+          obj[xuat] = user.ma_kho;
+        } else if (hasNhap) {
+          obj[nhap] = user.ma_kho;
+        }
+      });
+
+      // 3. Always set primary ma_kho to be sure for other filters
       obj.ma_kho = user.ma_kho;
 
-      // Handle nested params object (common in export/report routes)
+      // Handle nested params object
       if (obj.params && typeof obj.params === "object") {
         forceWarehouse(obj.params);
       }
@@ -72,12 +89,22 @@ const warehouseIsolation = (req, res, next) => {
     // 3. Xử lý URL Params
     if (req.params) forceWarehouse(req.params);
 
-    // Cưỡng ép thêm dựa trên URL cho chắc chắn
+    // 4. Force specific fields based on Route
     if (req.method === "POST" || req.method === "PUT") {
-      if (req.originalUrl.includes("don-hang-mua"))
-        req.body.ma_kho_nhap = user.ma_kho;
-      if (req.originalUrl.includes("hoa-don-ban"))
-        req.body.ma_kho_xuat = user.ma_kho;
+      const url = req.originalUrl;
+      if (url.includes("don-hang-mua")) req.body.ma_kho_nhap = user.ma_kho;
+      if (url.includes("hoa-don-ban")) req.body.ma_kho_xuat = user.ma_kho;
+
+      // For chuyen-kho, if it's a restricted user, we must ensure at least one side is theirs
+      if (url.includes("chuyen-kho")) {
+        if (
+          req.body.ma_kho_xuat !== user.ma_kho &&
+          req.body.ma_kho_nhap !== user.ma_kho
+        ) {
+          // If neither side is the user's warehouse, default the source to their warehouse
+          req.body.ma_kho_xuat = user.ma_kho;
+        }
+      }
     }
   }
 
