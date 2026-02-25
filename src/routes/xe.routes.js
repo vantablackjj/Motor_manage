@@ -11,6 +11,18 @@ const {
 } = require("../validations/xe.validation");
 
 /**
+ * @route   GET /api/xe
+ * @desc    Lấy danh sách xe với filters (search, limit, offset, ma_kho, trang_thai)
+ * @access  Private (products.view)
+ */
+router.get(
+  "/",
+  authenticate,
+  checkPermission("products", "view"),
+  xeController.getAll,
+);
+
+/**
  * @route   GET /api/xe/:xe_key
  * @desc    Lấy chi tiết xe theo xe_key
  * @access  Private (products.view)

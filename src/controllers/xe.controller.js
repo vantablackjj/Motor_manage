@@ -3,6 +3,17 @@ const VehicleService = require("../services/themXe.service");
 const { sendSuccess, sendError } = require("../utils/response");
 
 class XeController {
+  // Lấy tất cả danh sách xe với filters
+  async getAll(req, res, next) {
+    try {
+      const filters = req.query;
+      const data = await Xe.getAll(filters);
+      sendSuccess(res, data, "Lấy danh sách xe thành công");
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Lấy xe theo xe_key
   async getByXeKey(req, res, next) {
     try {

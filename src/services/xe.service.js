@@ -1,6 +1,73 @@
 const { query, pool } = require("../config/database");
 
 class Xe {
+  // Lấy tất cả danh sách xe với filters
+  static async getAll(filters = {}) {
+    let sql = `
+      SELECT 
+        x.ma_serial as xe_key, x.ma_hang_hoa as ma_loai_xe, x.serial_identifier as so_khung,
+        x.trang_thai, x.locked, x.locked_reason, x.ngay_nhap_kho as ngay_nhap,
+        hh.ten_hang_hoa as ten_loai, m.ten_mau,
+        k.ten_kho, (x.thuoc_tinh_rieng->>'so_may') as so_may,
+        x.gia_von as gia_nhap
+      FROM tm_hang_hoa_serial x
+      INNER JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
+      LEFT JOIN dm_mau m ON (x.thuoc_tinh_rieng->>'ma_mau') = m.ma_mau
+      WHERE 1=1
+    `;
+
+    const params = [];
+    let idx = 1;
+
+    if (filters.ma_kho || filters.ma_kho_hien_tai) {
+      const ma_kho = filters.ma_kho || filters.ma_kho_hien_tai;
+      sql += ` AND x.ma_kho_hien_tai = $${idx++}`;
+      params.push(ma_kho);
+    }
+
+    if (filters.trang_thai) {
+      sql += ` AND x.trang_thai = $${idx++}`;
+      params.push(filters.trang_thai);
+    }
+
+    if (filters.ma_loai_xe) {
+      sql += ` AND x.ma_hang_hoa = $${idx++}`;
+      params.push(filters.ma_loai_xe);
+    }
+
+    if (filters.search) {
+      sql += ` AND (
+        x.serial_identifier ILIKE $${idx}
+        OR (x.thuoc_tinh_rieng->>'so_may') ILIKE $${idx}
+        OR hh.ten_hang_hoa ILIKE $${idx}
+        OR x.ma_serial ILIKE $${idx}
+      )`;
+      params.push(`%${filters.search}%`);
+      idx++;
+    }
+
+    if (filters.locked !== undefined) {
+      sql += ` AND x.locked = $${idx++}`;
+      params.push(filters.locked === "true" || filters.locked === true);
+    }
+
+    sql += " ORDER BY x.created_at DESC";
+
+    if (filters.limit) {
+      sql += ` LIMIT $${idx++}`;
+      params.push(parseInt(filters.limit));
+    }
+
+    if (filters.offset) {
+      sql += ` OFFSET $${idx++}`;
+      params.push(parseInt(filters.offset));
+    }
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
   // Lấy xe theo xe_key
   static async getByXeKey(xe_key) {
     const result = await query(
