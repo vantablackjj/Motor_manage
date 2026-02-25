@@ -1,131 +1,64 @@
 const express = require("express");
 const router = express.Router();
+const khoController = require("../controllers/kho.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
-const { sendSuccess, sendError } = require("../ultils/respone");
-const Kho = require("../services/kho.service");
-const Joi = require("joi");
+const {
+  createKhoSchema,
+  updateKhoSchema,
+} = require("../validations/kho.validation");
 
-// Validation schemas
-const createKhoSchema = Joi.object({
-  ma_kho: Joi.string().max(50),
-  ten_kho: Joi.string().required().max(200),
-  dia_chi: Joi.string().max(500).allow("", null),
-  dien_thoai: Joi.string().max(50).allow("", null),
-  loai_kho: Joi.string().valid("CHINH", "DAILY").required(),
-  mac_dinh: Joi.boolean().default(false),
-  ghi_chu: Joi.string().allow("", null),
-});
+/**
+ * @route   GET /api/kho
+ * @desc    Lấy danh sách các kho trong hệ thống
+ * @access  Private
+ */
+router.get("/", authenticate, khoController.getAll);
 
-const updateKhoSchema = Joi.object({
-  ten_kho: Joi.string().required().max(200),
-  dia_chi: Joi.string().max(500).allow("", null),
-  dien_thoai: Joi.string().max(50).allow("", null),
-  mac_dinh: Joi.boolean(),
-  chinh: Joi.boolean(),
-  daily: Joi.boolean(),
-  ghi_chu: Joi.string().allow("", null),
-});
+/**
+ * @route   GET /api/kho/:ma_kho
+ * @desc    Lấy chi tiết thông tin kho
+ * @access  Private
+ */
+router.get("/:ma_kho", authenticate, khoController.getByMa);
 
-// GET /api/kho - Lấy danh sách kho
-router.get("/", authenticate, async (req, res, next) => {
-  try {
-    const filters = {
-      chinh:
-        req.query.chinh === "true"
-          ? true
-          : req.query.chinh === "false"
-            ? false
-            : undefined,
-      daily:
-        req.query.daily === "true"
-          ? true
-          : req.query.daily === "false"
-            ? false
-            : undefined,
-    };
-
-    const data = await Kho.getAll(filters);
-    sendSuccess(res, data, "Lấy danh sách kho thành công");
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/kho/:ma_kho - Lấy chi tiết kho
-router.get("/:id", authenticate, async (req, res, next) => {
-  try {
-    const { ma_kho } = req.params;
-    const data = await Kho.getByMaKho(ma_kho);
-
-    if (!data) {
-      return sendError(res, "Kho không tồn tại", 404);
-    }
-
-    sendSuccess(res, data, "Lấy thông tin kho thành công");
-  } catch (error) {
-    next(error);
-  }
-});
-
-// POST tạo kho mới - chỉ QUAN_LY, ADMIN
+/**
+ * @route   POST /api/kho
+ * @desc    Tạo kho mới
+ * @access  Private (warehouses.create)
+ */
 router.post(
   "/",
   authenticate,
   checkPermission("warehouses", "create"),
   validate(createKhoSchema),
-  async (req, res, next) => {
-    try {
-      const data = await Kho.create(req.body);
-      sendSuccess(res, data, "Tạo kho thành công", 201);
-    } catch (error) {
-      next(error);
-    }
-  },
+  khoController.create,
 );
 
-// PUT cập nhật kho - QUAN_LY, ADMIN
+/**
+ * @route   PUT /api/kho/:ma_kho
+ * @desc    Cập nhật thông tin kho
+ * @access  Private (warehouses.edit)
+ */
 router.put(
   "/:ma_kho",
   authenticate,
   checkPermission("warehouses", "edit"),
   validate(updateKhoSchema),
-  async (req, res, next) => {
-    try {
-      const { ma_kho } = req.params;
-      const data = await Kho.update(ma_kho, req.body);
-
-      if (!data) {
-        return sendError(res, "Kho không tồn tại", 404);
-      }
-
-      sendSuccess(res, data, "Cập nhật kho thành công");
-    } catch (error) {
-      next(error);
-    }
-  },
+  khoController.update,
 );
 
-// DELETE xóa kho (soft delete) - chỉ ADMIN
+/**
+ * @route   DELETE /api/kho/:id
+ * @desc    Xóa kho (soft delete)
+ * @access  Private (warehouses.delete)
+ */
 router.delete(
   "/:id",
   authenticate,
   checkPermission("warehouses", "delete"),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const data = await Kho.softDeleteById(id);
-
-      if (!data) {
-        return sendError(res, "Kho không tồn tại", 404);
-      }
-
-      sendSuccess(res, data, "Xóa kho thành công");
-    } catch (error) {
-      next(error);
-    }
-  },
+  khoController.delete,
 );
 
 module.exports = router;

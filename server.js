@@ -5,9 +5,9 @@ if (process.env.NODE_ENV !== "production") {
 const http = require("http");
 const { Server } = require("socket.io");
 const app = require("./src/app");
-const logger = require("./src/ultils/logger");
+const logger = require("./src/utils/logger");
 const { pool } = require("./src/config/database");
-const MigrationRunner = require("./src/ultils/migrationRunner");
+const MigrationRunner = require("./src/utils/migrationRunner");
 const NotificationService = require("./src/services/notification.service");
 
 const PORT = process.env.PORT || 3000;

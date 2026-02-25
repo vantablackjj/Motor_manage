@@ -42,7 +42,7 @@ class Kho {
   // Tạo kho mới
   static async create(data) {
     const { ten_kho, dia_chi, dien_thoai, loai_kho, ghi_chu } = data;
-    const { generateCode } = require("../ultils/codeGenerator");
+    const { generateCode } = require("../utils/codeGenerator");
     const ma_kho = await generateCode("sys_kho", "ma_kho", "KHO");
 
     // Map loai_kho sang chinh / daily

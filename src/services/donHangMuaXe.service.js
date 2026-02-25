@@ -1,6 +1,6 @@
 const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
-const { withTransaction } = require("../ultils/transaction");
+const { withTransaction } = require("../utils/transaction");
 const VehicleService = require("./themXe.service");
 const CongNoService = require("./congNo.service");
 

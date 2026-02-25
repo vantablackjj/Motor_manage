@@ -1,6 +1,6 @@
 
 const Joi = require('joi');
-const { sendError } = require('../ultils/respone');
+const { sendError } = require('../utils/response');
 
 const validate = (schema) => {
   return (req, res, next) => {

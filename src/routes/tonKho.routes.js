@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const InventoryService = require('../services/tonKho.service');
-const { sendSuccess, sendError } = require('../ultils/respone');
+const { sendSuccess, sendError } = require('../utils/response');
 
 // Lấy tất cả tồn kho
 router.get('/', async (req, res) => {

@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
-const { sendError } = require("../ultils/respone");
+const { sendError } = require("../utils/response");
 const User = require("../models/User");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 /**
  * Middleware xác thực JWT token

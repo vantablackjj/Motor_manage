@@ -145,7 +145,7 @@ class ProductCatalogService {
    * Create new product
    */
   static async create(data) {
-    const { generateCode } = require("../ultils/codeGenerator");
+    const { generateCode } = require("../utils/codeGenerator");
     // 1. Validate brand and get required specs
     const brandResult = await query(
       `SELECT ten_nhom, thong_so_bat_buoc, status FROM dm_nhom_hang WHERE ma_nhom = $1`,

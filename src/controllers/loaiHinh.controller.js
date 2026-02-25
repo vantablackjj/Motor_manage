@@ -1,6 +1,6 @@
 // controllers/color.controller.js
 const loaiHinhService = require("../services/loaiHinh.service");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 
 exports.getAll = async (req, res, next) => {
   try {

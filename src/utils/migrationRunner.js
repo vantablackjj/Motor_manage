@@ -7,7 +7,7 @@ require("dotenv").config();
 const fs = require("fs").promises;
 const path = require("path");
 const { pool } = require("../config/database");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 class MigrationRunner {
   constructor() {

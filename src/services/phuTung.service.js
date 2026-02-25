@@ -147,7 +147,7 @@ class PhuTung {
     try {
       await client.query("BEGIN");
 
-      const { generateCode } = require("../ultils/codeGenerator");
+      const { generateCode } = require("../utils/codeGenerator");
       const ma_pt_gen = await generateCode("tm_hang_hoa", "ma_hang_hoa", "SP");
 
       const { ten_pt, don_vi_tinh, nhom_pt, gia_nhap, gia_ban, vat, ghi_chu } =

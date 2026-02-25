@@ -1,5 +1,5 @@
-const logger = require("../ultils/logger");
-const { sendError } = require("../ultils/respone");
+const logger = require("../utils/logger");
+const { sendError } = require("../utils/response");
 
 const errorHandler = (err, req, res, next) => {
   logger.error("Error occurred:", {

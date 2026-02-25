@@ -1,6 +1,6 @@
 // controllers/noiSx.controller.js
 const NoiSxService = require("../services/noiSx.service");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 
 exports.getAll = async (req, res, next) => {
   try {

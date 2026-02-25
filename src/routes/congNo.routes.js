@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
-const { sendSuccess } = require("../ultils/respone");
+const { sendSuccess } = require("../utils/response");
 const congNoService = require("../services/congNo.service");
 
 // GET /api/cong-no - Tổng hợp công nợ

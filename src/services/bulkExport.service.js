@@ -1,5 +1,5 @@
 const ExcelJS = require("exceljs");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 class BulkExportService {
   /**

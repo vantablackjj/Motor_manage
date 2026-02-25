@@ -7,7 +7,7 @@ const rateLimit = require("express-rate-limit");
 const { swaggerUi, swaggerSpec } = require("./config/swagger");
 const routes = require("./routes");
 const errorHandler = require("./middleware/errorHandler");
-const logger = require("./ultils/logger");
+const logger = require("./utils/logger");
 
 const app = express();
 
@@ -30,7 +30,10 @@ if (process.env.NODE_ENV === "development") {
 
 // ─── 4. CORS ─────────────────────────────────────────────────────────────────
 // Hỗ trợ nhiều origin (phân cách bởi dấu phẩy trong CORS_ORIGIN)
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5001")
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ||
+  "http://localhost:5173,https://manage-motor-fe-12un.vercel.app"
+)
   .split(",")
   .map((o) => o.trim());
 

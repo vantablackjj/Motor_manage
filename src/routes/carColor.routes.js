@@ -6,7 +6,7 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { checkRole } = require('../middleware/roleCheck');
 const { validate } = require('../middleware/validation');
-const { sendSuccess, sendError } = require('../ultils/respone');
+const { sendSuccess, sendError } = require('../utils/response');
 
 const CarColorService = require('../services/carColor.service');
 

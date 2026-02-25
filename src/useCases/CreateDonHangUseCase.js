@@ -9,7 +9,7 @@ const HangHoaRepository = require("../repositories/HangHoaRepository");
 const DoiTacRepository = require("../repositories/DoiTacRepository");
 const KhoRepository = require("../repositories/KhoRepository");
 const TonKhoRepository = require("../repositories/TonKhoRepository");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 class CreateDonHangUseCase {
   /**

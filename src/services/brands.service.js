@@ -63,7 +63,7 @@ class BrandService {
     // Priority: ma_nhom_cha > type > default "XE"
     const parentGroup = ma_nhom_cha || type || "XE";
 
-    const { generateCode } = require("../ultils/codeGenerator");
+    const { generateCode } = require("../utils/codeGenerator");
 
     // Generate code
     const ma_nh = await generateCode("dm_nhom_hang", "ma_nhom", "NH");

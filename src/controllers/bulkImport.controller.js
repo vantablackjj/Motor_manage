@@ -1,5 +1,5 @@
 const BulkImportService = require("../services/bulkImport.service");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 const fs = require("fs");
 const path = require("path");
 

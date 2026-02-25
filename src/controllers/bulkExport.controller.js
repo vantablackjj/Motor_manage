@@ -12,7 +12,7 @@ const HoaDonBanService = require("../services/hoaDonBan.service");
 const ChuyenKhoService = require("../services/chuyenKho.service");
 const XeService = require("../services/xe.service");
 const DonHangMuaXeService = require("../services/donHangMuaXe.service");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 class BulkExportController {
   // --- MASTER DATA ---

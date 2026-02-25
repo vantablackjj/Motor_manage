@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+logs/
+uploads/
+.git
+.env
+.agent/
+scripts/
+tools/
+tests/
+Dockerfile
+.dockerignore
+ecosystem.config.js
+package-lock.json

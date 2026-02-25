@@ -1,6 +1,6 @@
 const donHangMuaService = require("../services/donHangMua.service");
-const { sendSuccess, sendError } = require("../ultils/respone");
-const logger = require("../ultils/logger");
+const { sendSuccess, sendError } = require("../utils/response");
+const logger = require("../utils/logger");
 
 class DonHangMuaController {
   // GET /api/v1/don-hang-mua

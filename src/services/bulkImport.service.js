@@ -3,7 +3,7 @@ const { from: copyFrom } = require("pg-copy-streams");
 const ExcelJS = require("exceljs");
 const fs = require("fs");
 const { Readable } = require("stream");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 class BulkImportService {
   /**

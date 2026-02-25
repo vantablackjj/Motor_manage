@@ -1,6 +1,6 @@
 
 const ModelService = require('../services/modelCar.service');
-const { sendSuccess, sendError } = require('../ultils/respone');
+const { sendSuccess, sendError } = require('../utils/response');
 
 exports.getAll = async (req, res, next) => {
   try {

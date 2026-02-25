@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
 const { validate } = require("../middleware/validation");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 const chuyenKhoService = require("../services/chuyenKho.service");
 const Joi = require("joi");
 

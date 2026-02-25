@@ -1,239 +1,133 @@
 const express = require("express");
 const router = express.Router();
-
+const userController = require("../controllers/user.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/permissions");
 const { checkRole } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { sendSuccess } = require("../ultils/respone");
-
-const userService = require("../services/user.service");
-
-const Joi = require("joi");
-
-/* ======================
- * VALIDATION
- * ====================== */
-
-const createUserSchema = Joi.object({
-  username: Joi.string().required(),
-  password: Joi.string().min(6).required(),
-  ho_ten: Joi.string().required(),
-  email: Joi.string().email().allow(null, ""),
-  dien_thoai: Joi.string().allow(null, ""),
-  vai_tro: Joi.string().required(),
-  ma_kho: Joi.string().allow(null),
-});
-
-const updateUserSchema = Joi.object({
-  ho_ten: Joi.string(),
-  email: Joi.string().email().allow(null, ""),
-  dien_thoai: Joi.string().allow(null, ""),
-  vai_tro: Joi.string(),
-  ma_kho: Joi.string().allow(null),
-});
-
-const changePasswordSchema = Joi.object({
-  oldPassword: Joi.string().required(),
-  newPassword: Joi.string().min(6).required(),
-});
-
-const resetPasswordSchema = Joi.object({
-  newPassword: Joi.string().min(6).required(),
-});
-
-/* ======================
- * ROUTES
- * ====================== */
+const {
+  createUserSchema,
+  updateUserSchema,
+  changePasswordSchema,
+  resetPasswordSchema,
+} = require("../validations/user.validation");
 
 /**
- * GET /users
- * Xem danh sách user - QUAN_LY và ADMIN
- * KE_TOAN chỉ xem (readonly)
+ * @route   GET /api/users
+ * @desc    Lấy danh sách người dùng
+ * @access  Private (users.view)
  */
 router.get(
   "/",
   authenticate,
   checkPermission("users", "view"),
-  async (req, res, next) => {
-    try {
-      const users = await userService.getAll(req.query);
-      sendSuccess(res, users);
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.getAll,
 );
 
 /**
- * GET /users/:id/permissions
- * Lấy danh sách quyền của user
+ * @route   GET /api/users/:id/permissions
+ * @desc    Lấy danh sách quyền cụ thể của người dùng
+ * @access  Private
  */
-router.get("/:id/permissions", authenticate, async (req, res, next) => {
-  try {
-    const user = await userService.getById(req.params.id);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User không tồn tại" });
-    }
-    sendSuccess(res, user.permissions || {}, "Lấy danh sách quyền thành công");
-  } catch (err) {
-    next(err);
-  }
-});
+router.get("/:id/permissions", authenticate, userController.getPermissions);
 
 /**
- * GET /users/:id
- * Xem chi tiết user - QUAN_LY và ADMIN
+ * @route   GET /api/users/:id
+ * @desc    Lấy chi tiết người dùng
+ * @access  Private (users.view)
  */
 router.get(
   "/:id",
   authenticate,
   checkPermission("users", "view"),
-  async (req, res, next) => {
-    try {
-      const user = await userService.getById(req.params.id);
-      sendSuccess(res, user);
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.getById,
 );
 
 /**
- * GET /users/:id/warehouses
- * Lấy danh sách quyền kho của user - ADMIN hoặc QUAN_LY (vì họ được view users)
+ * @route   GET /api/users/:id/warehouses
+ * @desc    Lấy danh sách quyền kho của người dùng
+ * @access  Private (ADMIN only)
  */
 router.get(
   "/:id/warehouses",
   authenticate,
   checkRole("ADMIN"),
-  async (req, res, next) => {
-    try {
-      const permissions = await userService.getWarehousePermissions(
-        req.params.id,
-      );
-      sendSuccess(res, permissions);
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.getWarehousePermissions,
 );
 
 /**
- * POST /users
- * Tạo user mới - chỉ QUAN_LY và ADMIN
+ * @route   POST /api/users
+ * @desc    Tạo người dùng mới
+ * @access  Private (users.create)
  */
 router.post(
   "/",
   authenticate,
   checkPermission("users", "create"),
   validate(createUserSchema),
-  async (req, res, next) => {
-    try {
-      const user = await userService.create(req.body);
-      sendSuccess(res, user, "Tạo user thành công");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.create,
 );
 
 /**
- * PUT /users/:id
- * Cập nhật user - chỉ QUAN_LY và ADMIN
+ * @route   PUT /api/users/:id
+ * @desc    Cập nhật thông tin người dùng
+ * @access  Private (users.edit)
  */
 router.put(
   "/:id",
   authenticate,
   checkPermission("users", "edit"),
   validate(updateUserSchema),
-  async (req, res, next) => {
-    try {
-      const user = await userService.update(req.params.id, req.body);
-      sendSuccess(res, user, "Cập nhật user thành công");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.update,
 );
 
 /**
- * PATCH /users/:id/deactivate
- * Vô hiệu hóa user - chỉ ADMIN
+ * @route   PATCH /api/users/:id/deactivate
+ * @desc    Vô hiệu hóa người dùng
+ * @access  Private (users.delete/ADMIN)
  */
 router.patch(
   "/:id/deactivate",
   authenticate,
   checkPermission("users", "delete"),
-  async (req, res, next) => {
-    try {
-      const user = await userService.deactivate(req.params.id);
-      sendSuccess(res, user, "Đã vô hiệu hóa user");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.deactivate,
 );
 
 /**
- * PATCH /users/:id/activate
- * Kích hoạt user - chỉ ADMIN
+ * @route   PATCH /api/users/:id/activate
+ * @desc    Kích hoạt người dùng
+ * @access  Private (users.delete/ADMIN)
  */
 router.patch(
   "/:id/activate",
   authenticate,
   checkPermission("users", "delete"),
-  async (req, res, next) => {
-    try {
-      const user = await userService.activate(req.params.id);
-      sendSuccess(res, user, "Đã kích hoạt user");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.activate,
 );
 
 /**
- * PATCH /users/:id/change-password
- * Đổi mật khẩu - bản thân user (không cần quyền đặc biệt)
+ * @route   PATCH /api/users/:id/change-password
+ * @desc    Đổi mật khẩu cá nhân
+ * @access  Private
  */
 router.patch(
   "/:id/change-password",
   authenticate,
   validate(changePasswordSchema),
-  async (req, res, next) => {
-    try {
-      await userService.changePassword(
-        req.params.id,
-        req.body.oldPassword,
-        req.body.newPassword,
-      );
-      sendSuccess(res, null, "Đổi mật khẩu thành công");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.changePassword,
 );
 
 /**
- * POST /users/:id/reset-password
- * Reset mật khẩu - chỉ QUAN_LY và ADMIN (yêu cầu quyền edit)
+ * @route   POST /api/users/:id/reset-password
+ * @desc    Đặt lại mật khẩu cho người dùng khác
+ * @access  Private (users.edit)
  */
 router.post(
   "/:id/reset-password",
   authenticate,
   checkPermission("users", "edit"),
   validate(resetPasswordSchema),
-  async (req, res, next) => {
-    try {
-      await userService.resetPassword(req.params.id, req.body.newPassword);
-      sendSuccess(res, null, "Đặt lại mật khẩu thành công");
-    } catch (err) {
-      next(err);
-    }
-  },
+  userController.resetPassword,
 );
 
 module.exports = router;

@@ -1,5 +1,5 @@
 const { ROLES } = require("../config/constants");
-const { sendError } = require("../ultils/respone");
+const { sendError } = require("../utils/response");
 
 /**
  * Middleware thực hiện cách ly dữ liệu theo kho

@@ -42,7 +42,7 @@ class KhachHangService {
    * Tạo mới khách hàng
    * ====================== */
   static async create(data) {
-    const { generateCode } = require("../ultils/codeGenerator");
+    const { generateCode } = require("../utils/codeGenerator");
     const loai_doi_tac =
       data.loai_doi_tac || (data.la_ncc ? "NHA_CUNG_CAP" : "KHACH_HANG");
     const prefix = loai_doi_tac === "NHA_CUNG_CAP" ? "NCC" : "KH";

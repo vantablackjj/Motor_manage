@@ -1,6 +1,6 @@
 
 const { ROLES } = require('../config/constants');
-const { sendError } = require('../ultils/respone');
+const { sendError } = require('../utils/response');
 const { query } = require('../config/database');
 
 /**

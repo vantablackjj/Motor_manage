@@ -1,6 +1,6 @@
 // controllers/donHangMuaXe.controller.js - ĐÃ SỬA LỖI
 const DonHangMuaXeService = require("../services/donHangMuaXe.service");
-const { sendSuccess } = require("../ultils/respone");
+const { sendSuccess } = require("../utils/response");
 
 class DonHangMuaXeController {
   /**
@@ -161,7 +161,7 @@ class DonHangMuaXeController {
       const { ma_phieu } = req.params;
       const userId = req.user.id;
       const danhSachXe = req.body.danh_sach_xe || req.body.vehicles; // Array of vehicles
-      const logger = require("../ultils/logger");
+      const logger = require("../utils/logger");
       logger.info(
         `[DonHangMuaXe] Nhap kho ma_phieu=${ma_phieu} items=${JSON.stringify(danhSachXe)}`,
       );

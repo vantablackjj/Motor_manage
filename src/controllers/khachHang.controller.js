@@ -1,6 +1,6 @@
 // controllers/khachHang.controller.js
 const khachHangService = require("../services/khachHang.service");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 
 exports.getAll = async (req, res, next) => {
   try {

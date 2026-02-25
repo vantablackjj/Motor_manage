@@ -4,7 +4,7 @@
  */
 
 const { pool } = require("../config/database");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 // Import repositories
 const HangHoaRepository = require("./HangHoaRepository");

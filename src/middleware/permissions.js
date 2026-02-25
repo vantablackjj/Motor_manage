@@ -4,7 +4,7 @@
  */
 
 const { query } = require("../config/database");
-const { sendError } = require("../ultils/respone");
+const { sendError } = require("../utils/response");
 const { ROLES } = require("../config/constants");
 
 // ─── Permission Cache ─────────────────────────────────────────────────────────

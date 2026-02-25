@@ -1,6 +1,6 @@
 // controllers/color.controller.js
 const ColorService = require("../services/color.service");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 
 exports.getAll = async (req, res, next) => {
   try {

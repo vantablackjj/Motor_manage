@@ -1,6 +1,6 @@
 const baoCaoService = require("../services/baoCao.service");
-const { generateExcel } = require("../ultils/excelHelper");
-const pdfGenerator = require("../ultils/pdfGenerator");
+const { generateExcel } = require("../utils/excelHelper");
+const pdfGenerator = require("../utils/pdfGenerator");
 
 class BaoCaoController {
   // Inventory

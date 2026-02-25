@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const { validate } = require("../middleware/validation");
 const { authenticate } = require("../middleware/auth");
 const { checkRole } = require("../middleware/roleCheck");
-const { sendSuccess, sendError } = require("../ultils/respone");
+const { sendSuccess, sendError } = require("../utils/response");
 const User = require("../services/user.service");
 const {
   generateToken,
@@ -15,7 +15,7 @@ const {
 const { query } = require("../config/database");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
-const logger = require("../ultils/logger");
+const logger = require("../utils/logger");
 
 // ============================================================
 // REFRESH TOKEN HELPERS (lưu/kiểm tra/thu hồi token trong DB)
