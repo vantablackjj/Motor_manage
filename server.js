@@ -10,6 +10,7 @@ const { pool } = require("./src/config/database");
 const MigrationRunner = require("./src/utils/migrationRunner");
 const NotificationService = require("./src/services/notification.service");
 const PushNotificationService = require("./src/services/pushNotification.service");
+const MaintenanceService = require("./src/services/MaintenanceService");
 
 const PORT = process.env.PORT || 3000;
 
@@ -94,6 +95,28 @@ async function startServer() {
 
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
+
+      // Chạy trình nhắc nhở mỗi 24 giờ
+      setInterval(
+        async () => {
+          try {
+            logger.info("Auto-triggering daily maintenance reminders...");
+            await MaintenanceService.runDailyReminders();
+          } catch (err) {
+            logger.error("Error in daily reminder scheduler:", err);
+          }
+        },
+        24 * 60 * 60 * 1000,
+      );
+
+      // Chạy lần đầu sau khi start 1 phút để tránh overload lúc khởi động
+      setTimeout(async () => {
+        try {
+          await MaintenanceService.runDailyReminders();
+        } catch (err) {
+          logger.error("Error in initial reminder trigger:", err);
+        }
+      }, 60 * 1000);
     });
 
     process.on("SIGTERM", () => {

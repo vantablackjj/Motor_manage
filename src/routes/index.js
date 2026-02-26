@@ -33,6 +33,7 @@ const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
 const notificationRoutes = require("./notification.routes");
 const pushRoutes = require("./push.routes");
+const maintenanceRoutes = require("./maintenance.routes");
 
 // 1. PUBLIC ROUTES (Không cần đăng nhập)
 router.use("/auth", authRoutes);
@@ -96,5 +97,6 @@ router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/push", pushRoutes);
+router.use("/maintenance", maintenanceRoutes);
 
 module.exports = router;
