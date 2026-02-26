@@ -12,7 +12,7 @@ SET permissions = jsonb_set(
   '{inventory, approve}',
   'true'::jsonb
 )
-WHERE ten_vai_tro = 'QUAN_LY';
+WHERE ma_quyen = 'QUAN_LY';
 
 -- Thêm quyền inventory.approve cho role KE_TOAN
 UPDATE sys_role
@@ -21,12 +21,12 @@ SET permissions = jsonb_set(
   '{inventory, approve}',
   'true'::jsonb
 )
-WHERE ten_vai_tro = 'KE_TOAN';
+WHERE ma_quyen = 'KE_TOAN';
 
 -- Kiểm tra lại kết quả
-SELECT ten_vai_tro, permissions->'inventory' AS inventory_perms
+SELECT ma_quyen, permissions->'inventory' AS inventory_perms
 FROM sys_role
-WHERE ten_vai_tro IN ('QUAN_LY', 'KE_TOAN', 'ADMIN');
+WHERE ma_quyen IN ('QUAN_LY', 'KE_TOAN', 'ADMIN');
 
 -- Success message
 DO $$
