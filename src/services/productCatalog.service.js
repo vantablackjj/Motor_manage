@@ -97,6 +97,16 @@ class ProductCatalogService {
 
     sql += ` ORDER BY hh.ma_nhom_hang, hh.ten_hang_hoa`;
 
+    // Pagination
+    if (filters.limit !== undefined) {
+      sql += ` LIMIT $${idx++}`;
+      params.push(filters.limit);
+    }
+    if (filters.offset !== undefined) {
+      sql += ` OFFSET $${idx++}`;
+      params.push(filters.offset);
+    }
+
     const result = await query(sql, params);
     return result.rows;
   }

@@ -7,14 +7,27 @@ class ProductController {
    */
   static async getAll(req, res) {
     try {
+      const { type, brand, loai_hinh, noi_sx, status, limit, offset } =
+        req.query;
+
       const filters = {
-        loai_quan_ly: req.query.type, // SERIAL or BATCH
-        ma_nh: req.query.brand,
-        loai_hinh: req.query.loai_hinh,
-        noi_sx: req.query.noi_sx,
-        status:
-          req.query.status !== undefined ? req.query.status === "true" : true,
+        // Only pass to loai_quan_ly if it's a valid enum value (SERIAL or BATCH)
+        loai_quan_ly: ["SERIAL", "BATCH"].includes(type?.toUpperCase())
+          ? type.toUpperCase()
+          : undefined,
+        // If type is XE or PT, treat it as a brand (group) filter if brand is not provided
+        ma_nh:
+          brand ||
+          (["XE", "PT"].includes(type?.toUpperCase())
+            ? type.toUpperCase()
+            : undefined),
+        loai_hinh: loai_hinh,
+        noi_sx: noi_sx,
+        status: status !== undefined ? status === "true" : true,
+        limit: limit ? parseInt(limit) : undefined,
+        offset: offset ? parseInt(offset) : undefined,
       };
+
       const products = await ProductCatalogService.getAll(filters);
       res.json({ success: true, data: products });
     } catch (error) {
