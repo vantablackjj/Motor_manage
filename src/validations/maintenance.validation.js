@@ -1,7 +1,7 @@
 const Joi = require("joi");
 
 const createMaintenanceSchema = Joi.object({
-  ma_phieu: Joi.string().required(),
+  ma_phieu: Joi.string().allow("", null),
   ma_serial: Joi.string().required(),
   ma_doi_tac: Joi.string().required(),
   so_km_hien_tai: Joi.number().integer().min(0).required(),

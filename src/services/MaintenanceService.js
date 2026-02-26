@@ -5,6 +5,7 @@ const User = require("../models/User");
 const PushNotificationService = require("./pushNotification.service");
 const logger = require("../utils/logger");
 const { query } = require("../config/database");
+const { generateCode } = require("../utils/codeGenerator");
 
 class MaintenanceService {
   /**
@@ -96,6 +97,9 @@ class MaintenanceService {
     );
 
     // Bước 2: Tạo phiếu bảo trì
+    if (!data.ma_phieu) {
+      data.ma_phieu = await generateCode("tm_bao_tri", "ma_phieu", "BT", 10);
+    }
     const phieu = await BaoTri.create(data);
 
     // Bước 3: Tạo nhắc nhở bảo trì tiếp theo
