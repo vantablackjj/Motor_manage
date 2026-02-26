@@ -314,9 +314,12 @@ class HoaDonBanService {
           await client.query(
             `UPDATE tm_hang_hoa_serial
              SET trang_thai = 'DA_BAN',
-                 locked = FALSE
+                 locked = FALSE,
+                 so_hoa_don_ban = $2,
+                 ngay_ban = CURRENT_DATE,
+                 la_xe_cua_hang = TRUE
              WHERE ma_serial = $1`,
-            [ct.ma_serial],
+            [ct.ma_serial, so_hd],
           );
 
           // Ghi lịch sử

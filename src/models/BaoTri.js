@@ -12,14 +12,16 @@ class BaoTri {
         nguoi_lap_phieu,
         tong_tien,
         ghi_chu,
+        loai_bao_tri,
+        ly_do_mien_phi,
         chi_tiet, // Array of { ma_hang_hoa, ten_hang_muc, loai_hang_muc, so_luong, don_gia, thanh_tien, ghi_chu }
       } = data;
 
       // 1. Insert phiếu bảo trì
       const resPhieu = await client.query(
         `INSERT INTO tm_bao_tri (
-          ma_phieu, ma_serial, ma_doi_tac, so_km_hien_tai, nguoi_lap_phieu, tong_tien, ghi_chu
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ma_phieu, ma_serial, ma_doi_tac, so_km_hien_tai, nguoi_lap_phieu, tong_tien, ghi_chu, loai_bao_tri, ly_do_mien_phi
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           ma_phieu,
@@ -29,6 +31,8 @@ class BaoTri {
           nguoi_lap_phieu,
           tong_tien,
           ghi_chu,
+          loai_bao_tri || "TINH_PHI",
+          ly_do_mien_phi || null,
         ],
       );
 
@@ -68,9 +72,15 @@ class BaoTri {
   // Lấy danh sách phiếu bảo trì
   static async getAll(filters = {}) {
     let sql = `
-      SELECT b.*, x.serial_identifier as so_khung, d.ten_doi_tac as ten_khach_hang
+      SELECT b.*,
+        x.serial_identifier as so_khung,
+        x.la_xe_cua_hang,
+        hh.ten_hang_hoa as ten_loai_xe,
+        d.ten_doi_tac as ten_khach_hang,
+        d.dien_thoai
       FROM tm_bao_tri b
       LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
+      LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
       WHERE 1=1
     `;
@@ -86,6 +96,14 @@ class BaoTri {
       sql += ` AND b.ma_serial = $${params.length}`;
     }
 
+    // Filter: chỉ xe cửa hàng hoặc chỉ xe ngoài
+    if (filters.la_xe_cua_hang !== undefined) {
+      params.push(
+        filters.la_xe_cua_hang === "true" || filters.la_xe_cua_hang === true,
+      );
+      sql += ` AND x.la_xe_cua_hang = $${params.length}`;
+    }
+
     sql += " ORDER BY b.ngay_bao_tri DESC";
 
     const res = await query(sql, params);
@@ -95,9 +113,15 @@ class BaoTri {
   // Lấy chi tiết phiếu
   static async getById(ma_phieu) {
     const resPhieu = await query(
-      `SELECT b.*, x.serial_identifier as so_khung, d.ten_doi_tac as ten_khach_hang, d.dien_thoai
+      `SELECT b.*,
+        x.serial_identifier as so_khung,
+        x.la_xe_cua_hang,
+        x.bien_so,
+        hh.ten_hang_hoa as ten_loai_xe,
+        d.ten_doi_tac as ten_khach_hang, d.dien_thoai
        FROM tm_bao_tri b
        LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
+       LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
        LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
        WHERE b.ma_phieu = $1`,
       [ma_phieu],
