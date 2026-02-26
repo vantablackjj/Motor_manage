@@ -3,7 +3,9 @@ const router = express.Router();
 const MaintenanceController = require("../controllers/MaintenanceController");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
-const maintenanceValidation = require("../validations/maintenance.validation");
+const {
+  createMaintenanceSchema,
+} = require("../validations/maintenance.validation");
 const { checkPermission } = require("../middleware/permissions");
 
 /**
@@ -18,7 +20,7 @@ router.use(authenticate);
 router.post(
   "/",
   checkPermission("inventory", "edit"),
-  validate(maintenanceValidation.create),
+  validate(createMaintenanceSchema),
   MaintenanceController.create,
 );
 
