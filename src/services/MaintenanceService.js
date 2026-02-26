@@ -4,7 +4,7 @@ const Notification = require("../models/Notification");
 const User = require("../models/User");
 const PushNotificationService = require("./pushNotification.service");
 const logger = require("../utils/logger");
-const { query } = require("../config/database");
+const { query, transaction } = require("../config/database");
 const { generateCode } = require("../utils/codeGenerator");
 
 class MaintenanceService {
@@ -120,6 +120,104 @@ class MaintenanceService {
       la_xe_cua_hang,
       da_tao_moi_xe_ngoai: da_tao_moi,
     };
+  }
+
+  // Phê duyệt phiếu bảo trì và trừ kho
+  static async approveMaintenanceRecord(ma_phieu, username, selectedKho) {
+    const phieu = await BaoTri.getById(ma_phieu);
+    if (!phieu) {
+      throw { status: 404, message: "Không tìm thấy phiếu" };
+    }
+    if (phieu.trang_thai !== "CHO_DUYET") {
+      throw { status: 400, message: "Phiếu đã được xử lý trước đó" };
+    }
+
+    const ma_kho = selectedKho || phieu.ma_kho;
+    if (!ma_kho) {
+      throw {
+        status: 400,
+        message: "Chưa xác định kho xuất để trừ phụ tùng",
+      };
+    }
+
+    return await transaction(async (client) => {
+      // 1. Cập nhật trạng thái phiếu
+      await client.query(
+        `UPDATE tm_bao_tri 
+         SET trang_thai = 'DA_DUYET', nguoi_duyet = $1, ngay_duyet = CURRENT_TIMESTAMP, ma_kho = $2
+         WHERE ma_phieu = $3`,
+        [username, ma_kho, ma_phieu],
+      );
+
+      // 2. Xử lý trừ kho cho phụ tùng
+      const phu_tung = phieu.chi_tiet.filter(
+        (item) => item.loai_hang_muc === "PHU_TUNG" && item.ma_hang_hoa,
+      );
+
+      for (const item of phu_tung) {
+        // Kiểm tra tồn kho trước
+        const stockRes = await client.query(
+          `SELECT so_luong_ton FROM tm_hang_hoa_ton_kho 
+           WHERE ma_hang_hoa = $1 AND ma_kho = $2 FOR UPDATE`,
+          [item.ma_hang_hoa, ma_kho],
+        );
+
+        if (
+          stockRes.rows.length === 0 ||
+          stockRes.rows[0].so_luong_ton < item.so_luong
+        ) {
+          throw new Error(
+            `Không đủ số lượng trong kho cho phụ tùng: ${item.ten_hang_muc} (Mã: ${item.ma_hang_hoa})`,
+          );
+        }
+
+        // Trừ tồn kho
+        await client.query(
+          `UPDATE tm_hang_hoa_ton_kho 
+           SET so_luong_ton = so_luong_ton - $1, cap_nhat_cuoi = CURRENT_TIMESTAMP
+           WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
+          [item.so_luong, item.ma_hang_hoa, ma_kho],
+        );
+
+        // Ghi lịch sử hàng hóa
+        await client.query(
+          `INSERT INTO tm_hang_hoa_lich_su (
+            ma_hang_hoa, loai_giao_dich, so_chung_tu, ma_kho_xuat, so_luong, nguoi_thuc_hien, dien_giai
+          ) VALUES ($1, 'XUAT_BAO_TRI', $2, $3, $4, $5, $6)`,
+          [
+            item.ma_hang_hoa,
+            ma_phieu,
+            ma_kho,
+            item.so_luong,
+            username,
+            `Xuất phụ tùng bảo trì cho xe ${phieu.ma_serial}`,
+          ],
+        );
+      }
+
+      logger.info(
+        `[Maintenance] Approved ticket ${ma_phieu}, deducted stock for ${phu_tung.length} items.`,
+      );
+      return { ma_phieu, status: "DA_DUYET" };
+    });
+  }
+
+  // Từ chối phiếu bảo trì
+  static async rejectMaintenanceRecord(ma_phieu, username) {
+    const phieu = await BaoTri.getById(ma_phieu);
+    if (!phieu) {
+      throw { status: 404, message: "Không tìm thấy phiếu" };
+    }
+    if (phieu.trang_thai !== "CHO_DUYET") {
+      throw { status: 400, message: "Phiếu đã được xử lý trước đó" };
+    }
+
+    await query(
+      `UPDATE tm_bao_tri SET trang_thai = 'DA_HUY', ghi_chu = ghi_chu || $1 WHERE ma_phieu = $2`,
+      [`\n[Hủy bởi ${username} lúc ${new Date().toLocaleString()}]`, ma_phieu],
+    );
+
+    return { ma_phieu, status: "DA_HUY" };
   }
 
   // Chạy trình nhắc nhở hàng ngày

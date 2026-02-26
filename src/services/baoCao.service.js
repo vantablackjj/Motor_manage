@@ -918,13 +918,41 @@ class BaoCaoService {
         pool.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
       ]);
 
-    // Debt aggregation logic simplified or isolated
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
     const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
 
-    const [intDebtRes, custDebtRes] = await Promise.all([
+    const sqlRecentActivities = `
+      SELECT id, so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
+        SELECT 
+          id,
+          so_hoa_don as so_phieu, 
+          loai_hoa_don as loai_giao_dich, 
+          thanh_tien as tong_tien, 
+          ngay_hoa_don::timestamp as ngay_lap 
+        FROM tm_hoa_don 
+        WHERE loai_hoa_don IN ('BAN_HANG')
+        ${ma_kho ? "AND ma_ben_xuat = $1" : ""}
+        
+        UNION ALL
+        
+        SELECT 
+          id,
+          so_don_hang as so_phieu, 
+          CASE WHEN loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE loai_don_hang END as loai_giao_dich, 
+          thanh_tien as tong_tien, 
+          ngay_dat_hang::timestamp as ngay_lap 
+        FROM tm_don_hang 
+        WHERE loai_don_hang IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
+        ${ma_kho ? "AND (ma_ben_nhap = $1 OR ma_ben_xuat = $1)" : ""}
+      ) as combined
+      ORDER BY ngay_lap DESC
+      LIMIT 10
+    `;
+
+    const [intDebtRes, custDebtRes, recentActivitiesRes] = await Promise.all([
       pool.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
       pool.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
+      pool.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
     ]);
 
     return {
@@ -934,6 +962,7 @@ class BaoCaoService {
       low_stock_pt: Number(lowStockRes.rows[0].total || 0),
       internal_debt: Number(intDebtRes.rows[0].total || 0),
       customer_debt: Number(custDebtRes.rows[0].total || 0),
+      giao_dich_gan_day: recentActivitiesRes.rows,
     };
   }
 

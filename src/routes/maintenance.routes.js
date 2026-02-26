@@ -42,4 +42,26 @@ router.post(
   MaintenanceController.triggerReminders,
 );
 
+/**
+ * @route   POST /api/maintenance/:id/approve
+ * @desc    Phê duyệt phiếu bảo trì (cập nhật trạng thái DA_DUYET và trừ kho phụ tùng)
+ * @access  Private (inventory.approve)
+ */
+router.post(
+  "/:id/approve",
+  checkPermission("inventory", "approve"),
+  MaintenanceController.approve,
+);
+
+/**
+ * @route   POST /api/maintenance/:id/reject
+ * @desc    Từ chối/Hủy phiếu bảo trì (cập nhật trạng thái DA_HUY)
+ * @access  Private (inventory.approve)
+ */
+router.post(
+  "/:id/reject",
+  checkPermission("inventory", "approve"),
+  MaintenanceController.reject,
+);
+
 module.exports = router;

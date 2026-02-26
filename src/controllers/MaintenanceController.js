@@ -60,6 +60,52 @@ class MaintenanceController {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
+  // Phê duyệt phiếu bảo trì
+  static async approve(req, res) {
+    try {
+      const { id } = req.params;
+      const { ma_kho } = req.body; // Có thể chọn kho xuất phụ tùng khi duyệt
+      const result = await MaintenanceService.approveMaintenanceRecord(
+        id,
+        req.user.username,
+        ma_kho,
+      );
+      res.json({
+        success: true,
+        message: "Phê duyệt phiếu bảo trì thành công",
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Error approving maintenance record:", error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || "Lỗi phê duyệt phiếu",
+      });
+    }
+  }
+
+  // Từ chối/Hủy phiếu bảo trì
+  static async reject(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await MaintenanceService.rejectMaintenanceRecord(
+        id,
+        req.user.username,
+      );
+      res.json({
+        success: true,
+        message: "Đã từ chối/hủy phiếu bảo trì",
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Error rejecting maintenance record:", error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || "Lỗi hủy phiếu",
+      });
+    }
+  }
 }
 
 module.exports = MaintenanceController;

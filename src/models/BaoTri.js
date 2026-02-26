@@ -14,14 +14,15 @@ class BaoTri {
         ghi_chu,
         loai_bao_tri,
         ly_do_mien_phi,
+        ma_kho,
         chi_tiet, // Array of { ma_hang_hoa, ten_hang_muc, loai_hang_muc, so_luong, don_gia, thanh_tien, ghi_chu }
       } = data;
 
       // 1. Insert phiếu bảo trì
       const resPhieu = await client.query(
         `INSERT INTO tm_bao_tri (
-          ma_phieu, ma_serial, ma_doi_tac, so_km_hien_tai, nguoi_lap_phieu, tong_tien, ghi_chu, loai_bao_tri, ly_do_mien_phi
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ma_phieu, ma_serial, ma_doi_tac, so_km_hien_tai, nguoi_lap_phieu, tong_tien, ghi_chu, loai_bao_tri, ly_do_mien_phi, ma_kho, trang_thai
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'CHO_DUYET')
         RETURNING *`,
         [
           ma_phieu,
@@ -33,6 +34,7 @@ class BaoTri {
           ghi_chu,
           loai_bao_tri || "TINH_PHI",
           ly_do_mien_phi || null,
+          ma_kho || null,
         ],
       );
 
