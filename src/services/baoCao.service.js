@@ -926,7 +926,7 @@ class BaoCaoService {
         SELECT 
           id,
           so_hoa_don as so_phieu, 
-          loai_hoa_don as loai_giao_dich, 
+          loai_hoa_don::varchar as loai_giao_dich, 
           thanh_tien as tong_tien, 
           ngay_hoa_don::timestamp as ngay_lap 
         FROM tm_hoa_don 
@@ -938,7 +938,7 @@ class BaoCaoService {
         SELECT 
           id,
           so_don_hang as so_phieu, 
-          CASE WHEN loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE loai_don_hang END as loai_giao_dich, 
+          CASE WHEN loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE loai_don_hang::varchar END as loai_giao_dich, 
           thanh_tien as tong_tien, 
           ngay_dat_hang::timestamp as ngay_lap 
         FROM tm_don_hang 

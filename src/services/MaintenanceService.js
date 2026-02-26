@@ -74,14 +74,68 @@ class MaintenanceService {
       };
     }
 
-    await query(
-      `INSERT INTO tm_hang_hoa_serial (
-        ma_serial, ma_hang_hoa, serial_identifier,
-        trang_thai, la_xe_cua_hang, ghi_chu
-      ) VALUES ($1, $2, $3, 'XE_NGOAI', FALSE,
-        'Xe khách mang từ ngoài - tự động đăng ký qua phiếu bảo trì')`,
-      [ma_serial, ma_hang_hoa, so_khung || ma_serial],
+    // Kiểm tra xe ngoài - Người dùng có thể chọn hoặc nhập tự do
+    let actualProductId = ma_hang_hoa;
+    let actualNote =
+      "Xe khách mang từ ngoài - tự động đăng ký qua phiếu sửa chữa";
+
+    const checkProduct = await query(
+      `SELECT ma_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = $1 OR ten_hang_hoa ILIKE $1 LIMIT 1`,
+      [ma_hang_hoa],
     );
+
+    if (checkProduct.rows.length === 0) {
+      // The user typed a custom model name instead of selecting a valid ID
+      actualNote = `Model xe vãng lai: ${ma_hang_hoa}. Xe khách mang từ ngoài vào.`;
+
+      const genericXe = await query(
+        `SELECT ma_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = 'XE_NGOAI'`,
+      );
+      if (genericXe.rows.length === 0) {
+        // Ensure "XE" group exists or use NULL if it doesn't
+        const nhomXe = await query(
+          `SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' LIMIT 1`,
+        );
+        const groupXe = nhomXe.rows.length > 0 ? "XE" : null;
+
+        await query(
+          `INSERT INTO tm_hang_hoa (ma_hang_hoa, ten_hang_hoa, ma_nhom_hang, loai_quan_ly, don_vi_tinh, status)
+           VALUES ('XE_NGOAI', 'Xe Vãng Lai (Ngoài HT)', $1, 'SERIAL', 'Chiếc', true)`,
+          [groupXe],
+        );
+      }
+      actualProductId = "XE_NGOAI";
+    } else {
+      // If they typed the name and we found it, map it to the actual product ID
+      actualProductId = checkProduct.rows[0].ma_hang_hoa;
+    }
+
+    // DEBUG Check first
+    const confirmProduct = await query(
+      `SELECT ma_hang_hoa FROM tm_hang_hoa WHERE ma_hang_hoa = $1`,
+      [actualProductId],
+    );
+    if (confirmProduct.rows.length === 0) {
+      throw new Error(
+        `[DEBUG] Attempted to use actualProductId='${actualProductId}' but it does not exist in tm_hang_hoa!`,
+      );
+    }
+
+    try {
+      await query(
+        `INSERT INTO tm_hang_hoa_serial (
+          ma_serial, ma_hang_hoa, serial_identifier,
+          trang_thai, la_xe_cua_hang, ghi_chu
+        ) VALUES ($1, $2, $3, 'XE_NGOAI', FALSE, $4)`,
+        [ma_serial, actualProductId, so_khung || ma_serial, actualNote],
+      );
+    } catch (insertErr) {
+      logger.error(
+        `[DEBUG Insert Error] ProductId: ${actualProductId}`,
+        insertErr,
+      );
+      throw insertErr;
+    }
 
     logger.info(`[Maintenance] Đã đăng ký xe ngoài: ${ma_serial}`);
     return { la_xe_cua_hang: false, da_tao_moi: true };
