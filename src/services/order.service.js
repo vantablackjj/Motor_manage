@@ -416,6 +416,23 @@ class OrderService {
             nguoi_thuc_hien: nguoi_lap,
             ghi_chu,
           });
+
+          // Automatically create first maintenance reminder (30 days or 1000km)
+          if (
+            loai_quan_ly === "SERIAL" &&
+            item.serials &&
+            item.serials.length > 0
+          ) {
+            for (const s of item.serials) {
+              const ma_serial =
+                typeof s === "string" ? s : s.ma_serial || s.serial;
+              await client.query(
+                `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien, so_km_du_kien) 
+                 VALUES ($1, $2, 'BAO_DUONG_DINH_KY', CURRENT_DATE + INTERVAL '30 days', 1000)`,
+                [ma_serial, order.ma_ben_nhap],
+              );
+            }
+          }
         } else if (order.loai_don_hang === "CHUYEN_KHO") {
           await WarehouseService.processExit(client, {
             ma_hang_hoa: item.ma_hang_hoa,
