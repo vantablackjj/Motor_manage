@@ -144,6 +144,50 @@ class MaintenanceService {
 
   // Tạo phiếu bảo trì
   static async createMaintenanceRecord(data) {
+    // Bước 0: Kiểm tra xem xe này có đang trong quá trình bảo trì nào khác chưa hoàn thành không
+    const activeMaintenance = await query(
+      `SELECT ma_phieu FROM tm_bao_tri WHERE ma_serial = $1 AND trang_thai NOT IN ('HOAN_THANH', 'DA_HUY')`,
+      [data.ma_serial],
+    );
+    if (activeMaintenance.rows.length > 0) {
+      throw {
+        status: 400,
+        message: `Xe ${data.ma_serial} đang trong quá trình bảo trì (Phiếu: ${activeMaintenance.rows[0].ma_phieu}). Vui lòng hoàn thành phiếu cũ trước.`,
+      };
+    }
+
+    // Bước 0.1: Kiểm tra bàn nâng có đang trống không (nếu có chọn bàn nâng)
+    if (data.ma_ban_nang) {
+      const banNangStatus = await query(
+        `SELECT trang_thai FROM dm_ban_nang WHERE ma_ban_nang = $1`,
+        [data.ma_ban_nang],
+      );
+      if (
+        banNangStatus.rows.length > 0 &&
+        banNangStatus.rows[0].trang_thai !== "TRONG"
+      ) {
+        throw {
+          status: 400,
+          message: `Bàn nâng ${data.ma_ban_nang} đang bận. Vui lòng chọn bàn khác.`,
+        };
+      }
+    }
+
+    // Bước 0.2: Kiểm tra số KM (không được thấp hơn số KM hiện tại trong HT)
+    const xeCheck = await query(
+      `SELECT so_km_hien_tai FROM tm_hang_hoa_serial WHERE ma_serial = $1`,
+      [data.ma_serial],
+    );
+    if (
+      xeCheck.rows.length > 0 &&
+      xeCheck.rows[0].so_km_hien_tai > data.so_km_hien_tai
+    ) {
+      throw {
+        status: 400,
+        message: `Số KM nhập vào (${data.so_km_hien_tai}) thấp hơn số KM cũ (${xeCheck.rows[0].so_km_hien_tai}). Vui lòng kiểm tra lại.`,
+      };
+    }
+
     // Bước 1: Xác định xe / tự động đăng ký nếu là xe ngoài
     const { la_xe_cua_hang, da_tao_moi } = await this.resolveOrRegisterXe(
       data.ma_serial,
@@ -244,6 +288,21 @@ class MaintenanceService {
     return await transaction(async (client) => {
       // Nếu đổi bàn nâng
       if (ma_ban_nang && ma_ban_nang !== phieuData.ma_ban_nang) {
+        // Kiểm tra bàn mới có trống không
+        const banNangStatus = await client.query(
+          `SELECT trang_thai FROM dm_ban_nang WHERE ma_ban_nang = $1`,
+          [ma_ban_nang],
+        );
+        if (
+          banNangStatus.rows.length > 0 &&
+          banNangStatus.rows[0].trang_thai !== "TRONG"
+        ) {
+          throw {
+            status: 400,
+            message: `Bàn nâng ${ma_ban_nang} đang bận. Vui lòng chọn bàn khác.`,
+          };
+        }
+
         // Trả bàn nâng cũ về 'TRONG'
         if (phieuData.ma_ban_nang) {
           await client.query(
@@ -315,6 +374,12 @@ class MaintenanceService {
           );
         }
 
+        // Cập nhật số KM hiện tại cho xe
+        await client.query(
+          `UPDATE tm_hang_hoa_serial SET so_km_hien_tai = $1 WHERE ma_serial = $2`,
+          [phieuData.so_km_hien_tai, phieuData.ma_serial],
+        );
+
         // --- GHI NHẬN CÔNG NỢ KHÁCH HÀNG ---
         if (phieuData.tong_tien > 0) {
           await CongNoService.recordDoiTacDebt(client, {
@@ -340,10 +405,10 @@ class MaintenanceService {
       await client.query(
         `
         UPDATE tm_bao_tri 
-        SET trang_thai = $1, 
+        SET trang_thai = $1::enum_trang_thai_bao_tri, 
             ma_ban_nang = $2, 
             ma_kho = COALESCE($3, ma_kho),
-            thoi_gian_ket_thuc = CASE WHEN $1 = 'HOAN_THANH' THEN CURRENT_TIMESTAMP ELSE thoi_gian_ket_thuc END
+            thoi_gian_ket_thuc = CASE WHEN $1::text = 'HOAN_THANH' THEN CURRENT_TIMESTAMP ELSE thoi_gian_ket_thuc END
         WHERE ma_phieu = $4
       `,
         [

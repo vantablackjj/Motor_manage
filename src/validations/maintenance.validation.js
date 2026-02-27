@@ -29,7 +29,7 @@ const createMaintenanceSchema = Joi.object({
       ma_hang_hoa: Joi.string().allow(null, ""),
       ten_hang_muc: Joi.string().required(),
       loai_hang_muc: Joi.string().valid("PHU_TUNG", "DICH_VU").required(),
-      so_luong: Joi.number().precision(2).default(1),
+      so_luong: Joi.number().precision(2).min(0.01).default(1),
       don_gia: Joi.number().precision(2).default(0),
       thanh_tien: Joi.number().precision(2).default(0),
       ghi_chu: Joi.string().allow("", null),

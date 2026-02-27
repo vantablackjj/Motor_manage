@@ -18,7 +18,10 @@ class MaintenanceController {
       });
     } catch (error) {
       logger.error("Error creating maintenance record:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || "Lỗi tạo phiếu bảo trì",
+      });
     }
   }
 

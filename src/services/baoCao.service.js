@@ -920,6 +920,7 @@ class BaoCaoService {
 
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
     const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
+    const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
 
     const sqlRecentActivities = `
       SELECT id, so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
@@ -949,11 +950,13 @@ class BaoCaoService {
       LIMIT 10
     `;
 
-    const [intDebtRes, custDebtRes, recentActivitiesRes] = await Promise.all([
-      pool.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
-      pool.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
-      pool.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
-    ]);
+    const [intDebtRes, custDebtRes, suppDebtRes, recentActivitiesRes] =
+      await Promise.all([
+        pool.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
+        pool.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
+        pool.query(sqlSupplierDebt, ma_kho ? [ma_kho] : []),
+        pool.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
+      ]);
 
     return {
       revenue_today: Number(revTodayRes.rows[0].total || 0),
@@ -962,6 +965,7 @@ class BaoCaoService {
       low_stock_pt: Number(lowStockRes.rows[0].total || 0),
       internal_debt: Number(intDebtRes.rows[0].total || 0),
       customer_debt: Number(custDebtRes.rows[0].total || 0),
+      supplier_debt: Number(suppDebtRes.rows[0].total || 0),
       giao_dich_gan_day: recentActivitiesRes.rows,
     };
   }
