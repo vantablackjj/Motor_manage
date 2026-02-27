@@ -36,7 +36,7 @@ class BaoTri {
           ma_phieu,
           ma_serial,
           ma_doi_tac,
-          so_km_hien_tai,
+          parseInt(so_km_hien_tai),
           nguoi_lap_phieu,
           tong_tien,
           ghi_chu,
@@ -64,7 +64,7 @@ class BaoTri {
               item.ma_hang_hoa,
               item.ten_hang_muc,
               item.loai_hang_muc,
-              item.so_luong,
+              parseInt(item.so_luong),
               item.don_gia,
               item.thanh_tien,
               item.ghi_chu,
@@ -78,7 +78,7 @@ class BaoTri {
         `UPDATE tm_hang_hoa_serial 
          SET so_km_hien_tai = $1, updated_at = CURRENT_TIMESTAMP
          WHERE ma_serial = $2`,
-        [so_km_hien_tai, ma_serial],
+        [parseInt(so_km_hien_tai), ma_serial],
       );
 
       return resPhieu.rows[0];
@@ -93,11 +93,15 @@ class BaoTri {
         x.la_xe_cua_hang,
         hh.ten_hang_hoa as ten_loai_xe,
         d.ten_doi_tac as ten_khach_hang,
-        d.dien_thoai
+        d.dien_thoai,
+        u.ho_ten as ten_ktv,
+        k.ten_kho
       FROM tm_bao_tri b
       LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
       LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
+      LEFT JOIN sys_user u ON b.ktv_chinh = u.id
+      LEFT JOIN sys_kho k ON b.ma_kho = k.ma_kho
       WHERE 1=1
     `;
     const params = [];
@@ -134,11 +138,15 @@ class BaoTri {
         x.la_xe_cua_hang,
         x.bien_so,
         hh.ten_hang_hoa as ten_loai_xe,
-        d.ten_doi_tac as ten_khach_hang, d.dien_thoai
+        d.ten_doi_tac as ten_khach_hang, d.dien_thoai,
+        u.ho_ten as ten_ktv,
+        k.ten_kho
        FROM tm_bao_tri b
        LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
        LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
        LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
+       LEFT JOIN sys_user u ON b.ktv_chinh = u.id
+       LEFT JOIN sys_kho k ON b.ma_kho = k.ma_kho
        WHERE b.ma_phieu = $1`,
       [ma_phieu],
     );

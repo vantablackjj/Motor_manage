@@ -188,6 +188,41 @@ class MaintenanceService {
       };
     }
 
+    // Bước 0.2.1: Kiểm tra kỹ thuật viên có đang bận không
+    if (data.ktv_chinh) {
+      const busyTechnician = await query(
+        `SELECT ma_phieu, ma_ban_nang FROM tm_bao_tri WHERE ktv_chinh = $1 AND trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')`,
+        [data.ktv_chinh],
+      );
+      if (busyTechnician.rows.length > 0) {
+        throw {
+          status: 400,
+          message: `Kỹ thuật viên này đang bận tại bàn nâng ${busyTechnician.rows[0].ma_ban_nang} (Phiếu: ${busyTechnician.rows[0].ma_phieu}).`,
+        };
+      }
+    }
+
+    // Bước 0.3: Kiểm tra tồn kho sớm (nếu đã chọn kho và có phụ tùng)
+    if (data.ma_kho && data.chi_tiet && data.chi_tiet.length > 0) {
+      const phu_tung = data.chi_tiet.filter(
+        (i) => i.loai_hang_muc === "PHU_TUNG" && i.ma_hang_hoa,
+      );
+      for (const item of phu_tung) {
+        const stockRes = await query(
+          `SELECT so_luong_ton FROM tm_hang_hoa_ton_kho WHERE ma_hang_hoa = $1 AND ma_kho = $2`,
+          [item.ma_hang_hoa, data.ma_kho],
+        );
+        const currentStock =
+          stockRes.rows.length > 0 ? Number(stockRes.rows[0].so_luong_ton) : 0;
+        if (currentStock < Number(item.so_luong)) {
+          throw {
+            status: 400,
+            message: `Kho hiện không đủ hàng cho phụ tùng: ${item.ten_hang_muc}. Hiện có: ${currentStock}, yêu cầu: ${item.so_luong}`,
+          };
+        }
+      }
+    }
+
     // Bước 1: Xác định xe / tự động đăng ký nếu là xe ngoài
     const { la_xe_cua_hang, da_tao_moi } = await this.resolveOrRegisterXe(
       data.ma_serial,
@@ -226,7 +261,7 @@ class MaintenanceService {
     }
 
     // Tạo transaction cho việc tạo phiếu và cập nhật bàn nâng nếu có
-    const finalResult = await transaction(async (client) => {
+    await transaction(async (client) => {
       // Cập nhật trạng thái bàn nâng nếu có gắn xe vào bàn
       if (data.ma_ban_nang) {
         await client.query(
@@ -235,7 +270,7 @@ class MaintenanceService {
         );
       }
 
-      const phieu = await BaoTri.create(data);
+      await BaoTri.create(data);
 
       // Bước 3: Tạo nhắc nhở bảo trì tiếp theo (giữ nguyên logic nhắc)
       const nextKM = parseInt(data.so_km_hien_tai) + 2000;
@@ -249,11 +284,13 @@ class MaintenanceService {
           nextKM,
         ],
       );
-      return phieu;
     });
 
+    // Fetch full record to return names (ten_kho, ten_ktv, etc.)
+    const fullPhieu = await BaoTri.getById(data.ma_phieu);
+
     return {
-      ...finalResult,
+      ...fullPhieu,
       la_xe_cua_hang,
       da_tao_moi_xe_ngoai: da_tao_moi,
     };
@@ -263,8 +300,8 @@ class MaintenanceService {
   static async getBanNang() {
     const res = await query(`
       SELECT bn.*, 
-             t.ma_phieu, t.ma_serial, t.tien_cong, t.tien_phu_tung,
-             u.username as ten_ktv
+             t.ma_phieu, t.ma_serial, t.tien_cong, t.tien_phu_tung, t.ktv_chinh as ktv_id,
+             u.ho_ten as ten_ktv
       FROM dm_ban_nang bn
       LEFT JOIN (
          SELECT ma_phieu, ma_ban_nang, ma_serial, tien_cong, tien_phu_tung, ktv_chinh 
@@ -349,7 +386,7 @@ class MaintenanceService {
           }
           await client.query(
             `UPDATE tm_hang_hoa_ton_kho SET so_luong_ton = so_luong_ton - $1 WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
-            [item.so_luong, item.ma_hang_hoa, khoXuat],
+            [parseInt(item.so_luong), item.ma_hang_hoa, khoXuat],
           );
           // Ghi log
           await client.query(
@@ -359,7 +396,7 @@ class MaintenanceService {
               item.ma_hang_hoa,
               ma_phieu,
               khoXuat,
-              item.so_luong,
+              parseInt(item.so_luong),
               user,
               `Sửa chữa xe ${phieuData.ma_serial}`,
             ],
@@ -377,7 +414,7 @@ class MaintenanceService {
         // Cập nhật số KM hiện tại cho xe
         await client.query(
           `UPDATE tm_hang_hoa_serial SET so_km_hien_tai = $1 WHERE ma_serial = $2`,
-          [phieuData.so_km_hien_tai, phieuData.ma_serial],
+          [parseInt(phieuData.so_km_hien_tai), phieuData.ma_serial],
         );
 
         // --- GHI NHẬN CÔNG NỢ KHÁCH HÀNG ---
