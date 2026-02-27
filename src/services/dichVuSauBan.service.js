@@ -69,15 +69,17 @@ class DichVuSauBanService {
         kh.ten_doi_tac AS ten_khach_hang,
         kh.dien_thoai,
         -- Đăng ký
-        x.dang_ky_xe,
+        x.dang_ky_xe AS is_registered,
         x.bien_so,
-        x.ngay_tra_dang_ky,
+        x.ngay_tra_dang_ky AS ngay_tra_bien,
         x.nguoi_lam_dang_ky,
         -- Đăng kiểm
-        x.dang_kiem,
-        x.ngay_tra_dang_kiem,
+        x.dang_kiem AS is_inspected,
+        x.ngay_tra_dang_kiem AS ngay_tra_giay_dang_kiem,
+        x.han_dang_kiem,
         x.nguoi_lam_dang_kiem,
         x.ghi_chu_dich_vu,
+        kh.dien_thoai AS so_dien_thoai,
         COUNT(*) OVER() AS total_count
       FROM tm_hang_hoa_serial x
       JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
@@ -121,9 +123,9 @@ class DichVuSauBanService {
         x.ngay_ban,
         kh.ma_doi_tac AS ma_khach_hang,
         kh.ten_doi_tac AS ten_khach_hang,
-        kh.dien_thoai,
-        x.dang_ky_xe, x.bien_so, x.ngay_tra_dang_ky, x.nguoi_lam_dang_ky,
-        x.dang_kiem, x.ngay_tra_dang_kiem, x.nguoi_lam_dang_kiem,
+        kh.dien_thoai AS so_dien_thoai,
+        x.dang_ky_xe AS is_registered, x.bien_so, x.ngay_tra_dang_ky AS ngay_tra_bien, x.nguoi_lam_dang_ky,
+        x.dang_kiem AS is_inspected, x.ngay_tra_dang_kiem AS ngay_tra_giay_dang_kiem, x.han_dang_kiem, x.nguoi_lam_dang_kiem,
         x.ghi_chu_dich_vu,
         x.trang_thai
       FROM tm_hang_hoa_serial x
@@ -143,7 +145,8 @@ class DichVuSauBanService {
    * @param {string} nguoi_thuc_hien - username
    */
   static async capNhatDangKy(xe_key, data, nguoi_thuc_hien) {
-    const { bien_so, ngay_tra_dang_ky, ghi_chu } = data;
+    const { bien_so, ngay_tra_bien, ghi_chu } = data;
+    const ngay_tra_dang_ky = ngay_tra_bien;
 
     if (!bien_so || !bien_so.trim()) {
       throw {
@@ -184,23 +187,43 @@ class DichVuSauBanService {
    * @param {string} nguoi_thuc_hien - username
    */
   static async capNhatDangKiem(xe_key, data, nguoi_thuc_hien) {
-    const { ngay_tra_dang_kiem, ghi_chu } = data;
+    const { ngay_tra_giay_dang_kiem, han_dang_kiem, ghi_chu } = data;
+    const ngay_tra_dang_kiem = ngay_tra_giay_dang_kiem;
 
     const result = await query(
       `UPDATE tm_hang_hoa_serial
        SET dang_kiem = TRUE,
            ngay_tra_dang_kiem = COALESCE($2::date, CURRENT_DATE),
-           nguoi_lam_dang_kiem = $3,
-           ghi_chu_dich_vu = COALESCE($4, ghi_chu_dich_vu),
+           han_dang_kiem = $3::date,
+           nguoi_lam_dang_kiem = $4,
+           ghi_chu_dich_vu = COALESCE($5, ghi_chu_dich_vu),
            updated_at = CURRENT_TIMESTAMP
        WHERE ma_serial = $1 AND trang_thai = 'DA_BAN'
        RETURNING *`,
-      [xe_key, ngay_tra_dang_kiem || null, nguoi_thuc_hien, ghi_chu],
+      [
+        xe_key,
+        ngay_tra_dang_kiem || null,
+        han_dang_kiem || null,
+        nguoi_thuc_hien,
+        ghi_chu,
+      ],
     );
 
     if (result.rows.length === 0) {
       throw { status: 404, message: "Xe không tồn tại hoặc chưa được bán" };
     }
+
+    // Tự động tạo nhắc nhở đăng kiểm khi gần hết hạn (trước 15 ngày)
+    if (han_dang_kiem) {
+      await query(
+        `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien) 
+         VALUES ($1, $2, 'DANG_KIEM', $3::date - INTERVAL '15 days')`,
+        [xe_key, result.rows[0].ma_khach_hang || null, han_dang_kiem],
+      ).catch((err) =>
+        console.error("Error creating inspection reminder:", err),
+      );
+    }
+
     return result.rows[0];
   }
 
@@ -211,10 +234,10 @@ class DichVuSauBanService {
   static async getStats() {
     const result = await query(`
       SELECT
-        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL) AS tong_da_ban,
-        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_ky_xe = FALSE) AS chua_dang_ky,
-        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_kiem = FALSE) AS chua_dang_kiem,
-        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_ky_xe = TRUE AND dang_kiem = TRUE) AS hoan_thanh
+        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL) AS tong_cong,
+        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_ky_xe = FALSE) AS cho_dang_ky,
+        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_kiem = FALSE) AS cho_dang_kiem,
+        COUNT(*) FILTER (WHERE trang_thai = 'DA_BAN' AND so_hoa_don_ban IS NOT NULL AND dang_ky_xe = TRUE AND dang_kiem = TRUE) AS da_hoan_thanh
       FROM tm_hang_hoa_serial
     `);
     return result.rows[0];

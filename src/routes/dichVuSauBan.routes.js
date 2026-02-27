@@ -59,7 +59,7 @@ router.patch(
       bien_so: Joi.string().trim().max(20).required().messages({
         "any.required": "Biển số là bắt buộc khi cập nhật đăng ký",
       }),
-      ngay_tra_dang_ky: Joi.date().iso().allow(null, ""),
+      ngay_tra_bien: Joi.date().iso().allow(null, ""),
       ghi_chu: Joi.string().allow(null, ""),
     }),
   ),
@@ -76,7 +76,8 @@ router.patch(
   checkPermission("sales_orders", "edit"),
   validate(
     Joi.object({
-      ngay_tra_dang_kiem: Joi.date().iso().allow(null, ""),
+      ngay_tra_giay_dang_kiem: Joi.date().iso().allow(null, ""),
+      han_dang_kiem: Joi.date().iso().allow(null, ""),
       ghi_chu: Joi.string().allow(null, ""),
     }).min(1),
   ),
