@@ -108,6 +108,20 @@ class MaintenanceController {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
+  // Cập nhật trạng thái nhắc nhở bảo trì
+  static async updateReminderStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await MaintenanceService.updateReminderStatus(
+        id,
+        req.body,
+      );
+      res.json({ success: true, message: "Cập nhật thành công", data: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
 module.exports = MaintenanceController;

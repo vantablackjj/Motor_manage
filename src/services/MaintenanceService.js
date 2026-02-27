@@ -462,7 +462,7 @@ class MaintenanceService {
 
   // Lấy danh sách nhắc nhở bảo trì
   static async getReminders(filters = {}) {
-    const { search, tu_ngay, den_ngay } = filters;
+    const { search, tu_ngay, den_ngay, trang_thai } = filters;
     let sql = `
       SELECT n.*, 
              x.serial_identifier as so_khung, 
@@ -482,6 +482,16 @@ class MaintenanceService {
       sql += ` AND (n.ma_serial ILIKE $${params.length} OR d.ten_doi_tac ILIKE $${params.length} OR x.serial_identifier ILIKE $${params.length})`;
     }
 
+    if (trang_thai) {
+      let dbStatus = trang_thai;
+      if (trang_thai === "CHUA_NHAC") dbStatus = "CHUA_XU_LY";
+      else if (trang_thai === "DA_NHAC") dbStatus = "DA_XU_LY";
+      else if (trang_thai === "BO_QUA") dbStatus = "BO_QUA";
+
+      params.push(dbStatus);
+      sql += ` AND n.trang_thai = $${params.length}`;
+    }
+
     if (tu_ngay) {
       params.push(tu_ngay);
       sql += ` AND n.ngay_du_kien >= $${params.length}`;
@@ -496,6 +506,41 @@ class MaintenanceService {
 
     const res = await query(sql, params);
     return res.rows;
+  }
+
+  // Cập nhật trạng thái nhắc nhở
+  static async updateReminderStatus(id, payload) {
+    const { trang_thai, ghi_chu } = payload;
+    let dbStatus = trang_thai;
+    if (trang_thai === "CHUA_NHAC") dbStatus = "CHUA_XU_LY";
+    else if (trang_thai === "DA_NHAC") dbStatus = "DA_XU_LY";
+
+    const updates = [];
+    const params = [id];
+    let queryIndex = 2;
+
+    if (dbStatus) {
+      updates.push(`trang_thai = $${queryIndex++}`);
+      params.push(dbStatus);
+    }
+    if (ghi_chu !== undefined) {
+      updates.push(`ghi_chu = $${queryIndex++}`);
+      params.push(ghi_chu);
+    }
+
+    if (updates.length === 0) return null;
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    const sql = `
+      UPDATE tm_nhac_nho_bao_duong
+      SET ${updates.join(", ")}
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const res = await query(sql, params);
+    return res.rows[0];
   }
 
   // Chạy trình nhắc nhở hàng ngày (Rút gọn)

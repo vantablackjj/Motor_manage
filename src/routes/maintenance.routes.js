@@ -31,15 +31,15 @@ router.get(
 );
 
 router.get(
-  "/:id",
-  checkPermission("inventory", "view"),
-  MaintenanceController.getById,
-);
-
-router.get(
-  "/reminders/list",
+  "/reminders",
   checkPermission("inventory", "view"),
   MaintenanceController.getReminders,
+);
+
+router.patch(
+  "/reminders/:id",
+  checkPermission("inventory", "edit"),
+  MaintenanceController.updateReminderStatus,
 );
 
 router.post(
@@ -57,6 +57,12 @@ router.get(
   "/ban-nang/list",
   checkPermission("inventory", "view"),
   MaintenanceController.getBanNang,
+);
+
+router.get(
+  "/:id",
+  checkPermission("inventory", "view"),
+  MaintenanceController.getById,
 );
 
 /**
