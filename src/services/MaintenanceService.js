@@ -465,6 +465,14 @@ class MaintenanceService {
     const { search, tu_ngay, den_ngay, trang_thai } = filters;
     let sql = `
       SELECT n.*, 
+             n.trang_thai as trang_thai_db,
+             CASE 
+               WHEN n.trang_thai = 'CHUA_XU_LY' THEN 'CHUA_NHAC'
+               WHEN n.trang_thai = 'DA_XU_LY' THEN 'DA_NHAC'
+               WHEN n.trang_thai = 'KHACH_TU_CHOI' THEN 'KHACH_TU_CHOI'
+               WHEN n.trang_thai = 'BO_QUA' THEN 'BO_QUA'
+               ELSE n.trang_thai
+             END as trang_thai,
              x.serial_identifier as so_khung, 
              hh.ten_hang_hoa as ten_xe,
              d.ten_doi_tac as ten_khach_hang, 
@@ -510,10 +518,13 @@ class MaintenanceService {
 
   // Cập nhật trạng thái nhắc nhở
   static async updateReminderStatus(id, payload) {
-    const { trang_thai, ghi_chu } = payload;
+    const { trang_thai, ghi_chu, ghi_chu_CSKH } = payload;
     let dbStatus = trang_thai;
     if (trang_thai === "CHUA_NHAC") dbStatus = "CHUA_XU_LY";
     else if (trang_thai === "DA_NHAC") dbStatus = "DA_XU_LY";
+
+    // Đồng bộ ghi chú từ FE (ghi_chu_CSKH)
+    const finalNote = ghi_chu_CSKH !== undefined ? ghi_chu_CSKH : ghi_chu;
 
     const updates = [];
     const params = [id];
@@ -523,9 +534,9 @@ class MaintenanceService {
       updates.push(`trang_thai = $${queryIndex++}`);
       params.push(dbStatus);
     }
-    if (ghi_chu !== undefined) {
+    if (finalNote !== undefined) {
       updates.push(`ghi_chu = $${queryIndex++}`);
-      params.push(ghi_chu);
+      params.push(finalNote);
     }
 
     if (updates.length === 0) return null;
