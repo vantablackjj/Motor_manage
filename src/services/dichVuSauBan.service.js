@@ -84,7 +84,8 @@ class DichVuSauBanService {
       FROM tm_hang_hoa_serial x
       JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN tm_hoa_don hd ON x.so_hoa_don_ban = hd.so_hoa_don
-      LEFT JOIN dm_doi_tac kh ON hd.ma_ben_nhap = kh.ma_doi_tac
+      LEFT JOIN tm_don_hang dh ON x.so_hoa_don_ban = dh.so_don_hang
+      LEFT JOIN dm_doi_tac kh ON COALESCE(hd.ma_ben_nhap, dh.ma_ben_nhap) = kh.ma_doi_tac
       WHERE ${where}
       ORDER BY x.ngay_ban DESC NULLS LAST, x.ma_serial
       LIMIT $${idx++} OFFSET $${idx++}
@@ -131,7 +132,8 @@ class DichVuSauBanService {
       FROM tm_hang_hoa_serial x
       JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN tm_hoa_don hd ON x.so_hoa_don_ban = hd.so_hoa_don
-      LEFT JOIN dm_doi_tac kh ON hd.ma_ben_nhap = kh.ma_doi_tac
+      LEFT JOIN tm_don_hang dh ON x.so_hoa_don_ban = dh.so_don_hang
+      LEFT JOIN dm_doi_tac kh ON COALESCE(hd.ma_ben_nhap, dh.ma_ben_nhap) = kh.ma_doi_tac
       WHERE x.ma_serial = $1`,
       [xe_key],
     );

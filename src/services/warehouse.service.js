@@ -113,19 +113,24 @@ class WarehouseService {
   ) {
     if (loai_quan_ly === "SERIAL") {
       for (const ma_serial of serials) {
+        const isSale = loai_giao_dich === "BAN_HANG";
         const result = await client.query(
           `
           UPDATE tm_hang_hoa_serial
           SET trang_thai = $1::enum_trang_thai_serial, 
               ma_kho_hien_tai = CASE WHEN $1::text = 'DA_BAN' THEN NULL ELSE ma_kho_hien_tai END,
+              so_hoa_don_ban = CASE WHEN $4 = TRUE THEN $5 ELSE so_hoa_don_ban END,
+              ngay_ban = CASE WHEN $4 = TRUE THEN CURRENT_DATE ELSE ngay_ban END,
               updated_at = CURRENT_TIMESTAMP
           WHERE ma_serial = $2 AND ma_kho_hien_tai = $3
           RETURNING *
         `,
           [
-            loai_giao_dich === "BAN_HANG" ? "DA_BAN" : "XUAT_KHO",
+            isSale ? "DA_BAN" : "XUAT_KHO",
             ma_serial,
             ma_kho,
+            isSale,
+            so_chung_tu,
           ],
         );
 
