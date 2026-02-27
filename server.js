@@ -39,6 +39,9 @@ async function startServer() {
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'vai_tro') THEN
                 ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tm_hang_hoa_serial' AND column_name = 'han_dang_kiem') THEN
+                ALTER TABLE tm_hang_hoa_serial ADD COLUMN han_dang_kiem DATE;
+            END IF;
         END $$;
       `);
       logger.info("✅ sys_user structure verified");
