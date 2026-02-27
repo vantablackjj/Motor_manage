@@ -32,15 +32,19 @@ async function startServer() {
       logger.info("Checking/Fixing sys_user structure...");
       await pool.query(`
         DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
-                ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sys_user') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
+                    ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'vai_tro') THEN
+                    ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
+                END IF;
             END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'vai_tro') THEN
-                ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tm_hang_hoa_serial' AND column_name = 'han_dang_kiem') THEN
-                ALTER TABLE tm_hang_hoa_serial ADD COLUMN han_dang_kiem DATE;
+
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tm_hang_hoa_serial') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tm_hang_hoa_serial' AND column_name = 'han_dang_kiem') THEN
+                    ALTER TABLE tm_hang_hoa_serial ADD COLUMN han_dang_kiem DATE;
+                END IF;
             END IF;
         END $$;
       `);
