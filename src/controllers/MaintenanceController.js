@@ -61,48 +61,37 @@ class MaintenanceController {
     }
   }
 
-  // Phê duyệt phiếu bảo trì
-  static async approve(req, res) {
+  // Lấy danh sách bàn nâng
+  static async getBanNang(req, res) {
     try {
-      const { id } = req.params;
-      const { ma_kho } = req.body; // Có thể chọn kho xuất phụ tùng khi duyệt
-      const result = await MaintenanceService.approveMaintenanceRecord(
-        id,
-        req.user.username,
-        ma_kho,
-      );
-      res.json({
-        success: true,
-        message: "Phê duyệt phiếu bảo trì thành công",
-        data: result,
-      });
+      const results = await MaintenanceService.getBanNang(req.query);
+      res.json({ success: true, data: results });
     } catch (error) {
-      logger.error("Error approving maintenance record:", error);
-      res.status(error.status || 500).json({
-        success: false,
-        message: error.message || "Lỗi phê duyệt phiếu",
-      });
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 
-  // Từ chối/Hủy phiếu bảo trì
-  static async reject(req, res) {
+  // Cập nhật trạng thái phiếu (và bàn nâng)
+  static async updateStatus(req, res) {
     try {
       const { id } = req.params;
-      const result = await MaintenanceService.rejectMaintenanceRecord(
-        id,
-        req.user.username,
-      );
+      const { trang_thai, ma_ban_nang, ma_kho } = req.body;
+      const result = await MaintenanceService.updateStatus(id, {
+        trang_thai,
+        ma_ban_nang,
+        ma_kho,
+        user: req.user.username,
+      });
       res.json({
         success: true,
-        message: "Đã từ chối/hủy phiếu bảo trì",
+        message: "Cập nhật trạng thái thành công",
         data: result,
       });
     } catch (error) {
-      logger.error("Error rejecting maintenance record:", error);
+      logger.error("Error updating maintenance status:", error);
       res.status(error.status || 500).json({
         success: false,
-        message: error.message || "Lỗi hủy phiếu",
+        message: error.message || "Lỗi cập nhật phiếu",
       });
     }
   }

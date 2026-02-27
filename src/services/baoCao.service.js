@@ -548,7 +548,7 @@ class BaoCaoService {
           dt.ten_doi_tac::varchar as ho_ten, 
           cn.ma_doi_tac::varchar as ma_kh,
           cn.loai_cong_no::varchar,
-          cn.tong_no::numeric as tong_phai_tra,
+          cn.tong_no::numeric as tong_no,
           cn.tong_da_thanh_toan::numeric as da_tra,
           cn.con_lai::numeric,
           cn.updated_at as ngay_cap_nhat
@@ -585,7 +585,7 @@ class BaoCaoService {
         cn.ma_doi_tac::varchar,
         'KHACH_HANG'::varchar as loai_doi_tac,
         cn.loai_cong_no::varchar,
-        cn.tong_no::numeric as tong_phai_tra,
+        cn.tong_no::numeric as tong_no,
         cn.tong_da_thanh_toan::numeric as da_tra,
         cn.con_lai::numeric,
         cn.updated_at as ngay_cap_nhat
@@ -600,7 +600,7 @@ class BaoCaoService {
         cn.ma_doi_tac::varchar,
         'NHA_CUNG_CAP'::varchar as loai_doi_tac,
         cn.loai_cong_no::varchar,
-        cn.tong_no::numeric as tong_phai_tra,
+        cn.tong_no::numeric as tong_no,
         cn.tong_da_thanh_toan::numeric as da_tra,
         cn.con_lai::numeric,
         cn.updated_at as ngay_cap_nhat
@@ -684,7 +684,7 @@ class BaoCaoService {
       SELECT 
         dt.ten_doi_tac as ho_ten, 
         cn.ma_doi_tac as ma_ncc,
-        cn.tong_no as tong_phai_tra,
+        cn.tong_no as tong_no,
         cn.tong_da_thanh_toan as da_tra,
         cn.con_lai
       FROM tm_cong_no_doi_tac cn

@@ -12,6 +12,15 @@ const createMaintenanceSchema = Joi.object({
     .default("TINH_PHI"),
   ly_do_mien_phi: Joi.string().allow("", null),
   ma_kho: Joi.string().allow(null, ""),
+  ma_ban_nang: Joi.string().allow(null, ""),
+  ktv_chinh: Joi.number().integer().allow(null, ""),
+  trang_thai: Joi.string()
+    .valid("TIEP_NHAN", "DANG_SUA", "CHO_THANH_TOAN", "HOAN_THANH", "DA_HUY")
+    .default("TIEP_NHAN"),
+  tien_phu_tung: Joi.number().min(0).default(0),
+  tien_cong: Joi.number().min(0).default(0),
+  thoi_gian_bat_dau: Joi.date().allow(null, ""),
+  thoi_gian_ket_thuc: Joi.date().allow(null, ""),
   // Dùng khi xe chưa có trong hệ thống (xe ngoài) → tự động đăng ký
   ma_hang_hoa: Joi.string().allow(null, ""),
   so_khung: Joi.string().allow(null, ""),

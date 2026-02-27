@@ -43,25 +43,25 @@ router.post(
 );
 
 /**
- * @route   POST /api/maintenance/:id/approve
- * @desc    Phê duyệt phiếu bảo trì (cập nhật trạng thái DA_DUYET và trừ kho phụ tùng)
- * @access  Private (inventory.approve)
+ * @route   GET /api/maintenance/ban-nang/list
+ * @desc    Lấy danh sách bàn nâng và trạng thái
+ * @access  Private (inventory.view)
  */
-router.post(
-  "/:id/approve",
-  checkPermission("inventory", "approve"),
-  MaintenanceController.approve,
+router.get(
+  "/ban-nang/list",
+  checkPermission("inventory", "view"),
+  MaintenanceController.getBanNang,
 );
 
 /**
- * @route   POST /api/maintenance/:id/reject
- * @desc    Từ chối/Hủy phiếu bảo trì (cập nhật trạng thái DA_HUY)
- * @access  Private (inventory.approve)
+ * @route   PUT /api/maintenance/:id/status
+ * @desc    Cập nhật trạng thái phiếu (Tạo hđ mới, Xuất kho nếu hoàn thành, vv)
+ * @access  Private (inventory.edit)
  */
-router.post(
-  "/:id/reject",
-  checkPermission("inventory", "approve"),
-  MaintenanceController.reject,
+router.put(
+  "/:id/status",
+  checkPermission("inventory", "edit"),
+  MaintenanceController.updateStatus,
 );
 
 module.exports = router;

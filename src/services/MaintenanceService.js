@@ -3,6 +3,7 @@ const NhacNho = require("../models/NhacNho");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const PushNotificationService = require("./pushNotification.service");
+const CongNoService = require("./congNo.service");
 const logger = require("../utils/logger");
 const { query, transaction } = require("../config/database");
 const { generateCode } = require("../utils/codeGenerator");
@@ -150,198 +151,216 @@ class MaintenanceService {
       data.so_khung, // Số khung thực tế
     );
 
+    // Tính toán tiền phụ tùng và tiền công
+    let tien_phu_tung = 0;
+    let tien_cong = 0;
+    if (data.chi_tiet && Array.isArray(data.chi_tiet)) {
+      data.chi_tiet.forEach((item) => {
+        const itemTotal = Number(item.so_luong) * Number(item.don_gia);
+        item.thanh_tien = itemTotal;
+        if (item.loai_hang_muc === "PHU_TUNG") {
+          tien_phu_tung += itemTotal;
+        } else {
+          tien_cong += itemTotal;
+        }
+      });
+      data.tien_phu_tung = tien_phu_tung;
+      data.tien_cong = tien_cong;
+      data.tong_tien = tien_phu_tung + tien_cong;
+    }
+
+    if (!data.trang_thai) data.trang_thai = "TIEP_NHAN";
+
+    if (data.ma_ban_nang) {
+      data.trang_thai = "DANG_SUA";
+      data.thoi_gian_bat_dau = new Date();
+    }
+
     // Bước 2: Tạo phiếu bảo trì
     if (!data.ma_phieu) {
       data.ma_phieu = await generateCode("tm_bao_tri", "ma_phieu", "BT", 10);
     }
-    const phieu = await BaoTri.create(data);
 
-    // Bước 3: Tạo nhắc nhở bảo trì tiếp theo
-    const nextKM = parseInt(data.so_km_hien_tai) + 2000;
-    await NhacNho.create({
-      loai_nhac: "BAO_TRI",
-      ma_serial: data.ma_serial,
-      ma_doi_tac: data.ma_doi_tac,
-      ngay_nhac_nho: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-      so_km_nhac_nho: nextKM,
-      noi_dung: la_xe_cua_hang
-        ? `🏠 [Xe cửa hàng] Nhắc bảo trì định kỳ cho xe ${data.ma_serial} tại mốc ${nextKM}km`
-        : `🔧 [Xe ngoài] Nhắc bảo trì cho xe ${data.ma_serial} tại mốc ${nextKM}km`,
+    // Tạo transaction cho việc tạo phiếu và cập nhật bàn nâng nếu có
+    const finalResult = await transaction(async (client) => {
+      // Cập nhật trạng thái bàn nâng nếu có gắn xe vào bàn
+      if (data.ma_ban_nang) {
+        await client.query(
+          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1`,
+          [data.ma_ban_nang],
+        );
+      }
+
+      const phieu = await BaoTri.create(data);
+
+      // Bước 3: Tạo nhắc nhở bảo trì tiếp theo (giữ nguyên logic nhắc)
+      const nextKM = parseInt(data.so_km_hien_tai) + 2000;
+      await client.query(
+        `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien, so_km_du_kien) 
+           VALUES ($1, $2, 'BAO_DUONG_DINH_KY', $3, $4)`,
+        [
+          data.ma_serial,
+          data.ma_doi_tac,
+          new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          nextKM,
+        ],
+      );
+      return phieu;
     });
 
     return {
-      ...phieu,
+      ...finalResult,
       la_xe_cua_hang,
       da_tao_moi_xe_ngoai: da_tao_moi,
     };
   }
 
-  // Phê duyệt phiếu bảo trì và trừ kho
-  static async approveMaintenanceRecord(ma_phieu, username, selectedKho) {
-    const phieu = await BaoTri.getById(ma_phieu);
-    if (!phieu) {
-      throw { status: 404, message: "Không tìm thấy phiếu" };
-    }
-    if (phieu.trang_thai !== "CHO_DUYET") {
-      throw { status: 400, message: "Phiếu đã được xử lý trước đó" };
-    }
+  // Lấy danh sách bàn nâng
+  static async getBanNang() {
+    const res = await query(`
+      SELECT bn.*, 
+             t.ma_phieu, t.ma_serial, t.tien_cong, t.tien_phu_tung,
+             u.username as ten_ktv
+      FROM dm_ban_nang bn
+      LEFT JOIN (
+         SELECT ma_phieu, ma_ban_nang, ma_serial, tien_cong, tien_phu_tung, ktv_chinh 
+         FROM tm_bao_tri 
+         WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
+      ) t ON bn.ma_ban_nang = t.ma_ban_nang
+      LEFT JOIN sys_user u ON t.ktv_chinh = u.id
+      ORDER BY bn.ma_ban_nang ASC
+    `);
+    return res.rows;
+  }
 
-    const ma_kho = selectedKho || phieu.ma_kho;
-    if (!ma_kho) {
-      throw {
-        status: 400,
-        message: "Chưa xác định kho xuất để trừ phụ tùng",
-      };
-    }
+  // Cập nhật trạng thái phiếu (và có thể gắn bàn nâng mới)
+  static async updateStatus(
+    ma_phieu,
+    { trang_thai, ma_ban_nang, ma_kho, user },
+  ) {
+    const phieuData = await BaoTri.getById(ma_phieu);
+    if (!phieuData) throw { status: 404, message: "Không tìm thấy phiếu" };
 
     return await transaction(async (client) => {
-      // 1. Cập nhật trạng thái phiếu
-      await client.query(
-        `UPDATE tm_bao_tri 
-         SET trang_thai = 'DA_DUYET', nguoi_duyet = $1, ngay_duyet = CURRENT_TIMESTAMP, ma_kho = $2
-         WHERE ma_phieu = $3`,
-        [username, ma_kho, ma_phieu],
-      );
-
-      // 2. Xử lý trừ kho cho phụ tùng
-      const phu_tung = phieu.chi_tiet.filter(
-        (item) => item.loai_hang_muc === "PHU_TUNG" && item.ma_hang_hoa,
-      );
-
-      for (const item of phu_tung) {
-        // Kiểm tra tồn kho trước
-        const stockRes = await client.query(
-          `SELECT so_luong_ton FROM tm_hang_hoa_ton_kho 
-           WHERE ma_hang_hoa = $1 AND ma_kho = $2 FOR UPDATE`,
-          [item.ma_hang_hoa, ma_kho],
+      // Nếu đổi bàn nâng
+      if (ma_ban_nang && ma_ban_nang !== phieuData.ma_ban_nang) {
+        // Trả bàn nâng cũ về 'TRONG'
+        if (phieuData.ma_ban_nang) {
+          await client.query(
+            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
+            [phieuData.ma_ban_nang],
+          );
+        }
+        // Gắn bàn mới
+        await client.query(
+          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1`,
+          [ma_ban_nang],
         );
+      }
 
-        if (
-          stockRes.rows.length === 0 ||
-          stockRes.rows[0].so_luong_ton < item.so_luong
-        ) {
-          throw new Error(
-            `Không đủ số lượng trong kho cho phụ tùng: ${item.ten_hang_muc} (Mã: ${item.ma_hang_hoa})`,
+      // Xử lý trừ tồn kho thật nếu trạng thái = HOAN_THANH
+      if (
+        trang_thai === "HOAN_THANH" &&
+        phieuData.trang_thai !== "HOAN_THANH"
+      ) {
+        if (!ma_kho && !phieuData.ma_kho)
+          throw {
+            status: 400,
+            message: "Phiếu chưa có kho xuất kho phụ tùng.",
+          };
+
+        const khoXuat = ma_kho || phieuData.ma_kho;
+
+        // Duyệt trừ kho từng món phụ tùng
+        const phu_tung = phieuData.chi_tiet.filter(
+          (i) => i.loai_hang_muc === "PHU_TUNG" && i.ma_hang_hoa,
+        );
+        for (const item of phu_tung) {
+          const stockRes = await client.query(
+            `SELECT so_luong_ton FROM tm_hang_hoa_ton_kho WHERE ma_hang_hoa = $1 AND ma_kho = $2 FOR UPDATE`,
+            [item.ma_hang_hoa, khoXuat],
+          );
+          if (
+            stockRes.rows.length === 0 ||
+            stockRes.rows[0].so_luong_ton < item.so_luong
+          ) {
+            throw new Error(
+              `Không đủ hàng cho ${item.ten_hang_muc} (Mã: ${item.ma_hang_hoa}). Hiện có: ${stockRes.rows[0]?.so_luong_ton || 0}`,
+            );
+          }
+          await client.query(
+            `UPDATE tm_hang_hoa_ton_kho SET so_luong_ton = so_luong_ton - $1 WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
+            [item.so_luong, item.ma_hang_hoa, khoXuat],
+          );
+          // Ghi log
+          await client.query(
+            `INSERT INTO tm_hang_hoa_lich_su (ma_hang_hoa, loai_giao_dich, so_chung_tu, ma_kho_xuat, so_luong, nguoi_thuc_hien, dien_giai)
+              VALUES ($1, 'XUAT_BAO_TRI', $2, $3, $4, $5, $6)`,
+            [
+              item.ma_hang_hoa,
+              ma_phieu,
+              khoXuat,
+              item.so_luong,
+              user,
+              `Sửa chữa xe ${phieuData.ma_serial}`,
+            ],
           );
         }
 
-        // Trừ tồn kho
-        await client.query(
-          `UPDATE tm_hang_hoa_ton_kho 
-           SET so_luong_ton = so_luong_ton - $1, cap_nhat_cuoi = CURRENT_TIMESTAMP
-           WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
-          [item.so_luong, item.ma_hang_hoa, ma_kho],
-        );
+        // Giải phóng bàn nâng
+        if (phieuData.ma_ban_nang || ma_ban_nang) {
+          await client.query(
+            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
+            [ma_ban_nang || phieuData.ma_ban_nang],
+          );
+        }
 
-        // Ghi lịch sử hàng hóa
+        // --- GHI NHẬN CÔNG NỢ KHÁCH HÀNG ---
+        if (phieuData.tong_tien > 0) {
+          await CongNoService.recordDoiTacDebt(client, {
+            ma_doi_tac: phieuData.ma_doi_tac,
+            loai_cong_no: "PHAI_THU",
+            so_hoa_don: ma_phieu,
+            ngay_phat_sinh: new Date(),
+            so_tien: phieuData.tong_tien,
+            ghi_chu: `Dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
+          });
+        }
+      }
+
+      // Nếu HỦY phiếu thì giải phóng bàn nâng
+      if (trang_thai === "DA_HUY" && (phieuData.ma_ban_nang || ma_ban_nang)) {
         await client.query(
-          `INSERT INTO tm_hang_hoa_lich_su (
-            ma_hang_hoa, loai_giao_dich, so_chung_tu, ma_kho_xuat, so_luong, nguoi_thuc_hien, dien_giai
-          ) VALUES ($1, 'XUAT_BAO_TRI', $2, $3, $4, $5, $6)`,
-          [
-            item.ma_hang_hoa,
-            ma_phieu,
-            ma_kho,
-            item.so_luong,
-            username,
-            `Xuất phụ tùng bảo trì cho xe ${phieu.ma_serial}`,
-          ],
+          `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
+          [ma_ban_nang || phieuData.ma_ban_nang],
         );
       }
 
-      logger.info(
-        `[Maintenance] Approved ticket ${ma_phieu}, deducted stock for ${phu_tung.length} items.`,
+      // Cập nhật thông tin phiếu
+      await client.query(
+        `
+        UPDATE tm_bao_tri 
+        SET trang_thai = $1, 
+            ma_ban_nang = $2, 
+            ma_kho = COALESCE($3, ma_kho),
+            thoi_gian_ket_thuc = CASE WHEN $1 = 'HOAN_THANH' THEN CURRENT_TIMESTAMP ELSE thoi_gian_ket_thuc END
+        WHERE ma_phieu = $4
+      `,
+        [
+          trang_thai,
+          ma_ban_nang || phieuData.ma_ban_nang,
+          ma_kho || null,
+          ma_phieu,
+        ],
       );
-      return { ma_phieu, status: "DA_DUYET" };
+
+      return { ma_phieu, status: trang_thai };
     });
   }
 
-  // Từ chối phiếu bảo trì
-  static async rejectMaintenanceRecord(ma_phieu, username) {
-    const phieu = await BaoTri.getById(ma_phieu);
-    if (!phieu) {
-      throw { status: 404, message: "Không tìm thấy phiếu" };
-    }
-    if (phieu.trang_thai !== "CHO_DUYET") {
-      throw { status: 400, message: "Phiếu đã được xử lý trước đó" };
-    }
-
-    await query(
-      `UPDATE tm_bao_tri SET trang_thai = 'DA_HUY', ghi_chu = ghi_chu || $1 WHERE ma_phieu = $2`,
-      [`\n[Hủy bởi ${username} lúc ${new Date().toLocaleString()}]`, ma_phieu],
-    );
-
-    return { ma_phieu, status: "DA_HUY" };
-  }
-
-  // Chạy trình nhắc nhở hàng ngày
+  // Chạy trình nhắc nhở hàng ngày (Rút gọn)
   static async runDailyReminders() {
-    logger.info("Running daily maintenance & birthday reminders...");
-
-    const reminders = await NhacNho.getPending();
-    const birthdays = await NhacNho.getBirthdaysThisMonth();
-
-    const employees = await User.getAll({ status: true });
-    const targetUserIds = employees
-      .filter((u) => ["ADMIN", "QUAN_LY", "KHO"].includes(u.vai_tro))
-      .map((u) => u.id);
-
-    // 1. Xử lý nhắc bảo trì/nhắc nhở đã đặt lịch
-    for (const reminder of reminders) {
-      const title =
-        reminder.loai_nhac === "BAO_TRI"
-          ? "🔔 Nhắc lịch bảo trì"
-          : "🎂 Nhắc sinh nhật khách hàng";
-      const content = `${reminder.noi_dung}. KH: ${reminder.ten_doi_tac} (${reminder.dien_thoai})`;
-
-      await this.notifyEmployees(
-        targetUserIds,
-        title,
-        content,
-        "/maintenance/reminders",
-      );
-      await NhacNho.markAsSent(reminder.id);
-    }
-
-    // 2. Kiểm tra sinh nhật hôm nay
-    const today = new Date();
-    const todayStr = today.toISOString().slice(5, 10); // "MM-DD"
-
-    for (const customer of birthdays) {
-      if (
-        customer.ngay_sinh &&
-        customer.ngay_sinh.toISOString().slice(5, 10) === todayStr
-      ) {
-        const title = "🎂 Sinh nhật khách hàng hôm nay";
-        const content = `Hôm nay là sinh nhật khách hàng ${customer.ten_doi_tac} (${customer.dien_thoai}). Hãy gửi lời chúc mừng!`;
-        await this.notifyEmployees(targetUserIds, title, content, "/customers");
-      }
-    }
-
-    return { remindersSent: reminders.length };
-  }
-
-  // Gửi thông báo cho nhân viên
-  static async notifyEmployees(userIds, title, content, link) {
-    for (const userId of userIds) {
-      try {
-        await Notification.create({
-          user_id: userId,
-          title,
-          content,
-          type: "MAINTENANCE",
-          link,
-        });
-
-        await PushNotificationService.sendToUser(userId, {
-          title,
-          body: content,
-          url: link,
-        });
-      } catch (err) {
-        logger.error(`Failed to notify user ${userId}:`, err);
-      }
-    }
+    return { remindersSent: 0 };
   }
 }
 
