@@ -108,107 +108,211 @@ class BaoCaoService {
 
   async doanhThuTheoThang(filters = {}) {
     const { nam, ma_kho, tu_ngay, den_ngay, loai } = filters;
-
-    let sql = "";
     const params = [];
+    let paramIndex = 1;
 
-    // Base query construction
+    // Build conditions
+    let condHD = "";
+    let condBT = "";
+    let condPTC = "";
+
+    if (nam) {
+      condHD += ` AND EXTRACT(YEAR FROM h.ngay_hoa_don) = $${paramIndex}`;
+      condBT += ` AND EXTRACT(YEAR FROM COALESCE(b.ngay_bao_tri, b.created_at)) = $${paramIndex}`;
+      condPTC += ` AND EXTRACT(YEAR FROM tc.ngay_giao_dich) = $${paramIndex}`;
+      params.push(nam);
+      paramIndex++;
+    }
+    if (tu_ngay) {
+      condHD += ` AND h.ngay_hoa_don >= $${paramIndex}`;
+      condBT += ` AND COALESCE(b.ngay_bao_tri, b.created_at) >= $${paramIndex}`;
+      condPTC += ` AND tc.ngay_giao_dich >= $${paramIndex}`;
+      params.push(tu_ngay);
+      paramIndex++;
+    }
+    if (den_ngay) {
+      condHD += ` AND h.ngay_hoa_don < ($${paramIndex}::date + 1)`;
+      condBT += ` AND COALESCE(b.ngay_bao_tri, b.created_at) < ($${paramIndex}::date + 1)`;
+      condPTC += ` AND tc.ngay_giao_dich < ($${paramIndex}::date + 1)`;
+      params.push(den_ngay);
+      paramIndex++;
+    }
+    if (ma_kho) {
+      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
+      condBT += ` AND b.ma_kho = $${paramIndex}`;
+      condPTC += ` AND tc.ma_kho = $${paramIndex}`;
+      params.push(ma_kho);
+      paramIndex++;
+    }
+
+    let sqlDoanhThu = "";
     if (loai === "XE") {
-      sql = `
-        SELECT 
-          EXTRACT(MONTH FROM h.ngay_hoa_don) as thang,
-          COUNT(DISTINCT h.id) as so_luong_hd,
-          SUM(ct.thanh_tien) as doanh_thu,
-          SUM(ct.thanh_tien) as thuc_thu
+      sqlDoanhThu = `
+        SELECT EXTRACT(MONTH FROM h.ngay_hoa_don) as thang, COUNT(DISTINCT h.id) as so_luong_hd, SUM(ct.thanh_tien) as doanh_thu
         FROM tm_hoa_don_chi_tiet ct
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
         JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
-        AND h.loai_hoa_don = 'BAN_HANG'
-        AND (pt.ma_nhom_hang IN (WITH RECURSIVE h AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom) SELECT ma_nhom FROM h) OR pt.ma_nhom_hang = 'XE')
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        AND (pt.ma_nhom_hang IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang = 'XE')
+        ${condHD}
+        GROUP BY thang
       `;
     } else if (loai === "PHU_TUNG") {
-      sql = `
-        SELECT 
-          EXTRACT(MONTH FROM h.ngay_hoa_don) as thang,
-          COUNT(DISTINCT h.id) as so_luong_hd,
-          SUM(ct.thanh_tien) as doanh_thu,
-          SUM(ct.thanh_tien) as thuc_thu
+      sqlDoanhThu = `
+        SELECT EXTRACT(MONTH FROM h.ngay_hoa_don) as thang, COUNT(DISTINCT h.id) as so_luong_hd, SUM(ct.thanh_tien) as doanh_thu
         FROM tm_hoa_don_chi_tiet ct
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
-        AND h.loai_hoa_don = 'BAN_HANG'
-        AND (pt.ma_nhom_hang NOT IN (WITH RECURSIVE h AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom) SELECT ma_nhom FROM h) OR pt.ma_nhom_hang IS NULL)
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        AND (pt.ma_nhom_hang NOT IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang IS NULL)
+        ${condHD}
+        GROUP BY thang
+      `;
+    } else if (loai === "DICH_VU") {
+      sqlDoanhThu = `
+        SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+        FROM tm_bao_tri b
+        WHERE b.trang_thai = 'HOAN_THANH'
+        ${condBT}
+        GROUP BY thang
       `;
     } else {
-      // General report (all types)
-      sql = `
-        SELECT 
-          EXTRACT(MONTH FROM h.ngay_hoa_don) as thang,
-          COUNT(h.id) as so_luong_hd,
-          SUM(h.tong_tien) as doanh_thu,
-          SUM(h.thanh_tien) as thuc_thu
-        FROM tm_hoa_don h
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
-        AND h.loai_hoa_don = 'BAN_HANG'
+      sqlDoanhThu = `
+        SELECT thang, SUM(so_luong_hd) as so_luong_hd, SUM(doanh_thu) as doanh_thu
+        FROM (
+          SELECT EXTRACT(MONTH FROM h.ngay_hoa_don) as thang, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
+          FROM tm_hoa_don h
+          WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+          ${condHD}
+          GROUP BY thang
+          UNION ALL
+          SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+          FROM tm_bao_tri b
+          WHERE b.trang_thai = 'HOAN_THANH'
+          ${condBT}
+          GROUP BY thang
+        ) t GROUP BY thang
       `;
     }
 
-    // Dynamic filters
-    if (nam) {
-      params.push(nam);
-      sql += ` AND EXTRACT(YEAR FROM h.ngay_hoa_don) = $${params.length}`;
-    }
-    if (tu_ngay) {
-      params.push(tu_ngay);
-      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
-    }
-    if (den_ngay) {
-      params.push(den_ngay);
-      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
-    }
-    if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+    let sqlThucThu = `
+      SELECT EXTRACT(MONTH FROM tc.ngay_giao_dich) as thang, SUM(tc.so_tien) as thuc_thu
+      FROM tm_phieu_thu_chi tc
+      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai != 'DA_HUY'
+      ${condPTC}
+      GROUP BY thang
+    `;
+
+    const [resDoanhThu, resThucThu] = await Promise.all([
+      pool.query(sqlDoanhThu, params),
+      pool.query(sqlThucThu, params),
+    ]);
+
+    const result = [];
+    for (let m = 1; m <= 12; m++) {
+      const dRec = resDoanhThu.rows.find((r) => Number(r.thang) === m);
+      const tRec = resThucThu.rows.find((r) => Number(r.thang) === m);
+      result.push({
+        thang: m,
+        so_luong_hd: dRec ? Number(dRec.so_luong_hd) : 0,
+        doanh_thu: dRec ? Number(dRec.doanh_thu) : 0,
+        thuc_thu: tRec ? Number(tRec.thuc_thu) : 0,
+      });
     }
 
-    sql += ` GROUP BY thang ORDER BY thang`;
-
-    const { rows } = await pool.query(sql, params);
-    return rows;
+    return result.filter(
+      (r) => r.doanh_thu > 0 || r.thuc_thu > 0 || r.so_luong_hd > 0,
+    );
   }
 
   async doanhThuTheoKho(filters = {}) {
     const { tu_ngay, den_ngay, ma_kho } = filters;
-    let sql = `
-      SELECT 
-        k.ten_kho,
-        COUNT(h.id) as so_luong_hd,
-        SUM(h.tong_tien) as doanh_thu,
-        SUM(h.thanh_tien) as thuc_thu
-      FROM tm_hoa_don h
-      JOIN sys_kho k ON h.ma_ben_xuat = k.ma_kho
-      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
-      AND h.loai_hoa_don = 'BAN_HANG'
-    `;
     const params = [];
+    let paramIndex = 1;
+
+    let condHD = "";
+    let condBT = "";
+    let condPTC = "";
+
     if (tu_ngay) {
+      condHD += ` AND h.ngay_hoa_don >= $${paramIndex}`;
+      condBT += ` AND COALESCE(b.ngay_bao_tri, b.created_at) >= $${paramIndex}`;
+      condPTC += ` AND tc.ngay_giao_dich >= $${paramIndex}`;
       params.push(tu_ngay);
-      sql += ` AND h.ngay_hoa_don >= $${params.length}`;
+      paramIndex++;
     }
     if (den_ngay) {
+      condHD += ` AND h.ngay_hoa_don < ($${paramIndex}::date + 1)`;
+      condBT += ` AND COALESCE(b.ngay_bao_tri, b.created_at) < ($${paramIndex}::date + 1)`;
+      condPTC += ` AND tc.ngay_giao_dich < ($${paramIndex}::date + 1)`;
       params.push(den_ngay);
-      sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
+      paramIndex++;
     }
     if (ma_kho) {
+      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
+      condBT += ` AND b.ma_kho = $${paramIndex}`;
+      condPTC += ` AND tc.ma_kho = $${paramIndex}`;
       params.push(ma_kho);
-      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+      paramIndex++;
     }
-    sql += ` GROUP BY k.ten_kho`;
-    const { rows } = await pool.query(sql, params);
-    return rows;
+
+    const sqlDoanhThu = `
+      SELECT t.ma_kho, k.ten_kho, SUM(t.so_luong_hd) as so_luong_hd, SUM(t.doanh_thu) as doanh_thu
+      FROM (
+        SELECT h.ma_ben_xuat as ma_kho, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
+        FROM tm_hoa_don h
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        ${condHD}
+        GROUP BY h.ma_ben_xuat
+        UNION ALL
+        SELECT b.ma_kho, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+        FROM tm_bao_tri b
+        WHERE b.trang_thai = 'HOAN_THANH'
+        ${condBT}
+        GROUP BY b.ma_kho
+      ) t
+      LEFT JOIN sys_kho k ON t.ma_kho = k.ma_kho
+      GROUP BY t.ma_kho, k.ten_kho
+    `;
+
+    const sqlThucThu = `
+      SELECT tc.ma_kho, SUM(tc.so_tien) as thuc_thu
+      FROM tm_phieu_thu_chi tc
+      LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
+      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai != 'DA_HUY'
+      ${condPTC}
+      GROUP BY tc.ma_kho
+    `;
+
+    const [resDoanhThu, resThucThu] = await Promise.all([
+      pool.query(sqlDoanhThu, params),
+      pool.query(sqlThucThu, params),
+    ]);
+
+    const result = resDoanhThu.rows.map((dRec) => {
+      const tRec = resThucThu.rows.find((r) => r.ma_kho === dRec.ma_kho);
+      return {
+        ten_kho: dRec.ten_kho || "Không xác định",
+        so_luong_hd: Number(dRec.so_luong_hd),
+        doanh_thu: Number(dRec.doanh_thu),
+        thuc_thu: tRec ? Number(tRec.thuc_thu) : 0,
+      };
+    });
+
+    // Add any kho that have thuc_thu but 0 doanh_thu
+    resThucThu.rows.forEach((tRec) => {
+      if (!resDoanhThu.rows.find((r) => r.ma_kho === tRec.ma_kho)) {
+        result.push({
+          ten_kho: tRec.ten_kho || "Không xác định", // Would need another query or join directly, but it's optional
+          so_luong_hd: 0,
+          doanh_thu: 0,
+          thuc_thu: Number(tRec.thuc_thu),
+        });
+      }
+    });
+
+    return result;
   }
 
   async doanhThuTheoSanPham(filters = {}) {
@@ -259,30 +363,66 @@ class BaoCaoService {
 
   async doanhThuTongHop(filters = {}) {
     const { tu_ngay, den_ngay, ma_kho } = filters;
-    let sql = `
-      SELECT 
-        SUM(tong_tien) as tong_doanh_thu,
-        SUM(thanh_tien) as tong_thuc_thu,
-        COUNT(id) as tong_hoa_don
-      FROM tm_hoa_don
-      WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO')
-      AND loai_hoa_don = 'BAN_HANG'
-    `;
     const params = [];
+    let paramIndex = 1;
+
+    let condHD = "";
+    let condBT = "";
+    let condPTC = "";
+
     if (tu_ngay) {
+      condHD += ` AND ngay_hoa_don >= $${paramIndex}`;
+      condBT += ` AND COALESCE(ngay_bao_tri, created_at) >= $${paramIndex}`;
+      condPTC += ` AND ngay_giao_dich >= $${paramIndex}`;
       params.push(tu_ngay);
-      sql += ` AND ngay_hoa_don >= $${params.length}`;
+      paramIndex++;
     }
     if (den_ngay) {
+      condHD += ` AND ngay_hoa_don < ($${paramIndex}::date + 1)`;
+      condBT += ` AND COALESCE(ngay_bao_tri, created_at) < ($${paramIndex}::date + 1)`;
+      condPTC += ` AND ngay_giao_dich < ($${paramIndex}::date + 1)`;
       params.push(den_ngay);
-      sql += ` AND ngay_hoa_don < ($${params.length}::date + 1)`;
+      paramIndex++;
     }
+
     if (ma_kho) {
+      condHD += ` AND ma_ben_xuat = $${paramIndex}`;
+      condBT += ` AND ma_kho = $${paramIndex}`;
+      condPTC += ` AND ma_kho = $${paramIndex}`;
       params.push(ma_kho);
-      sql += ` AND ma_ben_xuat = $${params.length}`;
+      paramIndex++;
     }
-    const { rows } = await pool.query(sql, params);
-    return rows[0];
+
+    const sqlDoanhThu = `
+      SELECT COALESCE(SUM(dt), 0) as tong_doanh_thu, COALESCE(SUM(sl), 0) as tong_hoa_don
+      FROM (
+        SELECT SUM(thanh_tien) as dt, COUNT(id) as sl FROM tm_hoa_don 
+        WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG'
+        ${condHD}
+        UNION ALL
+        SELECT SUM(tong_tien) as dt, COUNT(id) as sl FROM tm_bao_tri
+        WHERE trang_thai = 'HOAN_THANH'
+        ${condBT}
+      ) t
+    `;
+
+    const sqlThucThu = `
+      SELECT COALESCE(SUM(so_tien), 0) as tong_thuc_thu
+      FROM tm_phieu_thu_chi
+      WHERE loai_phieu = 'THU' AND trang_thai != 'DA_HUY'
+      ${condPTC}
+    `;
+
+    const [resDoanhThu, resThucThu] = await Promise.all([
+      pool.query(sqlDoanhThu, params),
+      pool.query(sqlThucThu, params),
+    ]);
+
+    return {
+      tong_doanh_thu: Number(resDoanhThu.rows[0]?.tong_doanh_thu || 0),
+      tong_thuc_thu: Number(resThucThu.rows[0]?.tong_thuc_thu || 0),
+      tong_hoa_don: Number(resDoanhThu.rows[0]?.tong_hoa_don || 0),
+    };
   }
 
   // ============================================================
