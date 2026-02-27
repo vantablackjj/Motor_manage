@@ -500,7 +500,91 @@ class MaintenanceService {
 
   // Chạy trình nhắc nhở hàng ngày (Rút gọn)
   static async runDailyReminders() {
-    return { remindersSent: 0 };
+    let remindersSent = 0;
+
+    await transaction(async (client) => {
+      // 1. Nhắc nhở theo Mốc thời gian (vd: Xe vừa mua tròn 1 tháng, 6 tháng, 1 năm)
+      // Tìm các xe có ngày bán cách đây đúng 1 tháng (30 ngày), 6 tháng (180 ngày), 1 năm (365 ngày)
+      const timeDueQuery = `
+        SELECT h.ma_ben_nhap as ma_doi_tac, ct.ma_serial, s.ngay_ban, s.so_km_hien_tai, d.ten_doi_tac 
+        FROM tm_hang_hoa_serial s 
+        JOIN tm_hoa_don_chi_tiet ct on s.ma_serial = ct.ma_serial 
+        JOIN tm_hoa_don h on ct.so_hoa_don = h.so_hoa_don 
+        JOIN dm_doi_tac d on h.ma_ben_nhap = d.ma_doi_tac
+        WHERE h.loai_hoa_don = 'BAN_HANG' 
+        AND s.ngay_ban IS NOT NULL
+        AND (
+          CURRENT_DATE = s.ngay_ban + INTERVAL '1 month'
+          OR CURRENT_DATE = s.ngay_ban + INTERVAL '6 months'
+          OR CURRENT_DATE = s.ngay_ban + INTERVAL '1 year'
+        )
+      `;
+      const timeDueRes = await client.query(timeDueQuery);
+
+      for (const car of timeDueRes.rows) {
+        // Kiểm tra xem đã nhắc hôm nay chưa để tránh lặp
+        const checkQuery = `SELECT id FROM tm_nhac_nho WHERE ma_serial = $1 AND ngay_nhac_nho = CURRENT_DATE AND loai_nhac = 'BAO_TRI'`;
+        const checkRes = await client.query(checkQuery, [car.ma_serial]);
+
+        if (checkRes.rows.length === 0) {
+          await client.query(
+            `INSERT INTO tm_nhac_nho (loai_nhac, ma_serial, ma_doi_tac, ngay_nhac_nho, so_km_nhac_nho, noi_dung, da_nhac) 
+              VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, FALSE)`,
+            [
+              "BAO_TRI",
+              car.ma_serial,
+              car.ma_doi_tac,
+              car.so_km_hien_tai,
+              `Đã đến hạn bảo dưỡng định kỳ theo thời gian cho xe ${car.ma_serial}. Vui lòng đưa xe đến cửa hàng để được kiểm tra.`,
+            ],
+          );
+          remindersSent++;
+        }
+      }
+
+      // 2. Nhắc nhở theo số KM
+      // Giả sử cứ mỗi 2000km là 1 lần nhắc (2000, 4000, 6000...)
+      // Tìm xe có số KM >= mốc nhắc nhở (gần nhất) nhưng CHƯA CÓ nhắc nhở nào cho mốc này
+      const kmDueQuery = `
+        SELECT s.ma_serial, s.so_km_hien_tai, 
+          COALESCE((SELECT h.ma_ben_nhap FROM tm_hoa_don_chi_tiet ct JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don WHERE ct.ma_serial = s.ma_serial AND h.loai_hoa_don = 'BAN_HANG' LIMIT 1), 
+                   (SELECT ma_doi_tac FROM tm_bao_tri b WHERE b.ma_serial = s.ma_serial ORDER BY thoi_gian_ket_thuc DESC LIMIT 1)) as ma_doi_tac
+        FROM tm_hang_hoa_serial s
+        WHERE s.so_km_hien_tai > 0
+      `;
+      const kmDueRes = await client.query(kmDueQuery);
+
+      for (const car of kmDueRes.rows) {
+        if (!car.ma_doi_tac) continue;
+
+        // Tính mốc 2000, 4000...
+        const mocKm = Math.floor(car.so_km_hien_tai / 2000) * 2000;
+        if (mocKm >= 2000) {
+          // Kiểm tra xem tại mốc này (hoặc lớn hơn) đã có nhắc chưa
+          const checkKmRes = await client.query(
+            `SELECT id FROM tm_nhac_nho WHERE ma_serial = $1 AND loai_nhac = 'BAO_TRI' AND so_km_nhac_nho >= $2`,
+            [car.ma_serial, mocKm],
+          );
+
+          if (checkKmRes.rows.length === 0) {
+            await client.query(
+              `INSERT INTO tm_nhac_nho (loai_nhac, ma_serial, ma_doi_tac, ngay_nhac_nho, so_km_nhac_nho, noi_dung, da_nhac) 
+                VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, FALSE)`,
+              [
+                "BAO_TRI",
+                car.ma_serial,
+                car.ma_doi_tac,
+                mocKm,
+                `Xe ${car.ma_serial} đã đạt mốc ${mocKm} km! Đã đến lúc mang xe qua xưởng để bảo dưỡng định kỳ.`,
+              ],
+            );
+            remindersSent++;
+          }
+        }
+      }
+    });
+
+    return { remindersSent };
   }
 }
 

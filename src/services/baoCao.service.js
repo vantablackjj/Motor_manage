@@ -171,7 +171,7 @@ class BaoCaoService {
       `;
     } else if (loai === "DICH_VU") {
       sqlDoanhThu = `
-        SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+        SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.ma_phieu) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
         FROM tm_bao_tri b
         WHERE b.trang_thai = 'HOAN_THANH'
         ${condBT}
@@ -187,7 +187,7 @@ class BaoCaoService {
           ${condHD}
           GROUP BY thang
           UNION ALL
-          SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+          SELECT EXTRACT(MONTH FROM COALESCE(b.ngay_bao_tri, b.created_at)) as thang, COUNT(b.ma_phieu) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
           FROM tm_bao_tri b
           WHERE b.trang_thai = 'HOAN_THANH'
           ${condBT}
@@ -260,13 +260,13 @@ class BaoCaoService {
     const sqlDoanhThu = `
       SELECT t.ma_kho, k.ten_kho, SUM(t.so_luong_hd) as so_luong_hd, SUM(t.doanh_thu) as doanh_thu
       FROM (
-        SELECT h.ma_ben_xuat as ma_kho, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
+        SELECT h.ma_ben_xuat as ma_kho, COUNT(h.so_hoa_don) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
         FROM tm_hoa_don h
         WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
         ${condHD}
         GROUP BY h.ma_ben_xuat
         UNION ALL
-        SELECT b.ma_kho, COUNT(b.id) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
+        SELECT b.ma_kho, COUNT(b.ma_phieu) as so_luong_hd, SUM(b.tong_tien) as doanh_thu
         FROM tm_bao_tri b
         WHERE b.trang_thai = 'HOAN_THANH'
         ${condBT}
@@ -396,11 +396,11 @@ class BaoCaoService {
     const sqlDoanhThu = `
       SELECT COALESCE(SUM(dt), 0) as tong_doanh_thu, COALESCE(SUM(sl), 0) as tong_hoa_don
       FROM (
-        SELECT SUM(thanh_tien) as dt, COUNT(id) as sl FROM tm_hoa_don 
+        SELECT SUM(thanh_tien) as dt, COUNT(so_hoa_don) as sl FROM tm_hoa_don 
         WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG'
         ${condHD}
         UNION ALL
-        SELECT SUM(tong_tien) as dt, COUNT(id) as sl FROM tm_bao_tri
+        SELECT SUM(tong_tien) as dt, COUNT(ma_phieu) as sl FROM tm_bao_tri
         WHERE trang_thai = 'HOAN_THANH'
         ${condBT}
       ) t
