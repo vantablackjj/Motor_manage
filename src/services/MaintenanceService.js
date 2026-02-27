@@ -422,7 +422,7 @@ class MaintenanceService {
           await CongNoService.recordDoiTacDebt(client, {
             ma_doi_tac: phieuData.ma_doi_tac,
             loai_cong_no: "PHAI_THU",
-            so_hoa_don: ma_phieu,
+            so_hoa_don: null, // Không dùng mã phiếu bảo trì làm số hóa đơn để tránh lỗi FK Constraint
             ngay_phat_sinh: new Date(),
             so_tien: phieuData.tong_tien,
             ghi_chu: `Dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
@@ -458,6 +458,44 @@ class MaintenanceService {
 
       return { ma_phieu, status: trang_thai };
     });
+  }
+
+  // Lấy danh sách nhắc nhở bảo trì
+  static async getReminders(filters = {}) {
+    const { search, tu_ngay, den_ngay } = filters;
+    let sql = `
+      SELECT n.*, 
+             x.serial_identifier as so_khung, 
+             hh.ten_hang_hoa as ten_xe,
+             d.ten_doi_tac as ten_khach_hang, 
+             d.dien_thoai
+      FROM tm_nhac_nho_bao_duong n
+      LEFT JOIN tm_hang_hoa_serial x ON n.ma_serial = x.ma_serial
+      LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN dm_doi_tac d ON n.ma_khach_hang = d.ma_doi_tac
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      sql += ` AND (n.ma_serial ILIKE $${params.length} OR d.ten_doi_tac ILIKE $${params.length} OR x.serial_identifier ILIKE $${params.length})`;
+    }
+
+    if (tu_ngay) {
+      params.push(tu_ngay);
+      sql += ` AND n.ngay_du_kien >= $${params.length}`;
+    }
+
+    if (den_ngay) {
+      params.push(den_ngay);
+      sql += ` AND n.ngay_du_kien <= $${params.length}`;
+    }
+
+    sql += " ORDER BY n.ngay_du_kien ASC, n.id DESC";
+
+    const res = await query(sql, params);
+    return res.rows;
   }
 
   // Chạy trình nhắc nhở hàng ngày (Rút gọn)

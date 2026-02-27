@@ -98,6 +98,16 @@ class MaintenanceController {
       });
     }
   }
+
+  // Lấy danh sách nhắc nhở bảo trì
+  static async getReminders(req, res) {
+    try {
+      const results = await MaintenanceService.getReminders(req.query);
+      res.json({ success: true, data: results });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
 module.exports = MaintenanceController;

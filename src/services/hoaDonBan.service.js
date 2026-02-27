@@ -339,6 +339,13 @@ class HoaDonBanService {
               `Bán xe theo hóa đơn ${so_hd}`,
             ],
           );
+
+          // Tự động tạo nhắc nhở bảo trì lần đầu sau khi mua xe (30 ngày hoặc 1000km)
+          await client.query(
+            `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien, so_km_du_kien) 
+             VALUES ($1, $2, 'BAO_DUONG_DINH_KY', CURRENT_DATE + INTERVAL '30 days', 1000)`,
+            [ct.ma_serial, hd.ma_ben_nhap],
+          );
         } else {
           // Phụ tùng
           // Giảm tồn kho

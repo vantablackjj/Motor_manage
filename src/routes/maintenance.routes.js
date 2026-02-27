@@ -36,6 +36,12 @@ router.get(
   MaintenanceController.getById,
 );
 
+router.get(
+  "/reminders/list",
+  checkPermission("inventory", "view"),
+  MaintenanceController.getReminders,
+);
+
 router.post(
   "/trigger-reminders",
   checkPermission("admin", "full"),
