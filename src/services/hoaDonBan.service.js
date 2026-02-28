@@ -277,7 +277,7 @@ class HoaDonBanService {
   }
 
   // Phê duyệt hóa đơn
-  async pheDuyet(so_hd, nguoi_duyet) {
+  async pheDuyet(so_hd, nguoi_duyet, so_tien_thu = null) {
     const client = await pool.connect();
 
     try {
@@ -295,11 +295,16 @@ class HoaDonBanService {
 
       const hd = hdResult.rows[0];
 
-      if (hd.trang_thai !== "NHAP") {
+      if (hd.trang_thai !== "NHAP" && hd.trang_thai !== "CHO_DUYET") {
         throw new Error(
           `Không thể duyệt hóa đơn ở trạng thái ${hd.trang_thai}`,
         );
       }
+
+      // Xác định số tiền thu ngay
+      // Nếu là null (mặc định), thu toàn bộ. Nếu là 0, ghi nợ hoàn toàn.
+      const thucThu =
+        so_tien_thu === null ? Number(hd.thanh_tien) : Number(so_tien_thu);
 
       // Lấy chi tiết
       const chiTietResult = await client.query(
@@ -307,7 +312,7 @@ class HoaDonBanService {
         [so_hd],
       );
 
-      // Xử lý từng dòng
+      // Xử lý từng dòng chi tiết (Giảm kho, ghi lịch sử)
       for (const ct of chiTietResult.rows) {
         if (ct.ma_serial) {
           // Xử lý xe
@@ -384,7 +389,7 @@ class HoaDonBanService {
         }
       }
 
-      // Ghi nhận công nợ đối tác
+      // 1. Ghi nhận công nợ đối tác (Luôn ghi nhận tổng số nợ phát sinh)
       const CongNoService = require("./congNo.service");
       await CongNoService.recordDoiTacDebt(client, {
         ma_doi_tac: hd.ma_ben_nhap,
@@ -395,38 +400,48 @@ class HoaDonBanService {
         ghi_chu: `Bán hàng theo hóa đơn ${so_hd}`,
       });
 
-      // Tự động tạo và duyệt phiếu thu tiền (Dòng tiền hợp nhất)
-      const phieuThu = await ThuChiService.taoPhieu(
-        {
-          nguoi_tao: nguoi_duyet,
-          ngay_giao_dich: new Date(),
-          ma_kho: hd.ma_ben_xuat,
-          ma_kh: hd.ma_ben_nhap,
-          so_tien: hd.thanh_tien,
-          loai: "THU",
-          hinh_thuc: "TIEN_MAT", // Mặc định tiền mặt khi duyệt nhanh
-          dien_giai: `Thu tiền bán hàng theo hóa đơn ${so_hd}`,
-          ma_hoa_don: so_hd,
-        },
-        client,
-      );
+      // 2. Xử lý thanh toán nếu có thu tiền ngay
+      if (thucThu > 0) {
+        // Tạo phiếu thu
+        const phieuThu = await ThuChiService.taoPhieu(
+          {
+            nguoi_tao: nguoi_duyet,
+            ngay_giao_dich: new Date(),
+            ma_kho: hd.ma_ben_xuat,
+            ma_kh: hd.ma_ben_nhap,
+            so_tien: thucThu,
+            loai: "THU",
+            hinh_thuc: "TIEN_MAT", // Mặc định
+            dien_giai: `Thu tiền bán hàng (một phần hoặc toàn bộ) theo hóa đơn ${so_hd}`,
+            ma_hoa_don: so_hd,
+          },
+          client,
+        );
 
-      // Duyệt phiếu thu ngay lập tức để cập nhật quỹ
-      await ThuChiService.pheDuyet(phieuThu.so_phieu_tc, nguoi_duyet, client);
+        // Duyệt phiếu thu ngay lập tức để thực hiện thanh toán vào công nợ vừa ghi
+        await ThuChiService.pheDuyet(phieuThu.so_phieu_tc, nguoi_duyet, client);
+      }
 
-      // Update hóa đơn
+      // 3. Update trạng thái hóa đơn
+      // Nếu thu đủ tiền -> DA_THANH_TOAN, ngược lại -> DA_XUAT (chờ thu nợ)
+      const trangThaiMoi =
+        thucThu >= Number(hd.thanh_tien) ? "DA_THANH_TOAN" : "DA_XUAT";
+
       await client.query(
         `UPDATE tm_hoa_don
-         SET trang_thai = 'DA_THANH_TOAN', updated_at = CURRENT_TIMESTAMP
-         WHERE so_hoa_don = $1`,
-        [so_hd],
+         SET trang_thai = $1, 
+             nguoi_duyet = $2,
+             ngay_duyet = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE so_hoa_don = $3`,
+        [trangThaiMoi, nguoi_duyet, so_hd],
       );
 
       await client.query("COMMIT");
 
       return {
         success: true,
-        message: `Đã duyệt hóa đơn ${so_hd}. Đã xuất kho và thu ${hd.thanh_tien} VNĐ`,
+        message: `Đã duyệt hóa đơn ${so_hd}. Thực thu: ${thucThu} VNĐ. Trạng thái: ${trangThaiMoi}`,
       };
     } catch (error) {
       await client.query("ROLLBACK");

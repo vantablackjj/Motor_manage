@@ -73,11 +73,13 @@ class DichVuSauBanService {
         x.bien_so,
         x.ngay_tra_dang_ky AS ngay_tra_bien,
         x.nguoi_lam_dang_ky,
+        u_dk.ho_ten as ten_nguoi_lam_dang_ky,
         -- Đăng kiểm
         x.dang_kiem AS is_inspected,
         x.ngay_tra_dang_kiem AS ngay_tra_giay_dang_kiem,
         x.han_dang_kiem,
         x.nguoi_lam_dang_kiem,
+        u_ki.ho_ten as ten_nguoi_lam_dang_kiem,
         x.ghi_chu_dich_vu,
         kh.dien_thoai AS so_dien_thoai,
         COUNT(*) OVER() AS total_count
@@ -86,6 +88,8 @@ class DichVuSauBanService {
       LEFT JOIN tm_hoa_don hd ON x.so_hoa_don_ban = hd.so_hoa_don
       LEFT JOIN tm_don_hang dh ON x.so_hoa_don_ban = dh.so_don_hang
       LEFT JOIN dm_doi_tac kh ON COALESCE(hd.ma_ben_nhap, dh.ma_ben_nhap) = kh.ma_doi_tac
+      LEFT JOIN sys_user u_dk ON x.nguoi_lam_dang_ky::text = u_dk.id::text
+      LEFT JOIN sys_user u_ki ON x.nguoi_lam_dang_kiem::text = u_ki.id::text
       WHERE ${where}
       ORDER BY x.ngay_ban DESC NULLS LAST, x.ma_serial
       LIMIT $${idx++} OFFSET $${idx++}
@@ -126,7 +130,9 @@ class DichVuSauBanService {
         kh.ten_doi_tac AS ten_khach_hang,
         kh.dien_thoai AS so_dien_thoai,
         x.dang_ky_xe AS is_registered, x.bien_so, x.ngay_tra_dang_ky AS ngay_tra_bien, x.nguoi_lam_dang_ky,
+        u_dk.ho_ten as ten_nguoi_lam_dang_ky,
         x.dang_kiem AS is_inspected, x.ngay_tra_dang_kiem AS ngay_tra_giay_dang_kiem, x.han_dang_kiem, x.nguoi_lam_dang_kiem,
+        u_ki.ho_ten as ten_nguoi_lam_dang_kiem,
         x.ghi_chu_dich_vu,
         x.trang_thai
       FROM tm_hang_hoa_serial x
@@ -134,6 +140,8 @@ class DichVuSauBanService {
       LEFT JOIN tm_hoa_don hd ON x.so_hoa_don_ban = hd.so_hoa_don
       LEFT JOIN tm_don_hang dh ON x.so_hoa_don_ban = dh.so_don_hang
       LEFT JOIN dm_doi_tac kh ON COALESCE(hd.ma_ben_nhap, dh.ma_ben_nhap) = kh.ma_doi_tac
+      LEFT JOIN sys_user u_dk ON x.nguoi_lam_dang_ky::text = u_dk.id::text
+      LEFT JOIN sys_user u_ki ON x.nguoi_lam_dang_kiem::text = u_ki.id::text
       WHERE x.ma_serial = $1`,
       [xe_key],
     );

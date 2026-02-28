@@ -264,19 +264,21 @@ class ThuChiService {
     // Get data
     const dataQuery = `
       SELECT
-        id,
-        so_phieu_tc as so_phieu,
-        loai_phieu as loai,
-        so_tien,
-        trang_thai,
-        ma_kho,
-        ma_doi_tac as ma_kh,
-        ngay_giao_dich,
-        created_by as nguoi_tao,
-        created_at
-      FROM tm_phieu_thu_chi
+        tc.id,
+        tc.so_phieu_tc as so_phieu,
+        tc.loai_phieu as loai,
+        tc.so_tien,
+        tc.trang_thai,
+        tc.ma_kho,
+        tc.ma_doi_tac as ma_kh,
+        tc.ngay_giao_dich,
+        tc.created_by as nguoi_tao,
+        COALESCE(u_tao.ho_ten, u_tao.username) as ten_nguoi_tao,
+        tc.created_at
+      FROM tm_phieu_thu_chi tc
+      LEFT JOIN sys_user u_tao ON tc.created_by::text = u_tao.id::text
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY tc.created_at DESC
       LIMIT $${values.length + 1}
       OFFSET $${values.length + 2}
     `;
@@ -301,18 +303,26 @@ class ThuChiService {
     const result = await pool.query(
       `
       SELECT
-        id, 
-        so_phieu_tc as so_phieu, 
-        loai_phieu as loai, 
-        so_tien, 
-        trang_thai, 
-        ma_kho, 
-        ma_doi_tac as ma_kh, 
-        ngay_giao_dich, 
-        created_by as nguoi_tao, 
-        noi_dung as dien_giai
-      FROM tm_phieu_thu_chi
-      WHERE TRIM(so_phieu_tc) = $1
+        tc.id, 
+        tc.so_phieu_tc as so_phieu, 
+        tc.loai_phieu as loai, 
+        tc.so_tien, 
+        tc.trang_thai, 
+        tc.ma_kho, 
+        tc.ma_doi_tac as ma_kh, 
+        tc.ngay_giao_dich, 
+        tc.created_by as nguoi_tao, 
+        COALESCE(u_tao.ho_ten, u_tao.username) as ten_nguoi_tao,
+        tc.nguoi_gui,
+        COALESCE(u_gui.ho_ten, u_gui.username) as ten_nguoi_gui,
+        tc.nguoi_duyet,
+        COALESCE(u_duyet.ho_ten, u_duyet.username) as ten_nguoi_duyet,
+        tc.noi_dung as dien_giai
+      FROM tm_phieu_thu_chi tc
+      LEFT JOIN sys_user u_tao ON tc.created_by::text = u_tao.id::text
+      LEFT JOIN sys_user u_gui ON tc.nguoi_gui::text = u_gui.id::text
+      LEFT JOIN sys_user u_duyet ON tc.nguoi_duyet::text = u_duyet.id::text
+      WHERE TRIM(tc.so_phieu_tc) = $1
     `,
       [so_phieu?.trim()],
     );
@@ -382,11 +392,13 @@ class ThuChiService {
         kh.ten_doi_tac as ten_kh,
         tc.ngay_giao_dich,
         tc.created_by as nguoi_tao,
+        COALESCE(u_tao.ho_ten, u_tao.username) as ten_nguoi_tao,
         tc.created_at,
         tc.hinh_thuc,
         tc.noi_dung as dien_giai
       FROM tm_phieu_thu_chi tc
       LEFT JOIN dm_doi_tac kh ON tc.ma_doi_tac = kh.ma_doi_tac
+      LEFT JOIN sys_user u_tao ON tc.created_by::text = u_tao.id::text
       ${whereClause}
       ORDER BY tc.created_at DESC
     `;

@@ -130,10 +130,12 @@ class Xe {
       `SELECT 
         ls.*, 
         kx.ten_kho as ten_kho_xuat,
-        kn.ten_kho as ten_kho_nhap
+        kn.ten_kho as ten_kho_nhap,
+        u.ho_ten as ten_nguoi_thuc_hien
       FROM tm_hang_hoa_lich_su ls
       LEFT JOIN sys_kho kx ON ls.ma_kho_xuat = kx.ma_kho
       LEFT JOIN sys_kho kn ON ls.ma_kho_nhap = kn.ma_kho
+      LEFT JOIN sys_user u ON ls.nguoi_thuc_hien::text = u.id::text
       WHERE ls.ma_serial = $1
       ORDER BY ls.ngay_giao_dich DESC`,
       [xe_key],

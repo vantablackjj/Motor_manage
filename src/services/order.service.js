@@ -689,12 +689,14 @@ class OrderService {
       SELECT 
         d.*,
         COALESCE(kx.ten_kho, dx.ten_doi_tac) as ten_ben_xuat,
-        COALESCE(kn.ten_kho, dn.ten_doi_tac) as ten_ben_nhap
+        COALESCE(kn.ten_kho, dn.ten_doi_tac) as ten_ben_nhap,
+        COALESCE(u.ho_ten, u.username) as ten_nguoi_tao
       FROM tm_don_hang d
       LEFT JOIN sys_kho kx ON d.ma_ben_xuat = kx.ma_kho AND d.loai_ben_xuat = 'KHO'
       LEFT JOIN dm_doi_tac dx ON d.ma_ben_xuat = dx.ma_doi_tac AND d.loai_ben_xuat = 'DOI_TAC'
       LEFT JOIN sys_kho kn ON d.ma_ben_nhap = kn.ma_kho AND d.loai_ben_nhap = 'KHO'
       LEFT JOIN dm_doi_tac dn ON d.ma_ben_nhap = dn.ma_doi_tac AND d.loai_ben_nhap = 'DOI_TAC'
+      LEFT JOIN sys_user u ON d.nguoi_tao::text = u.id::text
       ${whereClause} 
       ORDER BY d.created_at DESC 
       LIMIT $${idx++} OFFSET $${idx++}

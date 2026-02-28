@@ -55,6 +55,70 @@ class CongNoService {
   }
 
   /* =====================================================
+   * THANH TOÁN CÔNG NỢ ĐỐI TÁC (Khách hàng/Nhà cung cấp)
+   * ===================================================== */
+  async thanhToanDoiTac(data, nguoi_thuc_hien) {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const {
+        ma_doi_tac,
+        loai_cong_no,
+        so_tien,
+        hinh_thuc,
+        ma_kho,
+        dien_giai,
+        ma_hoa_don,
+      } = data;
+
+      if (!ma_doi_tac || !loai_cong_no || !so_tien || !ma_kho) {
+        throw new Error(
+          "Thiếu thông tin thanh toán: Đối tác, Loại công nợ, Số tiền hoặc Kho",
+        );
+      }
+
+      // Xác định loại phiếu (THU cho PHAI_THU - Khách hàng nợ mình, CHI cho PHAI_TRA - Mình nợ NCC)
+      const loai_phieu = loai_cong_no === "PHAI_THU" ? "THU" : "CHI";
+      const prefix = loai_phieu === "THU" ? "PT" : "PC";
+      const so_phieu = `${prefix}DT-${Date.now()}`;
+
+      // Tạo phiếu thu/chi
+      await client.query(
+        `
+        INSERT INTO tm_phieu_thu_chi (
+          so_phieu_tc, ngay_giao_dich, loai_phieu,
+          so_tien, hinh_thuc, ma_kho, ma_doi_tac, noi_dung, created_by,
+          ma_hoa_don, trang_thai
+        )
+        VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `,
+        [
+          so_phieu,
+          loai_phieu,
+          so_tien,
+          hinh_thuc || "TIEN_MAT",
+          ma_kho,
+          ma_doi_tac,
+          dien_giai || `Thanh toán công nợ đối tác ${ma_doi_tac}`,
+          nguoi_thuc_hien,
+          ma_hoa_don || null,
+          TRANG_THAI.NHAP, // Bắt đầu ở trạng thái Chờ duyệt
+        ],
+      );
+
+      await client.query("COMMIT");
+      return { success: true, so_phieu, message: "Đã tạo phiếu thanh toán nợ" };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /* =====================================================
    * THANH TOÁN CÔNG NỢ (Nội bộ)
    * ===================================================== */
   async thanhToan(data, nguoi_thuc_hien) {

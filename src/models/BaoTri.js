@@ -95,12 +95,14 @@ class BaoTri {
         d.ten_doi_tac as ten_khach_hang,
         d.dien_thoai,
         u.ho_ten as ten_ktv,
+        u_lap.ho_ten as ten_nguoi_lap_phieu,
         k.ten_kho
       FROM tm_bao_tri b
       LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
       LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
       LEFT JOIN sys_user u ON b.ktv_chinh = u.id
+      LEFT JOIN sys_user u_lap ON b.nguoi_lap_phieu::text = u_lap.id::text
       LEFT JOIN sys_kho k ON b.ma_kho = k.ma_kho
       WHERE 1=1
     `;
@@ -140,12 +142,14 @@ class BaoTri {
         hh.ten_hang_hoa as ten_loai_xe,
         d.ten_doi_tac as ten_khach_hang, d.dien_thoai,
         u.ho_ten as ten_ktv,
+        u_lap.ho_ten as ten_nguoi_lap_phieu,
         k.ten_kho
        FROM tm_bao_tri b
        LEFT JOIN tm_hang_hoa_serial x ON b.ma_serial = x.ma_serial
        LEFT JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
        LEFT JOIN dm_doi_tac d ON b.ma_doi_tac = d.ma_doi_tac
        LEFT JOIN sys_user u ON b.ktv_chinh = u.id
+       LEFT JOIN sys_user u_lap ON b.nguoi_lap_phieu::text = u_lap.id::text
        LEFT JOIN sys_kho k ON b.ma_kho = k.ma_kho
        WHERE b.ma_phieu = $1`,
       [ma_phieu],

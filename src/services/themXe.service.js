@@ -479,19 +479,18 @@ class VehicleService {
     return result.rows[0] || null;
   }
 
-  /**
-   * ✅ Lấy lịch sử giao dịch xe
-   */
   async getXeHistory(xeKey) {
     const result = await pool.query(
       `
       SELECT 
         ls.*,
         k_xuat.ten_kho as ten_kho_xuat,
-        k_nhap.ten_kho as ten_kho_nhap
+        k_nhap.ten_kho as ten_kho_nhap,
+        u.ho_ten as ten_nguoi_thuc_hien
       FROM tm_hang_hoa_lich_su ls
       LEFT JOIN sys_kho k_xuat ON ls.ma_kho_xuat = k_xuat.ma_kho
       LEFT JOIN sys_kho k_nhap ON ls.ma_kho_nhap = k_nhap.ma_kho
+      LEFT JOIN sys_user u ON ls.nguoi_thuc_hien::text = u.id::text
       WHERE ls.ma_serial = $1
       ORDER BY ls.ngay_giao_dich DESC
     `,

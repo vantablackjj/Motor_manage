@@ -270,9 +270,11 @@ router.patch(
   checkPermission("sales_orders", "approve"),
   async (req, res) => {
     try {
+      const { so_tien_thu } = req.body;
       const result = await hoaDonBanService.pheDuyet(
         req.params.so_hd,
         req.user.username,
+        so_tien_thu,
       );
 
       return sendSuccess(res, result, "Phê duyệt hóa đơn thành công");

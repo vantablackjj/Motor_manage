@@ -107,4 +107,19 @@ router.get(
   },
 );
 
+// POST /api/cong-no/doi-tac/thanh-toan - Thanh toán cho đối tác
+router.post(
+  "/doi-tac/thanh-toan",
+  authenticate,
+  checkPermission("payments", "create"),
+  async (req, res, next) => {
+    try {
+      const result = await congNoService.thanhToanDoiTac(req.body, req.user.id);
+      sendSuccess(res, result, "Tạo lệnh thanh toán đối tác thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 module.exports = router;

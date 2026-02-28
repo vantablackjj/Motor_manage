@@ -47,8 +47,11 @@ class PhuTung {
   //lich su
   static async getLichSu(ma_pt) {
     const sql = `
-      SELECT * from tm_hang_hoa_lich_su
-      WHERE ma_hang_hoa = $1
+      SELECT ls.*, u.ho_ten as ten_nguoi_thuc_hien
+      FROM tm_hang_hoa_lich_su ls
+      LEFT JOIN sys_user u ON ls.nguoi_thuc_hien::text = u.id::text
+      WHERE ls.ma_hang_hoa = $1
+      ORDER BY ls.ngay_giao_dich DESC
     `;
 
     const result = await query(sql, [ma_pt]);
