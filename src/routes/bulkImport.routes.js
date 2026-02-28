@@ -27,7 +27,7 @@ const upload = multer({
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== ".xlsx" && ext !== ".xls" && ext !== ".csv") {
       return cb(
-        new Error("Chỉ chấp nhận file Excel (.xlsx, .xls) hoặc CSV (.csv)")
+        new Error("Chỉ chấp nhận file Excel (.xlsx, .xls) hoặc CSV (.csv)"),
       );
     }
     cb(null, true);
@@ -43,7 +43,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importKhachHang
+  BulkImportController.importKhachHang,
 );
 
 /**
@@ -55,7 +55,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importPhuTung
+  BulkImportController.importPhuTung,
 );
 
 /**
@@ -67,7 +67,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importNoiSx
+  BulkImportController.importNoiSx,
 );
 
 /**
@@ -79,7 +79,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importBrand
+  BulkImportController.importBrand,
 );
 
 /**
@@ -91,7 +91,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importColor
+  BulkImportController.importColor,
 );
 
 /**
@@ -103,7 +103,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importWarehouse
+  BulkImportController.importWarehouse,
 );
 
 /**
@@ -115,7 +115,16 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importVehicleType
+  BulkImportController.importVehicleType,
+);
+
+// Alias for consistency with frontend
+router.post(
+  "/model-car",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importVehicleType,
 );
 
 /**
@@ -127,7 +136,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importXe
+  BulkImportController.importXe,
 );
 
 /**
@@ -139,7 +148,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importThuChi
+  BulkImportController.importThuChi,
 );
 
 /**
@@ -151,7 +160,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importNhapKho
+  BulkImportController.importNhapKho,
 );
 
 /**
@@ -163,7 +172,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importXuatKho
+  BulkImportController.importXuatKho,
 );
 
 /**
@@ -175,7 +184,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importTransferXe
+  BulkImportController.importTransferXe,
 );
 
 /**
@@ -187,7 +196,7 @@ router.post(
   authenticate,
   authorize(["ADMIN"]),
   upload.single("file"),
-  BulkImportController.importTransferPT
+  BulkImportController.importTransferPT,
 );
 
 module.exports = router;

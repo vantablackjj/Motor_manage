@@ -65,8 +65,15 @@ class BulkImportService {
    * @param {string} tableName - Tên bảng đích
    * @param {Array<object>} mapping - [{ excelCol, dbCol, validator }]
    * @param {object} constants - { dbCol: value } for all rows
+   * @param {function} transformer - (rowData) => transformedRowData
    */
-  static async safeImport(filePath, tableName, mapping, constants = {}) {
+  static async safeImport(
+    filePath,
+    tableName,
+    mapping,
+    constants = {},
+    transformer = null,
+  ) {
     const startTime = Date.now();
     let totalRows = 0;
     let successCount = 0;
@@ -113,7 +120,18 @@ class BulkImportService {
                 throw new Error(rowErrors.join("; "));
               }
 
-              currentBatch.push(rowData);
+              // Apply transformation if provided
+              let finalRowData = rowData;
+              if (typeof transformer === "function") {
+                finalRowData = transformer(rowData);
+                if (!finalRowData) {
+                  // If transformer returns null, skip this row
+                  totalRows--;
+                  continue;
+                }
+              }
+
+              currentBatch.push(finalRowData);
 
               if (currentBatch.length >= batchSize) {
                 await this._insertBatch(tableName, currentBatch);

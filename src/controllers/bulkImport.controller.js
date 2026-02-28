@@ -350,18 +350,15 @@ class BulkImportController {
       const { mode = "SAFE" } = req.body;
       if (!req.file) throw new Error("Vui lòng đính kèm file");
       const filePath = req.file.path;
-      const tableName = "tm_xe_loai";
+      const tableName = "tm_hang_hoa"; // tm_xe_loai -> tm_hang_hoa
       let result;
       if (mode === "FAST") {
         const columns = [
-          "ma_loai",
-          "ten_loai",
-          "ma_nh",
-          "noi_sx",
-          "loai_hinh",
-          "gia_nhap",
-          "gia_ban",
-          "vat",
+          "ma_hang_hoa", // ma_loai -> ma_hang_hoa
+          "ten_hang_hoa", // ten_loai -> ten_hang_hoa
+          "ma_nhom_hang", // ma_nh -> ma_nhom_hang
+          "gia_von_mac_dinh", // gia_nhap -> gia_von_mac_dinh
+          "gia_ban_mac_dinh", // gia_ban -> gia_ban_mac_dinh
         ];
         result = await BulkImportService.fastImport(
           filePath,
@@ -371,26 +368,28 @@ class BulkImportController {
       } else {
         const mapping = [
           {
-            dbCol: "ma_loai",
+            dbCol: "ma_hang_hoa",
             validator: (v) =>
               !v ? { error: "Mã loại không được để trống" } : {},
           },
           {
-            dbCol: "ten_loai",
+            dbCol: "ten_hang_hoa",
             validator: (v) =>
               !v ? { error: "Tên loại không được để trống" } : {},
           },
-          { dbCol: "ma_nh" },
-          { dbCol: "noi_sx" },
-          { dbCol: "loai_hinh" },
-          { dbCol: "gia_nhap" },
-          { dbCol: "gia_ban" },
-          { dbCol: "vat" },
+          { dbCol: "ma_nhom_hang" },
+          { dbCol: "gia_von_mac_dinh" },
+          { dbCol: "gia_ban_mac_dinh" },
         ];
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
           mapping,
+          {
+            loai_quan_ly: "SERIAL",
+            don_vi_tinh: "Chiếc",
+            status: true,
+          },
         );
       }
       fs.unlinkSync(filePath);
@@ -408,55 +407,52 @@ class BulkImportController {
   static async importXe(req, res, next) {
     try {
       const { mode = "SAFE" } = req.body;
+      const { ma_kho = "KHO01" } = req.body; // Default warehouse if not provided
       if (!req.file) throw new Error("Vui lòng đính kèm file");
       const filePath = req.file.path;
-      const tableName = "tm_xe_thuc_te";
+      const tableName = "tm_hang_hoa_serial";
       let result;
+
       if (mode === "FAST") {
-        const columns = [
-          "xe_key",
-          "so_khung",
-          "so_may",
-          "ma_loai_xe",
-          "ma_mau",
-          "ma_kho_hien_tai",
-          "gia_nhap",
-          "trang_thai",
-          "ngay_nhap",
-        ];
-        result = await BulkImportService.fastImport(
-          filePath,
-          tableName,
-          columns,
+        throw new Error(
+          "FAST mode hiện chưa hỗ trợ cấu trúc dữ liệu phức tạp của Xe",
         );
       } else {
         const mapping = [
-          {
-            dbCol: "xe_key",
-            validator: (v) =>
-              !v ? { error: "Xe Key không được để trống" } : {},
-          },
-          {
-            dbCol: "so_khung",
-            validator: (v) =>
-              !v ? { error: "Số khung không được để trống" } : {},
-          },
-          {
-            dbCol: "so_may",
-            validator: (v) =>
-              !v ? { error: "Số máy không được để trống" } : {},
-          },
-          { dbCol: "ma_loai_xe" },
-          { dbCol: "ma_mau" },
-          { dbCol: "ma_kho_hien_tai" },
-          { dbCol: "gia_nhap" },
-          { dbCol: "trang_thai" },
-          { dbCol: "ngay_nhap" },
+          { dbCol: "ma_hang_hoa" }, // A: maLoaiXe
+          { dbCol: "dummy_ten_xe" }, // B: tenXe (ignore)
+          { dbCol: "dummy_doi_xe" }, // C: doiXe (ignore)
+          { dbCol: "ma_mau" }, // D: maMau
+          { dbCol: "serial_identifier" }, // E: maKhung (Số khung)
+          { dbCol: "so_may" }, // F: maMay
+          { dbCol: "gia_von" }, // G: giaNhap
         ];
+
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
           mapping,
+          {
+            ma_kho_hien_tai: ma_kho,
+            trang_thai: "TON_KHO",
+            locked: false,
+          },
+          (rowData) => {
+            // Transform: Chuyển Số Khung/Số Máy/Màu vào JSONB và tạo ma_serial
+            rowData.ma_serial = rowData.serial_identifier; // Dùng số khung làm Key duy nhất
+            rowData.thuoc_tinh_rieng = {
+              so_khung: rowData.serial_identifier,
+              so_may: rowData.so_may,
+              mau_sac: { ma: rowData.ma_mau },
+              doi_xe: rowData.dummy_doi_xe,
+            };
+            // Xóa các trường tạm không có trong DB
+            delete rowData.dummy_ten_xe;
+            delete rowData.dummy_doi_xe;
+            delete rowData.ma_mau;
+            delete rowData.so_may;
+            return rowData;
+          },
         );
       }
       fs.unlinkSync(filePath);
