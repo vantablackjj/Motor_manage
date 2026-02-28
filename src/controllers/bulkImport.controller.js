@@ -59,7 +59,9 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
-          { loai_doi_tac: "KHACH_HANG", status: true }, // Constant values
+          { loai_doi_tac: "KHACH_HANG", status: true },
+          null,
+          { upsert: true, conflictCol: "ma_doi_tac" },
         );
       }
 
@@ -193,6 +195,8 @@ class BulkImportController {
           tableName,
           mapping,
           { status: true },
+          null,
+          { upsert: true, conflictCol: "ma" },
         );
       }
       fs.unlinkSync(filePath);
@@ -238,7 +242,9 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
-          { ma_nhom_cha: "XE", status: true }, // Constant for Brands
+          { ma_nhom_cha: "XE", status: true },
+          null,
+          { upsert: true, conflictCol: "ma_nhom" },
         );
       }
       fs.unlinkSync(filePath);
@@ -344,6 +350,9 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          null,
+          { upsert: true, conflictCol: "ma_kho" },
         );
       }
       fs.unlinkSync(filePath);
@@ -531,6 +540,16 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          (rowData) => {
+            // Map old ma_kh to ma_doi_tac for ERP compatibility
+            if (rowData.ma_kh) {
+              rowData.ma_doi_tac = rowData.ma_kh;
+              delete rowData.ma_kh;
+            }
+            return rowData;
+          },
+          { upsert: true, conflictCol: "so_phieu" },
         );
       }
       fs.unlinkSync(filePath);
@@ -587,6 +606,16 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          (rowData) => {
+            // Map ma_pt to ma_hang_hoa
+            if (rowData.ma_pt) {
+              rowData.ma_hang_hoa = rowData.ma_pt;
+              delete rowData.ma_pt;
+            }
+            return rowData;
+          },
+          { upsert: false },
         );
       }
       fs.unlinkSync(filePath);
@@ -643,6 +672,21 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          (rowData) => {
+            // Map ma_pt to ma_hang_hoa
+            if (rowData.ma_pt) {
+              rowData.ma_hang_hoa = rowData.ma_pt;
+              delete rowData.ma_pt;
+            }
+            // Map xe_key to ma_serial
+            if (rowData.xe_key) {
+              rowData.ma_serial = rowData.xe_key;
+              delete rowData.xe_key;
+            }
+            return rowData;
+          },
+          { upsert: false },
         );
       }
       fs.unlinkSync(filePath);
@@ -699,6 +743,20 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          (rowData) => {
+            // Map old columns to ERP
+            if (rowData.xe_key) {
+              rowData.ma_serial = rowData.xe_key;
+              delete rowData.xe_key;
+            }
+            if (rowData.ma_loai_xe) {
+              rowData.ma_hang_hoa = rowData.ma_loai_xe;
+              delete rowData.ma_loai_xe;
+            }
+            return rowData;
+          },
+          { upsert: false },
         );
       }
       fs.unlinkSync(filePath);
@@ -757,6 +815,15 @@ class BulkImportController {
           filePath,
           tableName,
           mapping,
+          {},
+          (rowData) => {
+            if (rowData.ma_pt) {
+              rowData.ma_hang_hoa = rowData.ma_pt;
+              delete rowData.ma_pt;
+            }
+            return rowData;
+          },
+          { upsert: false },
         );
       }
       fs.unlinkSync(filePath);

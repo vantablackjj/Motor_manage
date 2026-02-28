@@ -75,6 +75,10 @@ async function startServer() {
 
     // Initialize HTTP Server and Socket.io
     const server = http.createServer(app);
+    // Tăng timeout cho các tác vụ import lớn
+    server.timeout = 10 * 60 * 1000; // 10 phút
+    server.keepAliveTimeout = 65 * 1000;
+
     const io = new Server(server, {
       cors: {
         origin: "*",

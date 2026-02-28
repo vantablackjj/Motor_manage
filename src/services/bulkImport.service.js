@@ -80,13 +80,13 @@ class BulkImportService {
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
-    const batchSize = 1000;
+    const batchSize = 200; // Giảm xuống 200 để tránh timeout và xử lý mượt hơn
     let currentBatch = [];
 
     const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath, {
       entries: "emit",
-      sharedStrings: "cache",
-      styles: "cache",
+      sharedStrings: "cache", // Sử dụng cache để resolved cell values chính xác
+      styles: "ignore", // Bỏ qua style để tăng tốc
     });
 
     try {
@@ -135,6 +135,11 @@ class BulkImportService {
 
               if (isRowEmpty) continue; // Bỏ qua dòng hoàn toàn trống
               totalRows++;
+
+              // Log tiến độ ra terminal để debug
+              if (totalRows % 100 === 0) {
+                logger.info(`Đang import ${tableName}: Dòng ${totalRows}...`);
+              }
 
               if (rowErrors.length > 0) {
                 throw new Error(rowErrors.join("; "));
