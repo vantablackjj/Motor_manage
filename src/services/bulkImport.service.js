@@ -73,6 +73,7 @@ class BulkImportService {
     mapping,
     constants = {},
     transformer = null,
+    options = { upsert: true, conflictCol: null },
   ) {
     const startTime = Date.now();
     let totalRows = 0;
@@ -93,14 +94,33 @@ class BulkImportService {
         if (worksheetReader.id === 1 || worksheetReader.name) {
           for await (const row of worksheetReader) {
             if (row.number === 1) continue; // Skip header
-            totalRows++;
 
             try {
               const rowData = {};
               const rowErrors = [];
+              let isRowEmpty = true;
 
               mapping.forEach((m, index) => {
-                const cellValue = row.getCell(index + 1).value;
+                let cellValue = row.getCell(index + 1).value;
+
+                // Xử lý nếu cell là object (công thức, RichText...)
+                if (cellValue && typeof cellValue === "object") {
+                  if (cellValue.result !== undefined)
+                    cellValue = cellValue.result;
+                  else if (cellValue.text !== undefined)
+                    cellValue = cellValue.text;
+                  else if (cellValue.richText) {
+                    cellValue = cellValue.richText.map((t) => t.text).join("");
+                  }
+                }
+
+                if (
+                  cellValue !== null &&
+                  cellValue !== undefined &&
+                  cellValue !== ""
+                ) {
+                  isRowEmpty = false;
+                }
 
                 // Chạy validator nếu có
                 if (m.validator) {
@@ -113,19 +133,21 @@ class BulkImportService {
                 rowData[m.dbCol] = cellValue;
               });
 
-              // Merge constant values
-              Object.assign(rowData, constants);
+              if (isRowEmpty) continue; // Bỏ qua dòng hoàn toàn trống
+              totalRows++;
 
               if (rowErrors.length > 0) {
                 throw new Error(rowErrors.join("; "));
               }
 
-              // Apply transformation if provided
+              // Merge constant values
+              Object.assign(rowData, constants);
+
+              // Apply transformation
               let finalRowData = rowData;
               if (typeof transformer === "function") {
                 finalRowData = transformer(rowData);
                 if (!finalRowData) {
-                  // If transformer returns null, skip this row
                   totalRows--;
                   continue;
                 }
@@ -134,7 +156,7 @@ class BulkImportService {
               currentBatch.push(finalRowData);
 
               if (currentBatch.length >= batchSize) {
-                await this._insertBatch(tableName, currentBatch);
+                await this._insertBatch(tableName, currentBatch, options);
                 successCount += currentBatch.length;
                 currentBatch = [];
               }
@@ -151,8 +173,16 @@ class BulkImportService {
 
       // Insert nốt batch cuối
       if (currentBatch.length > 0) {
-        await this._insertBatch(tableName, currentBatch);
-        successCount += currentBatch.length;
+        try {
+          await this._insertBatch(tableName, currentBatch, options);
+          successCount += currentBatch.length;
+        } catch (err) {
+          errorCount += currentBatch.length;
+          errors.push({
+            row: "Final Batch",
+            message: `Lỗi ghi dữ liệu: ${err.message}`,
+          });
+        }
       }
 
       const duration = (Date.now() - startTime) / 1000;
@@ -160,7 +190,7 @@ class BulkImportService {
         totalRows,
         successCount,
         errorCount,
-        errors,
+        errors: errors.slice(0, 50), // Chỉ trả về 50 lỗi đầu tiên
         duration,
       };
     } catch (error) {
@@ -170,16 +200,16 @@ class BulkImportService {
   }
 
   /**
-   * Helper để insert batch dữ liệu
+   * Helper để insert batch dữ liệu với hỗ trợ UPSERT
    */
-  static async _insertBatch(tableName, dataArray) {
+  static async _insertBatch(tableName, dataArray, options = {}) {
     if (dataArray.length === 0) return;
 
     const columns = Object.keys(dataArray[0]);
     const values = [];
     const valuePlaceholders = [];
 
-    dataArray.forEach((row, i) => {
+    dataArray.forEach((row) => {
       const rowPlaceholders = [];
       columns.forEach((col) => {
         values.push(row[col]);
@@ -188,9 +218,21 @@ class BulkImportService {
       valuePlaceholders.push(`(${rowPlaceholders.join(", ")})`);
     });
 
-    const query = `INSERT INTO ${tableName} (${columns.join(
-      ", ",
-    )}) VALUES ${valuePlaceholders.join(", ")}`;
+    let query = `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES ${valuePlaceholders.join(", ")}`;
+
+    // Xử lý UPSERT nếu có yêu cầu
+    if (options.upsert && options.conflictCol) {
+      const updateSet = columns
+        .filter((col) => col !== options.conflictCol && col !== "id")
+        .map((col) => `${col} = EXCLUDED.${col}`)
+        .join(", ");
+
+      if (updateSet) {
+        query += ` ON CONFLICT (${options.conflictCol}) DO UPDATE SET ${updateSet}`;
+      } else {
+        query += ` ON CONFLICT (${options.conflictCol}) DO NOTHING`;
+      }
+    }
 
     await pool.query(query, values);
   }

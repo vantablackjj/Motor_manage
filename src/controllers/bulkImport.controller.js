@@ -142,6 +142,7 @@ class BulkImportController {
             delete rowData.dummy_status;
             return rowData;
           },
+          { upsert: true, conflictCol: "ma_hang_hoa" },
         );
       }
 
@@ -285,6 +286,8 @@ class BulkImportController {
           tableName,
           mapping,
           { status: true },
+          null,
+          { upsert: true, conflictCol: "ma_mau" },
         );
       }
       fs.unlinkSync(filePath);
@@ -407,6 +410,7 @@ class BulkImportController {
             delete rowData.dummy_ma_may;
             return rowData;
           },
+          { upsert: true, conflictCol: "ma_hang_hoa" },
         );
       }
       fs.unlinkSync(filePath);
@@ -470,6 +474,7 @@ class BulkImportController {
             delete rowData.so_may;
             return rowData;
           },
+          { upsert: true, conflictCol: "ma_serial" },
         );
       }
       fs.unlinkSync(filePath);
