@@ -32,7 +32,7 @@ if (process.env.NODE_ENV === "development") {
 // Hỗ trợ nhiều origin (phân cách bởi dấu phẩy trong CORS_ORIGIN)
 const allowedOrigins = (
   process.env.CORS_ORIGIN ||
-  "http://localhost:5173,https://manage-motor-fe-12un.vercel.app"
+  "http://localhost:5173,https://manage-motor-fe-12un.vercel.app,https://jaclyn-uncaged-ecliptically.ngrok-free.dev"
 )
   .split(",")
   .map((o) => o.trim());

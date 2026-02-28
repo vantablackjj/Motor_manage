@@ -462,7 +462,7 @@ class MaintenanceService {
 
   // Lấy danh sách nhắc nhở bảo trì
   static async getReminders(filters = {}) {
-    const { search, tu_ngay, den_ngay, trang_thai } = filters;
+    const { search, tu_ngay, den_ngay, trang_thai, limit, page } = filters;
     let sql = `
       SELECT n.*, 
              n.trang_thai as trang_thai_db,
@@ -511,6 +511,15 @@ class MaintenanceService {
     }
 
     sql += " ORDER BY n.ngay_du_kien ASC, n.id DESC";
+
+    if (limit) {
+      const pageSize = parseInt(limit) || 10;
+      const offset = ((parseInt(page) || 1) - 1) * pageSize;
+      params.push(pageSize);
+      sql += ` LIMIT $${params.length}`;
+      params.push(offset);
+      sql += ` OFFSET $${params.length}`;
+    }
 
     const res = await query(sql, params);
     return res.rows;
@@ -576,7 +585,9 @@ class MaintenanceService {
 
       for (const car of missingRes.rows) {
         // Tạo nhắc nhở đầu tiên (30 ngày sau bán hoặc 1000km)
-        const dueDate = new Date(car.ngay_ban);
+        // Nếu không có ngày bán, lấy ngày hiện tại làm mốc
+        const baseDate = car.ngay_ban ? new Date(car.ngay_ban) : new Date();
+        const dueDate = new Date(baseDate);
         dueDate.setDate(dueDate.getDate() + 30);
 
         await client.query(
