@@ -569,7 +569,7 @@ class HoaDonBanService {
            nguoi_gui_duyet_giao = $1,
            ngay_gui_duyet_giao = NOW()
        WHERE so_hoa_don = $2
-         AND trang_thai = 'DA_XUAT'
+         AND trang_thai IN ('DA_XUAT', 'DA_THANH_TOAN')
        RETURNING *`,
       [nguoi_gui, so_hd],
     );

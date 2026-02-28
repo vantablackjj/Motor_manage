@@ -701,14 +701,6 @@ class BaoCaoService {
         params.push(ma_kh);
         sql += ` AND cn.ma_doi_tac = $${params.length}`;
       }
-      if (tu_ngay) {
-        params.push(tu_ngay);
-        sql += ` AND cn.updated_at >= $${params.length}`;
-      }
-      if (den_ngay) {
-        params.push(den_ngay);
-        sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
-      }
       if (search) {
         params.push(`%${search}%`);
         sql += ` AND (dt.ten_doi_tac ILIKE $${params.length} OR cn.ma_doi_tac ILIKE $${params.length})`;
@@ -762,18 +754,6 @@ class BaoCaoService {
       paramIndex++;
       params.push(ma_ncc);
       sqlNhaCungCap += ` AND cn.ma_doi_tac = $${paramIndex}`;
-    }
-    if (tu_ngay) {
-      paramIndex++;
-      params.push(tu_ngay);
-      sqlKhachHang += ` AND cn.updated_at >= $${paramIndex}`;
-      sqlNhaCungCap += ` AND cn.updated_at >= $${paramIndex}`;
-    }
-    if (den_ngay) {
-      paramIndex++;
-      params.push(den_ngay);
-      sqlKhachHang += ` AND cn.updated_at < ($${paramIndex}::date + 1)`;
-      sqlNhaCungCap += ` AND cn.updated_at < ($${paramIndex}::date + 1)`;
     }
     if (search) {
       paramIndex++;
@@ -835,14 +815,6 @@ class BaoCaoService {
     if (ma_ncc) {
       params.push(ma_ncc);
       sql += ` AND cn.ma_doi_tac = $${params.length}`;
-    }
-    if (tu_ngay) {
-      params.push(tu_ngay);
-      sql += ` AND cn.updated_at >= $${params.length}`;
-    }
-    if (den_ngay) {
-      params.push(den_ngay);
-      sql += ` AND cn.updated_at < ($${params.length}::date + 1)`;
     }
     sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
@@ -1015,11 +987,11 @@ class BaoCaoService {
   // ============================================================
 
   async dashboard(filters = {}) {
-    const { ma_kho } = filters;
-    const today = new Date().toISOString().split("T")[0];
+    const { ma_kho, tu_ngay } = filters;
+    const today = tu_ngay || new Date().toISOString().split("T")[0];
     const firstDayOfMonth = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
+      new Date(today).getFullYear(),
+      new Date(today).getMonth(),
       1,
     )
       .toISOString()
