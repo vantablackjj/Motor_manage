@@ -94,44 +94,54 @@ class BulkImportController {
 
       let result;
       if (mode === "FAST") {
-        if (path.extname(req.file.originalname).toLowerCase() !== ".csv") {
-          throw new Error("FAST import chỉ hỗ trợ file CSV");
-        }
-        const columns = [
-          "ma_hang_hoa", // ma_pt -> ma_hang_hoa
-          "ten_hang_hoa", // ten_pt -> ten_hang_hoa
-          "don_vi_tinh",
-          "gia_von_mac_dinh", // gia_nhap -> gia_von_mac_dinh
-          "gia_ban_mac_dinh", // gia_ban -> gia_ban_mac_dinh
-          "ma_nhom_hang", // nhom_pt -> ma_nhom_hang
-        ];
-        result = await BulkImportService.fastImport(
-          filePath,
-          tableName,
-          columns,
+        throw new Error(
+          "FAST mode hiện chưa hỗ trợ cấu trúc dữ liệu tùy chỉnh của Phụ tùng",
         );
       } else {
         const mapping = [
           {
-            dbCol: "ma_hang_hoa",
+            dbCol: "ma_hang_hoa", // A: maPT
             validator: (v) =>
               !v ? { error: "Mã PT không được để trống" } : {},
           },
           {
-            dbCol: "ten_hang_hoa",
+            dbCol: "ten_hang_hoa", // B: tenTV
             validator: (v) =>
               !v ? { error: "Tên PT không được để trống" } : {},
           },
-          { dbCol: "don_vi_tinh" },
-          { dbCol: "gia_von_mac_dinh" },
-          { dbCol: "gia_ban_mac_dinh" },
-          { dbCol: "ma_nhom_hang" },
+          { dbCol: "dummy_ten_ta" }, // C: tenTA
+          { dbCol: "gia_von_mac_dinh" }, // D: giaBanCho
+          { dbCol: "gia_ban_mac_dinh" }, // E: giaBanLeC
+          { dbCol: "don_vi_tinh" }, // F: dvt
+          { dbCol: "dummy_status" }, // G: trongBC
         ];
+
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
           mapping,
-          { loai_quan_ly: "BATCH", status: true }, // Constant for Parts
+          {
+            loai_quan_ly: "BATCH",
+            ma_nhom_hang: "PT",
+            status: true,
+          },
+          (rowData) => {
+            // Transform: Ghi chú lại tên tiếng Anh nếu có
+            if (rowData.dummy_ten_ta) {
+              rowData.mo_ta = `Tên TA: ${rowData.dummy_ten_ta}`;
+            }
+            // Áp dụng status từ cột G nếu là FALSE
+            if (
+              rowData.dummy_status === false ||
+              rowData.dummy_status === "FALSE"
+            ) {
+              rowData.status = false;
+            }
+
+            delete rowData.dummy_ten_ta;
+            delete rowData.dummy_status;
+            return rowData;
+          },
         );
       }
 
