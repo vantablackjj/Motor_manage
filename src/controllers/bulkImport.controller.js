@@ -363,33 +363,26 @@ class BulkImportController {
       const tableName = "tm_hang_hoa"; // tm_xe_loai -> tm_hang_hoa
       let result;
       if (mode === "FAST") {
-        const columns = [
-          "ma_hang_hoa", // ma_loai -> ma_hang_hoa
-          "ten_hang_hoa", // ten_loai -> ten_hang_hoa
-          "ma_nhom_hang", // ma_nh -> ma_nhom_hang
-          "gia_von_mac_dinh", // gia_nhap -> gia_von_mac_dinh
-          "gia_ban_mac_dinh", // gia_ban -> gia_ban_mac_dinh
-        ];
-        result = await BulkImportService.fastImport(
-          filePath,
-          tableName,
-          columns,
+        throw new Error(
+          "FAST mode hiện chưa hỗ trợ cấu trúc dữ liệu tùy chỉnh cho Model",
         );
       } else {
         const mapping = [
           {
-            dbCol: "ma_hang_hoa",
+            dbCol: "ma_hang_hoa", // A: maLoaiXe
             validator: (v) =>
               !v ? { error: "Mã loại không được để trống" } : {},
           },
           {
-            dbCol: "ten_hang_hoa",
+            dbCol: "ten_hang_hoa", // B: tenXe
             validator: (v) =>
               !v ? { error: "Tên loại không được để trống" } : {},
           },
-          { dbCol: "ma_nhom_hang" },
-          { dbCol: "gia_von_mac_dinh" },
-          { dbCol: "gia_ban_mac_dinh" },
+          { dbCol: "dummy_doi_xe" }, // C: doiXe (skip)
+          { dbCol: "dummy_ma_mau" }, // D: maMau (skip - Tránh lỗi numeric)
+          { dbCol: "dummy_ma_khung" }, // E: maKhung (skip)
+          { dbCol: "dummy_ma_may" }, // F: maMay (skip)
+          { dbCol: "gia_von_mac_dinh" }, // G: giaNhap
         ];
         result = await BulkImportService.safeImport(
           filePath,
@@ -398,7 +391,21 @@ class BulkImportController {
           {
             loai_quan_ly: "SERIAL",
             don_vi_tinh: "Chiếc",
+            ma_nhom_hang: "XE", // Mặc định là nhóm Xe
             status: true,
+          },
+          (rowData) => {
+            // Giá bán lẻ mặc định cao hơn giá nhập 10% nếu không có cột giá bán
+            if (rowData.gia_von_mac_dinh && !rowData.gia_ban_mac_dinh) {
+              rowData.gia_ban_mac_dinh =
+                parseFloat(rowData.gia_von_mac_dinh) * 1.1;
+            }
+            // Dọn dẹp các trường tạm
+            delete rowData.dummy_doi_xe;
+            delete rowData.dummy_ma_mau;
+            delete rowData.dummy_ma_khung;
+            delete rowData.dummy_ma_may;
+            return rowData;
           },
         );
       }
