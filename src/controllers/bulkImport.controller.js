@@ -17,7 +17,7 @@ class BulkImportController {
       }
 
       const filePath = req.file.path;
-      const tableName = "tm_khach_hang";
+      const tableName = "dm_doi_tac"; // NEW table
 
       let result;
       if (mode === "FAST") {
@@ -26,44 +26,40 @@ class BulkImportController {
           throw new Error("FAST import chỉ hỗ trợ file CSV");
         }
         const columns = [
-          "ma_kh",
-          "ho_ten",
+          "ma_doi_tac", // ma_kh -> ma_doi_tac
+          "ten_doi_tac", // ho_ten -> ten_doi_tac
           "dien_thoai",
           "dia_chi",
           "email",
-          "la_ncc",
         ];
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         // SAFE mode hỗ trợ Excel (mặc định)
         const mapping = [
           {
-            dbCol: "ma_kh",
+            dbCol: "ma_doi_tac", // ma_kh -> ma_doi_tac
             validator: (v) =>
               !v ? { error: "Mã KH không được để trống" } : {},
           },
           {
-            dbCol: "ho_ten",
+            dbCol: "ten_doi_tac", // ho_ten -> ten_doi_tac
             validator: (v) =>
               !v ? { error: "Họ tên không được để trống" } : {},
           },
           { dbCol: "dien_thoai" },
           { dbCol: "dia_chi" },
           { dbCol: "email" },
-          {
-            dbCol: "la_ncc",
-            validator: (v) =>
-              v === undefined ? { error: "la_ncc phải có giá trị" } : {},
-          },
         ];
+        // Inject loai_doi_tac = 'KHACH_HANG' for all rows
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
+          { loai_doi_tac: "KHACH_HANG", status: true }, // Constant values
         );
       }
 
@@ -94,7 +90,7 @@ class BulkImportController {
       }
 
       const filePath = req.file.path;
-      const tableName = "tm_phu_tung";
+      const tableName = "tm_hang_hoa"; // NEW table
 
       let result;
       if (mode === "FAST") {
@@ -102,41 +98,40 @@ class BulkImportController {
           throw new Error("FAST import chỉ hỗ trợ file CSV");
         }
         const columns = [
-          "ma_pt",
-          "ten_pt",
+          "ma_hang_hoa", // ma_pt -> ma_hang_hoa
+          "ten_hang_hoa", // ten_pt -> ten_hang_hoa
           "don_vi_tinh",
-          "gia_nhap",
-          "gia_ban",
-          "vat",
-          "nhom_pt",
+          "gia_von_mac_dinh", // gia_nhap -> gia_von_mac_dinh
+          "gia_ban_mac_dinh", // gia_ban -> gia_ban_mac_dinh
+          "ma_nhom_hang", // nhom_pt -> ma_nhom_hang
         ];
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
           {
-            dbCol: "ma_pt",
+            dbCol: "ma_hang_hoa",
             validator: (v) =>
               !v ? { error: "Mã PT không được để trống" } : {},
           },
           {
-            dbCol: "ten_pt",
+            dbCol: "ten_hang_hoa",
             validator: (v) =>
               !v ? { error: "Tên PT không được để trống" } : {},
           },
           { dbCol: "don_vi_tinh" },
-          { dbCol: "gia_nhap" },
-          { dbCol: "gia_ban" },
-          { dbCol: "vat" },
-          { dbCol: "nhom_pt" },
+          { dbCol: "gia_von_mac_dinh" },
+          { dbCol: "gia_ban_mac_dinh" },
+          { dbCol: "ma_nhom_hang" },
         ];
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
+          { loai_quan_ly: "BATCH", status: true }, // Constant for Parts
         );
       }
 
@@ -162,14 +157,14 @@ class BulkImportController {
       const { mode = "SAFE" } = req.body;
       if (!req.file) throw new Error("Vui lòng đính kèm file");
       const filePath = req.file.path;
-      const tableName = "sys_noi_sx";
+      const tableName = "dm_noi_sx"; // sys_noi_sx -> dm_noi_sx
       let result;
       if (mode === "FAST") {
-        const columns = ["ma", "ten_noi_sx"];
+        const columns = ["ma", "ten"]; // ten_noi_sx -> ten
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -178,14 +173,15 @@ class BulkImportController {
             validator: (v) => (!v ? { error: "Mã không được để trống" } : {}),
           },
           {
-            dbCol: "ten_noi_sx",
+            dbCol: "ten", // ten_noi_sx -> ten
             validator: (v) => (!v ? { error: "Tên không được để trống" } : {}),
           },
         ];
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
+          { status: true },
         );
       }
       fs.unlinkSync(filePath);
@@ -205,24 +201,24 @@ class BulkImportController {
       const { mode = "SAFE" } = req.body;
       if (!req.file) throw new Error("Vui lòng đính kèm file");
       const filePath = req.file.path;
-      const tableName = "sys_nhan_hieu";
+      const tableName = "dm_nhom_hang"; // Brands now under dm_nhom_hang (XE subset)
       let result;
       if (mode === "FAST") {
-        const columns = ["ma_nh", "ten_nh"];
+        const columns = ["ma_nhom", "ten_nhom"]; // ma_nh -> ma_nhom, ten_nh -> ten_nhom
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
           {
-            dbCol: "ma_nh",
+            dbCol: "ma_nhom",
             validator: (v) =>
               !v ? { error: "Mã NH không được để trống" } : {},
           },
           {
-            dbCol: "ten_nh",
+            dbCol: "ten_nhom",
             validator: (v) =>
               !v ? { error: "Tên NH không được để trống" } : {},
           },
@@ -230,7 +226,8 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
+          { ma_nhom_cha: "XE", status: true }, // Constant for Brands
         );
       }
       fs.unlinkSync(filePath);
@@ -250,14 +247,14 @@ class BulkImportController {
       const { mode = "SAFE" } = req.body;
       if (!req.file) throw new Error("Vui lòng đính kèm file");
       const filePath = req.file.path;
-      const tableName = "sys_mau";
+      const tableName = "dm_mau"; // CRITICAL FIX: sys_mau -> dm_mau
       let result;
       if (mode === "FAST") {
         const columns = ["ma_mau", "ten_mau", "gia_tri"];
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -276,7 +273,8 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
+          { status: true },
         );
       }
       fs.unlinkSync(filePath);
@@ -310,7 +308,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -332,7 +330,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -368,7 +366,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -392,7 +390,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -429,7 +427,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -458,7 +456,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -494,7 +492,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -514,7 +512,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -550,7 +548,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -570,7 +568,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -606,7 +604,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -626,7 +624,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -662,7 +660,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -682,7 +680,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);
@@ -719,7 +717,7 @@ class BulkImportController {
         result = await BulkImportService.fastImport(
           filePath,
           tableName,
-          columns
+          columns,
         );
       } else {
         const mapping = [
@@ -740,7 +738,7 @@ class BulkImportController {
         result = await BulkImportService.safeImport(
           filePath,
           tableName,
-          mapping
+          mapping,
         );
       }
       fs.unlinkSync(filePath);

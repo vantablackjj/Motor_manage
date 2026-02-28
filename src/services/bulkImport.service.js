@@ -18,7 +18,7 @@ class BulkImportService {
 
     try {
       const copyQuery = `COPY ${tableName} (${columns.join(
-        ", "
+        ", ",
       )}) FROM STDIN WITH (FORMAT csv, HEADER true, DELIMITER ',')`;
 
       const stream = client.query(copyFrom(copyQuery));
@@ -64,8 +64,9 @@ class BulkImportService {
    * @param {string} filePath - Đường dẫn file Excel
    * @param {string} tableName - Tên bảng đích
    * @param {Array<object>} mapping - [{ excelCol, dbCol, validator }]
+   * @param {object} constants - { dbCol: value } for all rows
    */
-  static async safeImport(filePath, tableName, mapping) {
+  static async safeImport(filePath, tableName, mapping, constants = {}) {
     const startTime = Date.now();
     let totalRows = 0;
     let successCount = 0;
@@ -104,6 +105,9 @@ class BulkImportService {
 
                 rowData[m.dbCol] = cellValue;
               });
+
+              // Merge constant values
+              Object.assign(rowData, constants);
 
               if (rowErrors.length > 0) {
                 throw new Error(rowErrors.join("; "));
@@ -167,7 +171,7 @@ class BulkImportService {
     });
 
     const query = `INSERT INTO ${tableName} (${columns.join(
-      ", "
+      ", ",
     )}) VALUES ${valuePlaceholders.join(", ")}`;
 
     await pool.query(query, values);
