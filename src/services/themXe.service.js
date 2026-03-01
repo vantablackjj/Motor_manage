@@ -255,10 +255,17 @@ class VehicleService {
 
       const fullData = await this.getXeDetail(xeKey);
 
+      // Fetch user name for notification
+      const userRes = await client.query(
+        "SELECT ho_ten FROM sys_user WHERE id = $1",
+        [userId],
+      );
+      const ten_nhan_vien = userRes.rows[0]?.ho_ten || `ID: ${userId}`;
+
       // Notify Managers about new vehicle needing approval
       NotificationService.notifyManagers(
         "Xe mới chờ duyệt",
-        `Nhân viên đã nhập xe mới: ${fullData.ten_loai} (SK: ${fullData.so_khung}). Vui lòng phê duyệt.`,
+        `Nhân viên ${ten_nhan_vien} đã nhập xe mới: ${fullData.ten_loai} (SK: ${fullData.so_khung}). Vui lòng phê duyệt.`,
         `/approval/vehicle/${xeKey}`,
         "APPROVAL",
       ).catch((err) => console.error("Notification Error:", err));
@@ -612,10 +619,17 @@ class VehicleService {
 
     const updatedXe = result.rows[0];
 
+    // Fetch user name for notification
+    const userRes = await pool.query(
+      "SELECT ho_ten FROM sys_user WHERE id = $1",
+      [userId],
+    );
+    const ten_nhan_vien = userRes.rows[0]?.ho_ten || `ID: ${userId}`;
+
     // Notify Managers about vehicle submission
     NotificationService.notifyManagers(
       "Yêu cầu duyệt xe",
-      `Xe ${xeKey} đã được gửi yêu cầu phê duyệt.`,
+      `Xe ${xeKey} đã được ${ten_nhan_vien} gửi yêu cầu phê duyệt.`,
       `/approval/vehicle/${xeKey}`,
       "APPROVAL",
     ).catch((err) => console.error("Notification Error:", err));
@@ -674,12 +688,19 @@ class VehicleService {
       await client.query("COMMIT");
       const approvedXe = result.rows[0];
 
+      // Fetch user name for notification
+      const userRes = await client.query(
+        "SELECT ho_ten FROM sys_user WHERE id = $1",
+        [userId],
+      );
+      const ten_quan_ly = userRes.rows[0]?.ho_ten || `Quản lý`;
+
       // Notify the person who submitted the vehicle
       if (approvedXe.nguoi_gui_duyet) {
         NotificationService.notifyUser(
           approvedXe.nguoi_gui_duyet,
           "Xe đã được duyệt",
-          `Xe ${xeKey} của bạn đã được quản lý phê duyệt nhập kho.`,
+          `Xe ${xeKey} của bạn đã được ${ten_quan_ly} phê duyệt nhập kho.`,
           `/inventory/vehicle/${xeKey}`,
           "APPROVAL",
         ).catch((err) => console.error("Notification Error:", err));
@@ -719,12 +740,19 @@ class VehicleService {
 
     const rejectedXe = result.rows[0];
 
+    // Fetch user name for notification
+    const userRes = await pool.query(
+      "SELECT ho_ten FROM sys_user WHERE id = $1",
+      [userId],
+    );
+    const ten_quan_ly = userRes.rows[0]?.ho_ten || `Quản lý`;
+
     // Notify the person who submitted the vehicle
     if (rejectedXe.nguoi_gui_duyet) {
       NotificationService.notifyUser(
         rejectedXe.nguoi_gui_duyet,
         "Xe bị từ chối duyệt",
-        `Xe ${xeKey} đã bị từ chối. Lý do: ${lyDo}`,
+        `Xe ${xeKey} đã bị từ chối bởi ${ten_quan_ly}. Lý do: ${lyDo}`,
         `/inventory/vehicle/${xeKey}`,
         "APPROVAL",
       ).catch((err) => console.error("Notification Error:", err));

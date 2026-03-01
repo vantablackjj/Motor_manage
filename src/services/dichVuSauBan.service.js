@@ -223,17 +223,7 @@ class DichVuSauBanService {
       throw { status: 404, message: "Xe không tồn tại hoặc chưa được bán" };
     }
 
-    // Tự động tạo nhắc nhở đăng kiểm khi gần hết hạn (trước 15 ngày)
-    if (han_dang_kiem) {
-      await query(
-        `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien) 
-         VALUES ($1, $2, 'DANG_KIEM', $3::date - INTERVAL '15 days')`,
-        [xe_key, result.rows[0].ma_khach_hang || null, han_dang_kiem],
-      ).catch((err) =>
-        console.error("Error creating inspection reminder:", err),
-      );
-    }
-
+    // Khống cần tự động tạo nhắc nhở đăng kiểm cho xe máy
     return result.rows[0];
   }
 

@@ -4,9 +4,14 @@ class Notification {
   static async create(data) {
     const { user_id, title, content, type, link } = data;
     const result = await query(
-      `INSERT INTO tm_notifications (user_id, title, content, type, link)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
+      `WITH inserted AS (
+         INSERT INTO tm_notifications (user_id, title, content, type, link)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *
+       )
+       SELECT i.*, u.ho_ten as user_name
+       FROM inserted i
+       LEFT JOIN sys_user u ON i.user_id = u.id`,
       [user_id, title, content, type, link],
     );
     return result.rows[0];
@@ -14,8 +19,9 @@ class Notification {
 
   static async getByUser(user_id, limit = 20, offset = 0) {
     const result = await query(
-      `SELECT n.*, count(*) OVER() as total_count
+      `SELECT n.*, u.ho_ten as user_name, count(*) OVER() as total_count
        FROM tm_notifications n
+       LEFT JOIN sys_user u ON n.user_id = u.id
        WHERE n.user_id = $1
        ORDER BY n.created_at DESC
        LIMIT $2 OFFSET $3`,

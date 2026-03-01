@@ -124,6 +124,13 @@ class OrderService {
       await client.query("COMMIT");
       const order = orderRows[0];
 
+      // Fetch creator name for notification
+      const userRes = await client.query(
+        "SELECT ho_ten FROM sys_user WHERE id = $1",
+        [nguoi_tao],
+      );
+      const ten_nguoi_tao = userRes.rows[0]?.ho_ten || nguoi_tao;
+
       // Notify about new order
       let title = "Đơn hàng mới";
       if (order.loai_don_hang === "MUA_HANG") title = "Đơn mua hàng mới";
@@ -131,7 +138,7 @@ class OrderService {
 
       NotificationService.notifyManagers(
         title,
-        `Đơn hàng ${so_don_hang} đã được tạo bởi ${nguoi_tao}.`,
+        `Đơn hàng ${so_don_hang} đã được tạo bởi ${ten_nguoi_tao}.`,
         `/orders/view/${so_don_hang}`,
         "SYSTEM",
       ).catch((err) => console.error("Notification Error:", err));
@@ -880,11 +887,18 @@ class OrderService {
 
     const updatedOrder = updatedOrderResult.rows[0];
 
+    // Fetch updater name for notification
+    const userRes = await pool.query(
+      "SELECT ho_ten FROM sys_user WHERE id = $1",
+      [userId],
+    );
+    const ten_nguoi_sua = userRes.rows[0]?.ho_ten || userId;
+
     // Notify about status change
     NotificationService.notifyUser(
       updatedOrder.nguoi_tao,
       "Trạng thái đơn hàng thay đổi",
-      `Đơn hàng ${updatedOrder.so_don_hang} đã chuyển sang trạng thái: ${status}`,
+      `Đơn hàng ${updatedOrder.so_don_hang} đã được ${ten_nguoi_sua} chuyển sang trạng thái: ${status}`,
       `/orders/view/${updatedOrder.so_don_hang}`,
       "SYSTEM",
     ).catch((err) => console.error("Notification Error:", err));
