@@ -80,7 +80,7 @@ class BulkImportService {
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
-    const batchSize = 200; // Giảm xuống 200 để tránh timeout và xử lý mượt hơn
+    const batchSize = 500; // Tăng lên 500 để tối ưu throughput
     let currentBatch = [];
 
     const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath, {

@@ -8,6 +8,7 @@ class BulkImportController {
    * Import khách hàng
    */
   static async importKhachHang(req, res, next) {
+    if (req.setTimeout) req.setTimeout(600000); // 10 minutes for large imports
     try {
       const { mode = "SAFE" } = req.body;
       if (!req.file) {
@@ -83,6 +84,7 @@ class BulkImportController {
    * Import phụ tùng
    */
   static async importPhuTung(req, res, next) {
+    if (req.setTimeout) req.setTimeout(600000); // 10 minutes
     try {
       const { mode = "SAFE" } = req.body;
       if (!req.file) {

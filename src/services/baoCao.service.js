@@ -1095,7 +1095,12 @@ class BaoCaoService {
     const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don = $1${whereKho}`;
     const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
     const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
-    const sqlStockXeFixing = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'DANG_SUA'${whereKhoHienTai}`;
+    const sqlStockXeFixing = `
+      SELECT COUNT(DISTINCT ma_serial) as total 
+      FROM tm_bao_tri 
+      WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
+      ${ma_kho ? " AND ma_kho = $1" : ""}
+    `;
     const sqlLowStockPT = `
       SELECT COUNT(*) as total 
       FROM tm_hang_hoa_ton_kho tk 
