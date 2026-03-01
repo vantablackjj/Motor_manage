@@ -84,4 +84,14 @@ router.patch(
   DichVuSauBanController.capNhatDangKiem,
 );
 
+/**
+ * POST /api/dich-vu-sau-ban/xuat-bien-ban
+ * Xuất biên bản bàn giao xe hoặc giấy tờ
+ */
+router.post(
+  "/xuat-bien-ban",
+  checkPermission("sales_orders", "view"), // Chỉ cần quyền xem để in
+  DichVuSauBanController.xuatBienBan,
+);
+
 module.exports = router;

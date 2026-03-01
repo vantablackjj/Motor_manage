@@ -68,6 +68,15 @@ class BaoCaoController {
     }
   }
 
+  async baoCaoLoiNhuan(req, res) {
+    try {
+      const data = await baoCaoService.baoCaoLoiNhuan(req.query);
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // Import/Export
   async nhapXuatXe(req, res) {
     try {
@@ -367,6 +376,38 @@ class BaoCaoController {
           filename = "Bao_cao_nhap_xuat_phu_tung.xlsx";
           break;
 
+        case "PROFIT_LOSS":
+          data = await baoCaoService.baoCaoLoiNhuan(params);
+          if (params?.loai === "XE") {
+            columns = [
+              { header: "Ngày Bán", key: "ngay_ban", width: 15 },
+              { header: "Tên Xe", key: "ten_xe", width: 25 },
+              { header: "Số Khung", key: "so_khung", width: 25 },
+              { header: "Số HĐ", key: "so_hoa_don", width: 15 },
+              { header: "Giá Bán", key: "gia_ban", width: 15 },
+              { header: "Giá Vốn", key: "gia_von", width: 15 },
+              { header: "Lợi Nhuận", key: "loi_nhuan", width: 15 },
+              { header: "% LN", key: "ti_le_ln", width: 10 },
+            ];
+          } else if (params?.loai === "PHU_TUNG") {
+            columns = [
+              { header: "Mã PT", key: "ma_pt", width: 15 },
+              { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
+              { header: "Số Lượng", key: "so_luong", width: 10 },
+              { header: "Doanh Thu", key: "doanh_thu", width: 20 },
+              { header: "Giá Vốn", key: "tong_gia_von", width: 20 },
+              { header: "Lợi Nhuận", key: "loi_nhuan", width: 20 },
+            ];
+          } else {
+            columns = [
+              { header: "Tổng Doanh Thu", key: "tong_doanh_thu", width: 20 },
+              { header: "Tổng Giá Vốn", key: "tong_gia_von", width: 20 },
+              { header: "Tổng Lợi Nhuận", key: "tong_loi_nhuan", width: 20 },
+            ];
+          }
+          filename = "Bao_cao_loi_nhuan.xlsx";
+          break;
+
         default:
           return res.status(400).json({
             success: false,
@@ -550,6 +591,27 @@ class BaoCaoController {
             ];
             title = "BÁO CÁO NHẬP XUẤT PHỤ TÙNG";
             filename = "Bao_cao_nhap_xuat_phu_tung.pdf";
+            break;
+
+          case "PROFIT_LOSS":
+            data = await baoCaoService.baoCaoLoiNhuan(params);
+            if (params?.loai === "XE") {
+              columns = [
+                { header: "Ngày Bán", key: "ngay_ban", width: 15 },
+                { header: "Tên Xe", key: "ten_xe", width: 25 },
+                { header: "Số Khung", key: "so_khung", width: 25 },
+                { header: "Giá Bán", key: "gia_ban", width: 15 },
+                { header: "Lợi Nhuận", key: "loi_nhuan", width: 15 },
+              ];
+            } else {
+              columns = [
+                { header: "Tổng Doanh Thu", key: "tong_doanh_thu", width: 20 },
+                { header: "Tổng Giá Vốn", key: "tong_gia_von", width: 20 },
+                { header: "Tổng Lợi Nhuận", key: "tong_loi_nhuan", width: 20 },
+              ];
+            }
+            title = "BÁO CÁO LỢI NHUẬN";
+            filename = "Bao_cao_loi_nhuan.pdf";
             break;
 
           default:

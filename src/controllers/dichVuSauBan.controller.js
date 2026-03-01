@@ -1,5 +1,6 @@
 const DichVuSauBanService = require("../services/dichVuSauBan.service");
 const { sendSuccess, sendError } = require("../utils/response");
+const pdfService = require("../services/pdf.service");
 
 class DichVuSauBanController {
   /** GET /api/dich-vu-sau-ban */
@@ -74,6 +75,20 @@ class DichVuSauBanController {
       return sendSuccess(res, result, "Cập nhật đăng kiểm xe thành công");
     } catch (err) {
       return sendError(res, err.message, err.status || 500);
+    }
+  }
+
+  /**
+   * POST /api/dich-vu-sau-ban/xuat-bien-ban
+   */
+  static async xuatBienBan(req, res) {
+    try {
+      await pdfService.generateHandoverPdf(req.body, res);
+    } catch (err) {
+      console.error("Lỗi xuất biên bản:", err);
+      if (!res.headersSent) {
+        return sendError(res, err.message, 500);
+      }
     }
   }
 }

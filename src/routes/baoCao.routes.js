@@ -103,6 +103,18 @@ router.get(
   baoCaoController.doanhThuTongHop,
 );
 
+/**
+ * @route   GET /api/bao-cao/loi-nhuan
+ * @desc    Báo cáo lợi nhuận (Doanh thu - Giá vốn)
+ * @access  QUAN_LY, ADMIN (cần view_financial)
+ */
+router.get(
+  "/loi-nhuan",
+  authenticate,
+  checkPermission("reports", "view_financial"),
+  baoCaoController.baoCaoLoiNhuan,
+);
+
 // ============================================================
 // BÁO CÁO NHẬP XUẤT
 // ============================================================

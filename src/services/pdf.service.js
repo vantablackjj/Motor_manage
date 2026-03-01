@@ -353,6 +353,192 @@ class PdfService {
 
     doc.end();
   }
+
+  /**
+   * Generate a professional Hand-over Receipt (Biên bản bàn giao)
+   * Useful for handing over vehicles or registration papers
+   */
+  async generateHandoverPdf(data, res) {
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+
+    // Register fonts with fallbacks
+    try {
+      const regPath = this._findFont(this.fontPaths.regular);
+      if (regPath) doc.registerFont(this.fonts.regular, regPath);
+      else this.fonts.regular = "Helvetica";
+
+      const boldPath = this._findFont(this.fontPaths.bold);
+      if (boldPath) doc.registerFont(this.fonts.bold, boldPath);
+      else this.fonts.bold = "Helvetica-Bold";
+    } catch (e) {
+      this.fonts = { regular: "Helvetica", bold: "Helvetica-Bold" };
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=bien-ban-ban-giao-${Date.now()}.pdf`,
+    );
+    doc.pipe(res);
+    doc.font(this.fonts.regular);
+
+    // --- HEADER ---
+    doc
+      .fontSize(14)
+      .font(this.fonts.bold)
+      .text("CỬA HÀNG XE MÁY & PHỤ TÙNG", { align: "center" });
+    doc
+      .fontSize(10)
+      .font(this.fonts.regular)
+      .text("--------------------------", { align: "center" });
+    doc.moveDown();
+
+    doc
+      .fontSize(16)
+      .font(this.fonts.bold)
+      .text("BIÊN BẢN BÀN GIAO", { align: "center" });
+    doc
+      .fontSize(12)
+      .font(this.fonts.bold)
+      .text(
+        data.loai_ban_giao === "GIAY_TO"
+          ? "(V/v: Bàn giao Giấy tờ gốc / Đăng kiểm)"
+          : "(V/v: Bàn giao Xe máy)",
+        { align: "center" },
+      );
+    doc.moveDown(2);
+
+    const startX = 50;
+    doc.fontSize(11);
+    doc.text(
+      `Hôm nay, ngày ${new Date().toLocaleDateString("vi-VN")}, tại cửa hàng, chúng tôi gồm có:`,
+      startX,
+    );
+    doc.moveDown();
+
+    // Side A
+    doc
+      .font(this.fonts.bold)
+      .text("BÊN GIAO (Bên A): CỬA HÀNG XE MÁY & PHỤ TÙNG", startX);
+    doc
+      .font(this.fonts.regular)
+      .text(
+        `Đại diện: ..................................................................... Chức vụ: ...........................................`,
+        startX + 20,
+      );
+    doc.moveDown();
+
+    // Side B
+    doc
+      .font(this.fonts.bold)
+      .text(
+        `BÊN NHẬN (Bên B): ${data.ten_khach_hang || "............................................................."}`,
+        startX,
+      );
+    doc
+      .font(this.fonts.regular)
+      .text(
+        `Số CMND/CCCD: ${data.so_cmnd || "........................................."}  SĐT: ${data.so_dien_thoai || "....................................."}`,
+        startX + 20,
+      );
+    doc.text(
+      `Địa chỉ: ${data.dia_chi || "........................................................................................................................."}`,
+      startX + 20,
+    );
+    doc.moveDown(2);
+
+    doc.text("Hai bên thống nhất bàn giao các nội dung sau:", startX);
+    doc.moveDown();
+
+    // Content Table/List
+    if (data.loai_ban_giao === "GIAY_TO") {
+      doc.font(this.fonts.bold).text("1. Thông tin xe đối chiếu:", startX);
+      doc
+        .font(this.fonts.regular)
+        .text(
+          `- Tên xe: ${data.ten_xe || ".................................."}  Số khung: ${data.so_khung || ".................................."}`,
+          startX + 20,
+        );
+      doc.text(
+        `- Số máy: ${data.so_may || ".................................."}  Biển số: ${data.bien_so || ".................................."}`,
+        startX + 20,
+      );
+      doc.moveDown();
+
+      doc.font(this.fonts.bold).text("2. Danh mục giấy tờ bàn giao:", startX);
+      doc.font(this.fonts.regular);
+      const giayToList = data.danh_sach_giay_to || [
+        "Giấy chứng nhận đăng ký xe (Cà vẹt gốc)",
+        "Bảo hiểm xe máy",
+        "Hóa đơn GTGT (Bản photo/Gốc)",
+        "Phiếu bảo hành",
+      ];
+      giayToList.forEach((item) => {
+        doc.text(`[ x ]  ${item}`, startX + 20);
+      });
+    } else {
+      // Handover Vehicle
+      doc.font(this.fonts.bold).text("1. Thông tin xe bàn giao:", startX);
+      doc
+        .font(this.fonts.regular)
+        .text(
+          `- Loại xe: ${data.ten_xe || ".................................."}  Màu sơn: ${data.ten_mau || ".................................."}`,
+          startX + 20,
+        );
+      doc.text(
+        `- Số khung: ${data.so_khung || ".................................."}`,
+        startX + 20,
+      );
+      doc.text(
+        `- Số máy: ${data.so_may || ".................................."}`,
+        startX + 20,
+      );
+      doc.moveDown();
+      doc
+        .font(this.fonts.bold)
+        .text("2. Tình trạng xe & Phụ kiện kèm theo:", startX);
+      doc
+        .font(this.fonts.regular)
+        .text(
+          "- Xe mới 100%, không trầy xước, đầy đủ gương, bộ đồ nghề.",
+          startX + 20,
+        );
+      doc.text(
+        "- Quà tặng kèm: ................................................................................................................",
+        startX + 20,
+      );
+    }
+
+    doc.moveDown(2);
+    doc.text(
+      "Bên B xác nhận đã nhận đầy đủ các nội dung nêu trên và cam kết không khiếu nại về sau.",
+      startX,
+    );
+    doc.moveDown(4);
+
+    // Signatures
+    const signatureY = doc.y;
+    doc.font(this.fonts.bold);
+    doc.text("ĐẠI DIỆN BÊN GIAO", 50, signatureY, {
+      align: "center",
+      width: 200,
+    });
+    doc.text("ĐẠI DIỆN BÊN NHẬN", 350, signatureY, {
+      align: "center",
+      width: 200,
+    });
+    doc.font(this.fonts.regular).fontSize(9);
+    doc.text("(Ký và ghi rõ họ tên)", 50, signatureY + 15, {
+      align: "center",
+      width: 200,
+    });
+    doc.text("(Ký và ghi rõ họ tên)", 350, signatureY + 15, {
+      align: "center",
+      width: 200,
+    });
+
+    doc.end();
+  }
 }
 
 module.exports = new PdfService();

@@ -426,6 +426,97 @@ class BaoCaoService {
   }
 
   // ============================================================
+  // BÁO CÁO LỢI NHUẬN (PROFIT & LOSS)
+  // ============================================================
+
+  async baoCaoLoiNhuan(filters = {}) {
+    const { tu_ngay, den_ngay, ma_kho, loai } = filters;
+    const params = [];
+    let paramIndex = 1;
+
+    let cond =
+      "WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'";
+    if (tu_ngay) {
+      params.push(tu_ngay);
+      cond += ` AND h.ngay_hoa_don >= $${paramIndex}`;
+      paramIndex++;
+    }
+    if (den_ngay) {
+      params.push(den_ngay);
+      cond += ` AND h.ngay_hoa_don < ($${paramIndex}::date + 1)`;
+      paramIndex++;
+    }
+    if (ma_kho) {
+      params.push(ma_kho);
+      cond += ` AND h.ma_ben_xuat = $${paramIndex}`;
+      paramIndex++;
+    }
+
+    let sql = "";
+    if (loai === "XE") {
+      sql = `
+        SELECT 
+          ct.ma_serial as xe_key,
+          pt.ten_hang_hoa as ten_xe,
+          x.serial_identifier as so_khung,
+          h.so_hoa_don,
+          h.ngay_hoa_don as ngay_ban,
+          ct.don_gia as gia_ban,
+          COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0) as gia_von,
+          (ct.thanh_tien - COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0)) as loi_nhuan,
+          CASE WHEN COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0) > 0 
+               THEN (ct.thanh_tien - COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0)) / COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0) * 100 
+               ELSE 100 END as ti_le_ln
+        FROM tm_hoa_don_chi_tiet ct
+        JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
+        JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
+        JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
+        ${cond}
+        ORDER BY h.ngay_hoa_don DESC
+      `;
+    } else if (loai === "PHU_TUNG") {
+      sql = `
+        SELECT 
+          pt.ma_hang_hoa as ma_pt,
+          pt.ten_hang_hoa as ten_pt,
+          SUM(ct.so_luong) as so_luong,
+          SUM(ct.thanh_tien) as doanh_thu,
+          SUM(ct.so_luong * COALESCE(pt.gia_von_mac_dinh, 0)) as tong_gia_von,
+          SUM(ct.thanh_tien - (ct.so_luong * COALESCE(pt.gia_von_mac_dinh, 0))) as loi_nhuan
+        FROM tm_hoa_don_chi_tiet ct
+        JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
+        JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
+        ${cond}
+        AND ct.ma_serial IS NULL
+        GROUP BY pt.ma_hang_hoa, pt.ten_hang_hoa
+        ORDER BY loi_nhuan DESC
+      `;
+    } else {
+      // Tổng hợp chung
+      sql = `
+        SELECT 
+          SUM(ct.thanh_tien) as tong_doanh_thu,
+          SUM(CASE 
+            WHEN ct.ma_serial IS NOT NULL THEN COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0)
+            ELSE ct.so_luong * COALESCE(pt.gia_von_mac_dinh, 0)
+          END) as tong_gia_von,
+          SUM(ct.thanh_tien - CASE 
+            WHEN ct.ma_serial IS NOT NULL THEN COALESCE(x.gia_von, pt.gia_von_mac_dinh, 0)
+            ELSE ct.so_luong * COALESCE(pt.gia_von_mac_dinh, 0)
+          END) as tong_loi_nhuan
+        FROM tm_hoa_don_chi_tiet ct
+        JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
+        LEFT JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
+        LEFT JOIN tm_hang_hoa pt ON COALESCE(x.ma_hang_hoa, ct.ma_hang_hoa) = pt.ma_hang_hoa
+        ${cond}
+      `;
+    }
+
+    const { rows } = await pool.query(sql, params);
+    return rows;
+  }
+
+  // ============================================================
   // BÁO CÁO NHẬP XUẤT
   // ============================================================
 
@@ -1004,6 +1095,7 @@ class BaoCaoService {
     const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don = $1${whereKho}`;
     const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
     const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
+    const sqlStockXeFixing = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'DANG_SUA'${whereKhoHienTai}`;
     const sqlLowStockPT = `
       SELECT COUNT(*) as total 
       FROM tm_hang_hoa_ton_kho tk 
@@ -1015,20 +1107,36 @@ class BaoCaoService {
           SELECT n.ma_nhom FROM dm_nhom_hang n INNER JOIN nhom_tree nt ON n.ma_nhom_cha = nt.ma_nhom
         ) SELECT ma_nhom FROM nhom_tree
       ) OR pt.ma_nhom_hang IS NULL) 
-      AND tk.so_luong_ton <= tk.so_luong_toi_thieu
+      AND (tk.so_luong_ton <= COALESCE(tk.so_luong_toi_thieu, 0) OR tk.so_luong_ton = 0)
       ${whereKhoPT}
     `;
 
-    const [revTodayRes, revMonthRes, stockXeRes, lowStockRes] =
-      await Promise.all([
-        pool.query(sqlRevenueToday, ma_kho ? [today, ma_kho] : [today]),
-        pool.query(
-          sqlRevenueMonth,
-          ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
-        ),
-        pool.query(sqlStockXe, ma_kho ? [ma_kho] : []),
-        pool.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
-      ]);
+    const sqlCashCollectionToday = `SELECT SUM(so_tien) as total FROM tm_phieu_thu_chi WHERE loai_phieu = 'THU' AND trang_thai = 'DA_DUYET' AND ngay_giao_dich::date = $1${ma_kho ? " AND ma_kho = $2" : ""}`;
+    const sqlCashCollectionMonth = `SELECT SUM(so_tien) as total FROM tm_phieu_thu_chi WHERE loai_phieu = 'THU' AND trang_thai = 'DA_DUYET' AND ngay_giao_dich >= $1${ma_kho ? " AND ma_kho = $2" : ""}`;
+
+    const [
+      revTodayRes,
+      revMonthRes,
+      cashTodayRes,
+      cashMonthRes,
+      stockXeRes,
+      stockXeFixingRes,
+      lowStockRes,
+    ] = await Promise.all([
+      pool.query(sqlRevenueToday, ma_kho ? [today, ma_kho] : [today]),
+      pool.query(
+        sqlRevenueMonth,
+        ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+      ),
+      pool.query(sqlCashCollectionToday, ma_kho ? [today, ma_kho] : [today]),
+      pool.query(
+        sqlCashCollectionMonth,
+        ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+      ),
+      pool.query(sqlStockXe, ma_kho ? [ma_kho] : []),
+      pool.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
+      pool.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
+    ]);
 
     const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
     const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
@@ -1073,7 +1181,10 @@ class BaoCaoService {
     return {
       revenue_today: Number(revTodayRes.rows[0].total || 0),
       revenue_month: Number(revMonthRes.rows[0].total || 0),
+      cash_collection_today: Number(cashTodayRes.rows[0].total || 0),
+      cash_collection_month: Number(cashMonthRes.rows[0].total || 0),
       stock_xe: Number(stockXeRes.rows[0].total || 0),
+      stock_xe_fixing: Number(stockXeFixingRes.rows[0].total || 0),
       low_stock_pt: Number(lowStockRes.rows[0].total || 0),
       internal_debt: Number(intDebtRes.rows[0].total || 0),
       customer_debt: Number(custDebtRes.rows[0].total || 0),

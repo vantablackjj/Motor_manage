@@ -585,8 +585,15 @@ class MaintenanceService {
 
       for (const car of missingRes.rows) {
         // Tạo nhắc nhở đầu tiên (30 ngày sau bán hoặc 1000km)
-        // Nếu không có ngày bán, lấy ngày hiện tại làm mốc
-        const baseDate = car.ngay_ban ? new Date(car.ngay_ban) : new Date();
+        // Nếu không có ngày bán hợp lệ, lấy ngày hiện tại làm mốc
+        let baseDate = new Date();
+        if (car.ngay_ban) {
+          const testDate = new Date(car.ngay_ban);
+          if (!isNaN(testDate.getTime()) && testDate.getFullYear() > 2000) {
+            baseDate = testDate;
+          }
+        }
+
         const dueDate = new Date(baseDate);
         dueDate.setDate(dueDate.getDate() + 30);
 
