@@ -197,6 +197,9 @@ class BaoCaoService {
           SELECT EXTRACT(MONTH FROM h.ngay_hoa_don) as thang, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
           FROM tm_hoa_don h
           WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'
+          -- Lọc theo loại nếu có yêu cầu (mặc dù UNION ALL này tính tổng chung)
+          ${loai === "XE" ? "AND (EXISTS (SELECT 1 FROM tm_hoa_don_chi_tiet ct JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa WHERE ct.so_hoa_don = h.so_hoa_don AND (pt.ma_nhom_hang IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang = 'XE')))" : ""}
+          ${loai === "PHU_TUNG" ? "AND (EXISTS (SELECT 1 FROM tm_hoa_don_chi_tiet ct JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa WHERE ct.so_hoa_don = h.so_hoa_don AND (pt.ma_nhom_hang NOT IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang IS NULL)))" : ""}
           ${condHD}
           GROUP BY thang
           UNION ALL
@@ -956,7 +959,8 @@ class BaoCaoService {
       params.push(ma_kho);
       sql += ` AND tc.ma_kho = $${params.length}`;
     }
-    if (loai) {
+    // Chỉ filter loai_phieu nếu loai là THU hoặc CHI (không phải XE/PHU_TUNG/DICH_VU)
+    if (loai && (loai === "THU" || loai === "CHI")) {
       params.push(loai);
       sql += ` AND loai_phieu = $${params.length}`;
     }
@@ -1110,7 +1114,7 @@ class BaoCaoService {
     const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
     const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
 
-    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don = $1${whereKho}`;
+    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don::date = $1${whereKho}`;
     const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
     const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
     const sqlStockXeFixing = `
