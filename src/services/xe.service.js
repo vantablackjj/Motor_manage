@@ -407,7 +407,8 @@ class Xe {
       SELECT 
         x.ma_serial as xe_key, x.ma_hang_hoa as ma_loai_xe, x.serial_identifier as so_khung,
         (x.thuoc_tinh_rieng->>'so_may') as so_may, m.ten_mau,
-        hh.ten_hang_hoa as ten_loai, k.ten_kho, x.trang_thai, x.ngay_nhap_kho as ngay_nhap
+        hh.ten_hang_hoa as ten_loai, k.ten_kho, x.trang_thai, x.ngay_nhap_kho as ngay_nhap,
+        x.gia_von as gia_nhap
       FROM tm_hang_hoa_serial x
       INNER JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho

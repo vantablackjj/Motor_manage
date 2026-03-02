@@ -494,10 +494,12 @@ class DonHangMuaService {
     let sql = `
       SELECT 
         ct.*, 
+        ct.so_don_hang as ma_phieu,
         h.ngay_dat_hang as ngay_lap,
         h.ma_ben_nhap as ma_kho_nhap,
         pt.ten_hang_hoa as ten_pt,
-        pt.don_vi_tinh
+        pt.don_vi_tinh,
+        ct.don_gia as gia_nhap
       FROM tm_don_hang_chi_tiet ct
       INNER JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa

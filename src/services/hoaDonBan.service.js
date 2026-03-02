@@ -547,10 +547,12 @@ class HoaDonBanService {
     let sql = `
       SELECT 
         ct.*, 
+        ct.so_hoa_don as ma_hd,
         h.ngay_hoa_don as ngay_lap,
         h.ma_ben_xuat as ma_kho_xuat,
         pt.ten_hang_hoa as ten_pt,
-        pt.don_vi_tinh
+        pt.don_vi_tinh,
+        ct.don_gia as gia_ban
       FROM tm_hoa_don_chi_tiet ct
       INNER JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
       LEFT JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
