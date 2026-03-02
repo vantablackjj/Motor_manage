@@ -662,12 +662,32 @@ class HoaDonBanService {
         client,
       );
 
-      // 3. Duyệt phiếu thu (Cập nhật quỹ)
+      // 3. Duyệt phiếu thu (Cập nhật quỹ và công nợ)
       await ThuChiService.pheDuyet(
         phieuThu.so_phieu_tc,
         nguoi_thuc_hien,
         client,
       );
+
+      // 4. Kiểm tra tổng tiền đã thu cho hóa đơn này
+      //    Nếu đã thu đủ thì cập nhật hóa đơn sang DA_THANH_TOAN
+      const tongThuResult = await client.query(
+        `SELECT COALESCE(SUM(so_tien), 0) as tong_thu
+         FROM tm_phieu_thu_chi
+         WHERE ma_hoa_don = $1 AND loai_phieu = 'THU' AND trang_thai = 'DA_DUYET'`,
+        [so_hd],
+      );
+      const tongThuDuoc = Number(tongThuResult.rows[0]?.tong_thu || 0);
+
+      if (tongThuDuoc >= Number(hd.thanh_tien) && hd.trang_thai === "DA_XUAT") {
+        await client.query(
+          `UPDATE tm_hoa_don
+           SET trang_thai = 'DA_THANH_TOAN',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE so_hoa_don = $1`,
+          [so_hd],
+        );
+      }
 
       await client.query("COMMIT");
       return phieuThu;

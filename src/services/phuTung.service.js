@@ -13,7 +13,6 @@ class PhuTung {
     `;
 
     const params = [];
-    let idx = 1;
 
     // Filter by status (Default = TRUE if not specified, 'all' = no filter)
     if (filters.status !== undefined) {
@@ -38,7 +37,15 @@ class PhuTung {
       sql += ` AND (pt.ten_hang_hoa ILIKE $${params.length} OR pt.ma_hang_hoa ILIKE $${params.length})`;
     }
 
-    sql += " ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa";
+    sql += " ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa, pt.ma_hang_hoa";
+
+    if (filters.page || filters.limit) {
+      const { page = 1, limit = 100 } = filters;
+      const safeLimit = Math.min(Number(limit) || 100, 500);
+      const offset = (Number(page) - 1) * safeLimit;
+      sql += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(safeLimit, offset);
+    }
 
     const result = await query(sql, params);
     return result.rows;
@@ -87,10 +94,19 @@ class PhuTung {
       FROM tm_hang_hoa_ton_kho tk
       INNER JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
       WHERE tk.ma_kho = $1 AND pt.status = TRUE
-      ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa
+      ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa, pt.ma_hang_hoa
     `;
 
-    const result = await query(sql, [ma_kho]);
+    const queryParams = [ma_kho];
+    if (filters.page || filters.limit) {
+      const { page = 1, limit = 100 } = filters;
+      const safeLimit = Math.min(Number(limit) || 100, 500);
+      const offset = (Number(page) - 1) * safeLimit;
+      sql += ` LIMIT $2 OFFSET $3`;
+      queryParams.push(safeLimit, offset);
+    }
+
+    const result = await query(sql, queryParams);
 
     if (filters.trang_thai_ton) {
       return result.rows.filter(

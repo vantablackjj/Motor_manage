@@ -8,6 +8,7 @@ const { swaggerUi, swaggerSpec } = require("./config/swagger");
 const routes = require("./routes");
 const errorHandler = require("./middleware/errorHandler");
 const logger = require("./utils/logger");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
@@ -89,6 +90,7 @@ app.use(`${process.env.API_PREFIX || "/api"}/auth/login`, authLimiter);
 // ─── 6. Body parser ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
 
 // ─── 7. Health check (public, không qua auth) ────────────────────────────────
 app.get("/health", (req, res) => {

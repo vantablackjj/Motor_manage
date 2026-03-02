@@ -90,7 +90,7 @@ const changePasswordSchema = Joi.object({
 });
 
 const refreshTokenSchema = Joi.object({
-  refresh_token: Joi.string().required(),
+  refresh_token: Joi.string().optional(),
 });
 
 const assignWarehouseSchema = Joi.object({
@@ -156,11 +156,18 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
 
     logger.info(`User logged in successfully: ${username}`);
 
+    // Set refresh token in HTTP-only cookie
+    res.cookie("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none", // Required for cross-site cookies if FE/BE are on different domains
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
     sendSuccess(
       res,
       {
         access_token: accessToken,
-        refresh_token: refreshToken,
         token_type: "Bearer",
         expires_in: 7 * 24 * 60 * 60, // 7 days in seconds
         user,
@@ -215,7 +222,12 @@ router.post(
   validate(refreshTokenSchema),
   async (req, res, next) => {
     try {
-      const { refresh_token } = req.body;
+      const refresh_token =
+        req.cookies?.refresh_token || req.body.refresh_token;
+
+      if (!refresh_token) {
+        return sendError(res, "Refresh token is missing", 401);
+      }
 
       // Bước 1: Verify JWT signature và expiry
       let decoded;
@@ -385,8 +397,8 @@ router.put(
  */
 router.post("/logout", authenticate, async (req, res, next) => {
   try {
-    // Thu hồi refresh token khỏi DB nếu client gửi kèm
-    const { refresh_token } = req.body;
+    // Thu hồi refresh token khỏi DB nếu client gửi kèm hoặc có trong cookie
+    const refresh_token = req.cookies?.refresh_token || req.body.refresh_token;
     if (refresh_token) {
       try {
         await revokeRefreshToken(refresh_token);
@@ -395,6 +407,13 @@ router.post("/logout", authenticate, async (req, res, next) => {
         logger.warn("Could not revoke refresh token:", dbErr.message);
       }
     }
+
+    // Clear the cookie
+    res.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+    });
 
     logger.info(`User logged out: ${req.user.username}`);
     sendSuccess(res, null, "Đăng xuất thành công");

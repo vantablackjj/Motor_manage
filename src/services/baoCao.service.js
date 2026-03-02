@@ -37,7 +37,10 @@ class BaoCaoService {
   }
 
   async tonKhoPhuTung(filters = {}) {
-    const { ma_kho, nhom_pt, canh_bao } = filters;
+    const { ma_kho, nhom_pt, canh_bao, page = 1, limit = 50 } = filters;
+    const safeLimit = Math.min(Number(limit) || 50, 200);
+    const offset = (Number(page) - 1) * safeLimit;
+
     let sql = `
       SELECT 
         tk.ma_hang_hoa as ma_pt, pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh, pt.ma_nhom_hang as nhom_pt,
@@ -60,6 +63,16 @@ class BaoCaoService {
     if (canh_bao === "true" || canh_bao === true) {
       sql += ` AND tk.so_luong_ton <= tk.so_luong_toi_thieu`;
     }
+
+    sql += ` ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa, tk.ma_hang_hoa`;
+
+    if (filters.page || filters.limit) {
+      const safeLimit = Math.min(Number(limit) || 50, 500);
+      const offset = (Number(page) - 1) * safeLimit;
+      sql += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(safeLimit, offset);
+    }
+
     const { rows } = await pool.query(sql, params);
     return rows;
   }
@@ -153,7 +166,7 @@ class BaoCaoService {
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
         JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'
         AND (pt.ma_nhom_hang IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang = 'XE')
         ${condHD}
         GROUP BY thang
@@ -164,7 +177,7 @@ class BaoCaoService {
         FROM tm_hoa_don_chi_tiet ct
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'
         AND (pt.ma_nhom_hang NOT IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang IS NULL)
         ${condHD}
         GROUP BY thang
@@ -183,7 +196,7 @@ class BaoCaoService {
         FROM (
           SELECT EXTRACT(MONTH FROM h.ngay_hoa_don) as thang, COUNT(h.id) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
           FROM tm_hoa_don h
-          WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+          WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'
           ${condHD}
           GROUP BY thang
           UNION ALL
@@ -262,7 +275,7 @@ class BaoCaoService {
       FROM (
         SELECT h.ma_ben_xuat as ma_kho, COUNT(h.so_hoa_don) as so_luong_hd, SUM(h.thanh_tien) as doanh_thu
         FROM tm_hoa_don h
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'
         ${condHD}
         GROUP BY h.ma_ben_xuat
         UNION ALL
@@ -327,7 +340,7 @@ class BaoCaoService {
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa_serial x ON ct.ma_serial = x.ma_serial
         JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
         AND h.loai_hoa_don = 'BAN_HANG'
         AND (pt.ma_nhom_hang IN (WITH RECURSIVE h AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom) SELECT ma_nhom FROM h) OR pt.ma_nhom_hang = 'XE')
       `;
@@ -337,7 +350,7 @@ class BaoCaoService {
         FROM tm_hoa_don_chi_tiet ct
         JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
         JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
-        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
         AND h.loai_hoa_don = 'BAN_HANG'
         AND (pt.ma_nhom_hang NOT IN (WITH RECURSIVE h AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom) SELECT ma_nhom FROM h) OR pt.ma_nhom_hang IS NULL)
       `;
@@ -397,7 +410,7 @@ class BaoCaoService {
       SELECT COALESCE(SUM(dt), 0) as tong_doanh_thu, COALESCE(SUM(sl), 0) as tong_hoa_don
       FROM (
         SELECT SUM(thanh_tien) as dt, COUNT(so_hoa_don) as sl FROM tm_hoa_don 
-        WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG'
+        WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG'
         ${condHD}
         UNION ALL
         SELECT SUM(tong_tien) as dt, COUNT(ma_phieu) as sl FROM tm_bao_tri
@@ -435,7 +448,7 @@ class BaoCaoService {
     let paramIndex = 1;
 
     let cond =
-      "WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND h.loai_hoa_don = 'BAN_HANG'";
+      "WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND h.loai_hoa_don = 'BAN_HANG'";
     if (tu_ngay) {
       params.push(tu_ngay);
       cond += ` AND h.ngay_hoa_don >= $${paramIndex}`;
@@ -920,10 +933,15 @@ class BaoCaoService {
     const { tu_ngay, den_ngay, ma_kho, loai } = filters;
     let sql = `
       SELECT 
-        ngay_giao_dich, loai_phieu as loai, so_tien, noi_dung as dien_giai, k.ten_kho, so_phieu_tc as so_phieu
+        ngay_giao_dich, 
+        loai_phieu as loai,
+        so_tien, 
+        COALESCE(noi_dung, '') as dien_giai,
+        k.ten_kho, 
+        so_phieu_tc as so_phieu
       FROM tm_phieu_thu_chi tc
       LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE 1=1
+      WHERE trang_thai != 'DA_HUY'
     `;
     const params = [];
     if (tu_ngay) {
@@ -981,7 +999,7 @@ class BaoCaoService {
     let sql = `
       FROM dm_doi_tac kh
       JOIN tm_hoa_don h ON kh.ma_doi_tac = h.ma_ben_nhap
-      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') 
+      WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
       AND h.loai_hoa_don = 'BAN_HANG'
       AND kh.loai_doi_tac IN ('KHACH_HANG', 'CA_HAI')
     `;
@@ -1092,8 +1110,8 @@ class BaoCaoService {
     const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
     const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
 
-    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don = $1${whereKho}`;
-    const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
+    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don = $1${whereKho}`;
+    const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
     const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
     const sqlStockXeFixing = `
       SELECT COUNT(DISTINCT ma_serial) as total 

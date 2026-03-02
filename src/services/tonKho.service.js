@@ -3,6 +3,10 @@ const { query } = require("../config/database");
 class InventoryService {
   // Lấy tất cả tồn kho
   static async getAll(filters = {}) {
+    const { page = 1, limit = 100 } = filters;
+    const safeLimit = Math.min(Number(limit) || 100, 500);
+    const offset = (Number(page) - 1) * safeLimit;
+
     let sql = `
       SELECT id, ma_kho, ma_hang_hoa as ma_pt, so_luong_ton, updated_at as updated_at
       FROM tm_hang_hoa_ton_kho
@@ -20,6 +24,10 @@ class InventoryService {
       sql += ` AND ma_hang_hoa = $${params.length + 1}`;
       params.push(filters.ma_pt);
     }
+
+    sql += " ORDER BY ma_kho, ma_hang_hoa";
+    sql += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(safeLimit, offset);
 
     const result = await query(sql, params);
     return result.rows;
