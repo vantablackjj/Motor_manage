@@ -1,0 +1,13 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+Table: tm_hoa_don
+Has ID: true
+Columns: id, da_ke_khai_thue, ngay_ke_khai, thoi_gian_giao, trang_thai, ngay_lap, nguoi_gui_duyet_giao, ngay_gui_duyet_giao, nguoi_duyet_giao, ngay_duyet_giao, updated_at, updated_by, loai_hoa_don, lan_thu, ngay_hoa_don, loai_ben_xuat, loai_ben_nhap, tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, so_hoa_don, ghi_chu_duyet_giao, so_don_hang, so_phieu_kho, ghi_chu, ma_ben_xuat, nguoi_lap, ma_ben_nhap, nguoi_giao, nguoi_nhan, phuong_tien
+---
+Table: tm_don_hang
+Has ID: true
+Columns: updated_by, ngay_duyet, created_by, nguoi_gui, ngay_gui, updated_at, id, loai_don_hang, ngay_dat_hang, loai_ben_xuat, loai_ben_nhap, tong_gia_tri, chiet_khau, vat_percentage, thanh_tien, so_hoa_don_du_kien, so_hoa_don_da_xuat, trang_thai, created_at, so_don_hang, ghi_chu, nguoi_duyet, ma_ben_xuat, nguoi_tao, ma_ben_nhap
+---
+Table: tm_bao_tri
+Has ID: false
+Columns: ktv_chinh, so_km_hien_tai, tong_tien, created_at, updated_at, loai_bao_tri, ngay_duyet, tien_phu_tung, tien_cong, thoi_gian_bat_dau, thoi_gian_ket_thuc, ngay_bao_tri, ma_serial, ma_doi_tac, ma_ban_nang, ly_do_mien_phi, nguoi_lap_phieu, nguoi_duyet, ghi_chu, trang_thai, ma_phieu, ma_kho
+---

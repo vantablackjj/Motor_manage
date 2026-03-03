@@ -1188,9 +1188,8 @@ class BaoCaoService {
     const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
 
     const sqlRecentActivities = `
-      SELECT id, so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
+      SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
         SELECT 
-          id,
           so_hoa_don as so_phieu, 
           loai_hoa_don::varchar as loai_giao_dich, 
           thanh_tien as tong_tien, 
@@ -1202,7 +1201,6 @@ class BaoCaoService {
         UNION ALL
         
         SELECT 
-          id,
           so_don_hang as so_phieu, 
           CASE WHEN loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE loai_don_hang::varchar END as loai_giao_dich, 
           thanh_tien as tong_tien, 
@@ -1214,7 +1212,6 @@ class BaoCaoService {
         UNION ALL
 
         SELECT 
-          id,
           ma_phieu as so_phieu,
           'DICH_VU_BAO_TRI'::varchar as loai_giao_dich,
           tong_tien,
