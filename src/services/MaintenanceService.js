@@ -317,7 +317,7 @@ class MaintenanceService {
   // Cập nhật trạng thái phiếu (và có thể gắn bàn nâng mới)
   static async updateStatus(
     ma_phieu,
-    { trang_thai, ma_ban_nang, ma_kho, hinh_thuc_thanh_toan, user },
+    { trang_thai, ma_ban_nang, ma_kho, hinh_thuc_thanh_toan, user, userId },
   ) {
     const phieuData = await BaoTri.getById(ma_phieu);
     if (!phieuData) throw { status: 404, message: "Không tìm thấy phiếu" };
@@ -436,7 +436,7 @@ class MaintenanceService {
           const ThuChiService = require("./thuChi.service");
           const phieuThu = await ThuChiService.taoPhieu(
             {
-              nguoi_tao: user,
+              nguoi_tao: userId || user,
               ngay_giao_dich: new Date(),
               ma_kho: khoXuat,
               ma_kh: phieuData.ma_doi_tac,
@@ -450,7 +450,11 @@ class MaintenanceService {
           );
 
           // 3. Duyệt phiếu thu ngay lập tức để dòng tiền chảy về quỹ
-          await ThuChiService.pheDuyet(phieuThu.so_phieu_tc, user, client);
+          await ThuChiService.pheDuyet(
+            phieuThu.so_phieu_tc,
+            userId || user,
+            client,
+          );
         }
       }
 

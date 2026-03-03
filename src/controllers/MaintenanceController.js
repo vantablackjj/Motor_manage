@@ -86,6 +86,7 @@ class MaintenanceController {
         ma_kho,
         hinh_thuc_thanh_toan,
         user: req.user.username,
+        userId: req.user.id,
       });
       res.json({
         success: true,
