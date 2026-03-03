@@ -68,6 +68,15 @@ class BaoCaoController {
     }
   }
 
+  async doanhThuChiTiet(req, res) {
+    try {
+      const data = await baoCaoService.doanhThuChiTiet(req.query);
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   async baoCaoLoiNhuan(req, res) {
     try {
       const data = await baoCaoService.baoCaoLoiNhuan(req.query);
@@ -266,6 +275,22 @@ class BaoCaoController {
             { header: "Thực Thu", key: "thuc_thu", width: 20 },
           ];
           filename = `Doanh_thu_nam_${params?.nam || "nay"}.xlsx`;
+          break;
+
+        case "DOANH_THU_CHI_TIET":
+          data = await baoCaoService.doanhThuChiTiet(params);
+          columns = [
+            { header: "Ngày", key: "ngay", width: 20 },
+            { header: "Số Phiếu", key: "so_phieu", width: 15 },
+            { header: "Loại", key: "loai_doanh_thu", width: 15 },
+            { header: "Khách Hàng", key: "khach_hang", width: 30 },
+            { header: "Nội Dung", key: "noi_dung", width: 40 },
+            { header: "Số Lượng", key: "so_luong", width: 12 },
+            { header: "Đơn Giá", key: "don_gia", width: 15 },
+            { header: "Thành Tiền", key: "thanh_tien", width: 20 },
+            { header: "Kho", key: "kho", width: 20 },
+          ];
+          filename = "Bao_cao_doanh_thu_chi_tiet.xlsx";
           break;
 
         case "CONG_NO_KH":
@@ -497,6 +522,21 @@ class BaoCaoController {
             ];
             title = `BÁO CÁO DOANH THU NĂM ${params?.nam || ""}`;
             filename = "Bao_cao_doanh_thu.pdf";
+            break;
+
+          case "DOANH_THU_CHI_TIET":
+            data = await baoCaoService.doanhThuChiTiet(params);
+            columns = [
+              { header: "Ngày", key: "ngay", width: 15 },
+              { header: "Số Phiếu", key: "so_phieu", width: 12 },
+              { header: "Loại", key: "loai_doanh_thu", width: 12 },
+              { header: "Nội Dung", key: "noi_dung", width: 25 },
+              { header: "SL", key: "so_luong", width: 8 },
+              { header: "Đơn Giá", key: "don_gia", width: 12 },
+              { header: "Thành Tiền", key: "thanh_tien", width: 15 },
+            ];
+            title = "BÁO CÁO CHI TIẾT DOANH THU";
+            filename = "Bao_cao_doanh_thu_chi_tiet.pdf";
             break;
 
           case "CONG_NO_KH":

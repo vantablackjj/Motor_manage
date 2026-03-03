@@ -91,16 +91,23 @@ router.get(
   baoCaoController.doanhThuTheoSanPham,
 );
 
-/**
- * @route   GET /api/bao-cao/doanh-thu/tong-hop
- * @desc    Tổng hợp doanh thu toàn hệ thống
- * @access  KE_TOAN, QUAN_LY, ADMIN (cần view_financial)
- */
 router.get(
   "/doanh-thu/tong-hop",
   authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.doanhThuTongHop,
+);
+
+/**
+ * @route   GET /api/bao-cao/doanh-thu/chi-tiet
+ * @desc    Báo cáo doanh thu chi tiết từng giao dịch
+ * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
+ */
+router.get(
+  "/doanh-thu/chi-tiet",
+  authenticate,
+  checkPermission("reports", "view"),
+  baoCaoController.doanhThuChiTiet,
 );
 
 /**

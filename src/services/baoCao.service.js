@@ -445,6 +445,89 @@ class BaoCaoService {
     };
   }
 
+  async doanhThuChiTiet(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
+    const { tu_ngay, den_ngay, ma_kho, loai } = filters;
+    const params = [];
+    let paramIndex = 1;
+
+    let condHD = "";
+    let condBT = "";
+
+    if (tu_ngay) {
+      condHD += ` AND h.ngay_hoa_don >= $${paramIndex}`;
+      condBT += ` AND COALESCE(b.thoi_gian_ket_thuc, b.updated_at) >= $${paramIndex}`;
+      params.push(tu_ngay);
+      paramIndex++;
+    }
+    if (den_ngay) {
+      condHD += ` AND h.ngay_hoa_don < ($${paramIndex}::date + 1)`;
+      condBT += ` AND COALESCE(b.thoi_gian_ket_thuc, b.updated_at) < ($${paramIndex}::date + 1)`;
+      params.push(den_ngay);
+      paramIndex++;
+    }
+    if (ma_kho) {
+      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
+      condBT += ` AND b.ma_kho = $${paramIndex}`;
+      params.push(ma_kho);
+      paramIndex++;
+    }
+
+    const sql = `
+      SELECT * FROM (
+        -- Dữ liệu từ hóa đơn bán lẻ (Xe & Phụ tùng)
+        SELECT 
+          h.ngay_hoa_don as ngay, 
+          h.so_hoa_don as so_phieu,
+          CASE 
+            WHEN pt.ma_nhom_hang IN (WITH RECURSIVE cat AS (SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE' UNION ALL SELECT n.ma_nhom FROM dm_nhom_hang n JOIN cat ON n.ma_nhom_cha = cat.ma_nhom) SELECT ma_nhom FROM cat) OR pt.ma_nhom_hang = 'XE' THEN 'XE'
+            ELSE 'PHU_TUNG'
+          END as loai_doanh_thu,
+          dt.ten_doi_tac as khach_hang,
+          pt.ten_hang_hoa as noi_dung,
+          ct.so_luong,
+          ct.don_gia,
+          ct.thanh_tien,
+          k.ten_kho as kho
+        FROM tm_hoa_don h
+        JOIN tm_hoa_don_chi_tiet ct ON h.so_hoa_don = ct.so_hoa_don
+        JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
+        LEFT JOIN dm_doi_tac dt ON h.ma_ben_nhap = dt.ma_doi_tac
+        LEFT JOIN sys_kho k ON h.ma_ben_xuat = k.ma_kho
+        WHERE h.trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
+        AND h.loai_hoa_don = 'BAN_HANG'
+        ${condHD}
+
+        UNION ALL
+
+        -- Dữ liệu từ phiếu bảo trì/sửa chữa
+        SELECT 
+          COALESCE(b.thoi_gian_ket_thuc, b.updated_at) as ngay,
+          b.ma_phieu as so_phieu,
+          CASE WHEN bt_ct.loai_hang_muc = 'PHU_TUNG' THEN 'PHU_TUNG' ELSE 'DICH_VU' END as loai_doanh_thu,
+          dt.ten_doi_tac as khach_hang,
+          bt_ct.ten_hang_muc as noi_dung,
+          bt_ct.so_luong,
+          bt_ct.don_gia,
+          bt_ct.thanh_tien,
+          k.ten_kho as kho
+        FROM tm_bao_tri b
+        JOIN tm_bao_tri_chi_tiet bt_ct ON b.ma_phieu = bt_ct.ma_phieu
+        LEFT JOIN dm_doi_tac dt ON b.ma_doi_tac = dt.ma_doi_tac
+        LEFT JOIN sys_kho k ON b.ma_kho = k.ma_kho
+        WHERE b.trang_thai = 'HOAN_THANH'
+        ${condBT}
+      ) combined
+      WHERE ($${paramIndex}::text IS NULL OR loai_doanh_thu = $${paramIndex})
+      ORDER BY ngay DESC, so_phieu DESC
+    `;
+
+    params.push(loai || null);
+
+    const { rows } = await pool.query(sql, params);
+    return rows;
+  }
+
   // ============================================================
   // BÁO CÁO LỢI NHUẬN (PROFIT & LOSS)
   // ============================================================
