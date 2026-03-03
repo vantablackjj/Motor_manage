@@ -1132,25 +1132,41 @@ class BaoCaoService {
       const whereKhoTC = ma_kho ? ` AND ma_kho = $2` : "";
 
       // 1. Detailed Revenue Query (Range & Specific Day)
-      const sqlRevenueQuery = (dateFilter, warehouseCond) => `
+      const sqlRevenueQuery = (isRange, warehouseCond) => {
+        const denNgayIdx = ma_kho ? "$3" : "$2";
+        const dateCond = isRange
+          ? `BETWEEN $1::date AND ${denNgayIdx}::date`
+          : "= $1::date";
+        const mainDateCond = isRange
+          ? `COALESCE(thoi_gian_ket_thuc, updated_at)::date BETWEEN $1::date AND ${denNgayIdx}::date`
+          : "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1::date";
+
+        return `
         SELECT source, SUM(total) as total FROM (
           SELECT 'SALES' as source, SUM(thanh_tien) as total 
           FROM tm_hoa_don 
           WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
             AND loai_hoa_don = 'BAN_HANG' 
-            AND ${dateFilter === "$1" ? "ngay_hoa_don::date = $1" : "ngay_hoa_don::date BETWEEN $1 AND $3"}
+            AND ngay_hoa_don::date ${dateCond}
             ${warehouseCond}
           UNION ALL
           SELECT 'MAINTENANCE' as source, SUM(tong_tien) as total 
           FROM tm_bao_tri 
           WHERE trang_thai = 'HOAN_THANH' 
-            AND ${dateFilter === "$1" ? "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1" : "COALESCE(thoi_gian_ket_thuc, updated_at)::date BETWEEN $1 AND $3"}
+            AND ${mainDateCond}
             ${ma_kho ? " AND ma_kho = $2" : ""}
         ) t GROUP BY source
       `;
+      };
 
       // 2. Detailed Cash Collection Query (Range & Specific Day)
-      const sqlCashDetailsQuery = (dateFilter, warehouseCond) => `
+      const sqlCashDetailsQuery = (isRange, warehouseCond) => {
+        const denNgayIdx = ma_kho ? "$3" : "$2";
+        const dateCond = isRange
+          ? `ngay_giao_dich::date BETWEEN $1::date AND ${denNgayIdx}::date`
+          : "ngay_giao_dich::date = $1::date";
+
+        return `
         SELECT type, SUM(so_tien) as total FROM (
           SELECT 
             CASE 
@@ -1162,10 +1178,11 @@ class BaoCaoService {
           FROM tm_phieu_thu_chi
           WHERE loai_phieu = 'THU' 
             AND trang_thai = 'DA_DUYET' 
-            AND ${dateFilter === "$1" ? "ngay_giao_dich::date = $1" : "ngay_giao_dich::date BETWEEN $1 AND $3"}
+            AND ${dateCond}
             ${warehouseCond}
         ) t GROUP BY type
       `;
+      };
 
       const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
       const sqlStockXeFixing = `
@@ -1199,20 +1216,20 @@ class BaoCaoService {
         lowStockRes,
       ] = await Promise.all([
         client.query(
-          sqlRevenueQuery("$1", whereKho),
+          sqlRevenueQuery(false, whereKho),
           ma_kho ? [todayRef, ma_kho] : [todayRef],
         ),
         client.query(
-          sqlRevenueQuery("BETWEEN", whereKho),
-          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, null, denNgay],
+          sqlRevenueQuery(true, whereKho),
+          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, denNgay],
         ),
         client.query(
-          sqlCashDetailsQuery("$1", whereKhoTC),
+          sqlCashDetailsQuery(false, whereKhoTC),
           ma_kho ? [todayRef, ma_kho] : [todayRef],
         ),
         client.query(
-          sqlCashDetailsQuery("BETWEEN", whereKhoTC),
-          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, null, denNgay],
+          sqlCashDetailsQuery(true, whereKhoTC),
+          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, denNgay],
         ),
         client.query(sqlStockXe, ma_kho ? [ma_kho] : []),
         client.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
