@@ -317,7 +317,7 @@ class MaintenanceService {
   // Cập nhật trạng thái phiếu (và có thể gắn bàn nâng mới)
   static async updateStatus(
     ma_phieu,
-    { trang_thai, ma_ban_nang, ma_kho, user },
+    { trang_thai, ma_ban_nang, ma_kho, hinh_thuc_thanh_toan, user },
   ) {
     const phieuData = await BaoTri.getById(ma_phieu);
     if (!phieuData) throw { status: 404, message: "Không tìm thấy phiếu" };
@@ -417,16 +417,37 @@ class MaintenanceService {
           [parseInt(phieuData.so_km_hien_tai), phieuData.ma_serial],
         );
 
-        // --- GHI NHẬN CÔNG NỢ KHÁCH HÀNG ---
+        // --- GHI NHẬN CÔNG NỢ & DÒNG TIỀN ---
         if (phieuData.tong_tien > 0) {
+          // 1. Ghi nhận công nợ (Luôn ghi nhận để theo dõi lịch sử)
           await CongNoService.recordDoiTacDebt(client, {
             ma_doi_tac: phieuData.ma_doi_tac,
             loai_cong_no: "PHAI_THU",
-            so_hoa_don: null, // Không dùng mã phiếu bảo trì làm số hóa đơn để tránh lỗi FK Constraint
+            so_hoa_don: ma_phieu, // Gắn mã phiếu bảo trì vào để dễ đối soát
             ngay_phat_sinh: new Date(),
             so_tien: phieuData.tong_tien,
             ghi_chu: `Dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
           });
+
+          // 2. Mặc định tạo phiếu thu (dòng tiền) nếu hoàn thành
+          const ThuChiService = require("./thuChi.service");
+          const phieuThu = await ThuChiService.taoPhieu(
+            {
+              nguoi_tao: user,
+              ngay_giao_dich: new Date(),
+              ma_kho: khoXuat,
+              ma_kh: phieuData.ma_doi_tac,
+              so_tien: phieuData.tong_tien,
+              loai: "THU",
+              hinh_thuc: hinh_thuc_thanh_toan || "TIEN_MAT",
+              dien_giai: `Thu tiền dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
+              ma_hoa_don: ma_phieu,
+            },
+            client,
+          );
+
+          // 3. Duyệt phiếu thu ngay lập tức để dòng tiền chảy về quỹ
+          await ThuChiService.pheDuyet(phieuThu.so_phieu_tc, user, client);
         }
       }
 

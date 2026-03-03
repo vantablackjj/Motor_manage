@@ -1228,9 +1228,9 @@ class BaoCaoService {
   async bieuDoTonKho(filters = {}) {
     const { ma_kho } = filters;
     let sql = `
-      SELECT k.ten_kho, COUNT(*) as so_luong
+      SELECT pt.ten_hang_hoa as label, COUNT(*) as so_luong
       FROM tm_hang_hoa_serial x
-      JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
+      JOIN tm_hang_hoa pt ON x.ma_hang_hoa = pt.ma_hang_hoa
       WHERE x.trang_thai = 'TON_KHO'
     `;
     const params = [];
@@ -1238,7 +1238,7 @@ class BaoCaoService {
       params.push(ma_kho);
       sql += ` AND x.ma_kho_hien_tai = $1`;
     }
-    sql += ` GROUP BY k.ten_kho`;
+    sql += ` GROUP BY pt.ten_hang_hoa ORDER BY so_luong DESC LIMIT 10`;
     const { rows } = await pool.query(sql, params);
     return rows;
   }

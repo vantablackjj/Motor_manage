@@ -78,11 +78,13 @@ class MaintenanceController {
   static async updateStatus(req, res) {
     try {
       const { id } = req.params;
-      const { trang_thai, ma_ban_nang, ma_kho } = req.body;
+      const { trang_thai, ma_ban_nang, ma_kho, hinh_thuc_thanh_toan } =
+        req.body;
       const result = await MaintenanceService.updateStatus(id, {
         trang_thai,
         ma_ban_nang,
         ma_kho,
+        hinh_thuc_thanh_toan,
         user: req.user.username,
       });
       res.json({
