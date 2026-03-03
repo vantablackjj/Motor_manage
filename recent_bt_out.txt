@@ -1,0 +1,10 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+RECENT MAINTENANCE: [
+  {
+    "ma_phieu": "BT00000001",
+    "tong_tien": "111.00",
+    "trang_thai": "HOAN_THANH",
+    "thoi_gian_ket_thuc": "2026-02-27T18:13:01.444Z",
+    "updated_at": "2026-02-27T18:10:57.197Z"
+  }
+]

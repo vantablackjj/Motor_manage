@@ -1,0 +1,6 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+DEBUG TRANSACTION: undefined
+DB TIME (ICT): {
+  db_now: 2026-03-03T13:35:06.068Z,
+  db_today: 2026-03-02T17:00:00.000Z
+}

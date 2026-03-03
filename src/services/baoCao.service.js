@@ -1113,10 +1113,17 @@ class BaoCaoService {
       // Using shared client ensures this applies to ALL subsequent queries in this method
       await client.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
 
-      // Get "today" in ICT
+      // Get range in ICT
       const nowICT = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-      const today = tu_ngay || nowICT.toISOString().split("T")[0];
-      const firstDayOfMonth = today.substring(0, 8) + "01";
+      const realToday = nowICT.toISOString().split("T")[0];
+
+      const tuNgay = tu_ngay || realToday.substring(0, 8) + "01";
+      const denNgay = filters.den_ngay || realToday;
+      const todayRef = denNgay; // Compare daily stats against the end of the range
+
+      console.log(
+        `DASHBOARD RANGE: ${tuNgay} to ${denNgay} (Ref: ${todayRef})`,
+      );
 
       const whereKho = ma_kho ? ` AND ma_ben_xuat = $2` : "";
       const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
@@ -1124,25 +1131,25 @@ class BaoCaoService {
       const whereKhoBT = ma_kho ? ` AND ma_kho = $2` : "";
       const whereKhoTC = ma_kho ? ` AND ma_kho = $2` : "";
 
-      // 1. Detailed Revenue Query (Today & Month)
+      // 1. Detailed Revenue Query (Range & Specific Day)
       const sqlRevenueQuery = (dateFilter, warehouseCond) => `
         SELECT source, SUM(total) as total FROM (
           SELECT 'SALES' as source, SUM(thanh_tien) as total 
           FROM tm_hoa_don 
           WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
             AND loai_hoa_don = 'BAN_HANG' 
-            AND ${dateFilter === "$1" ? "ngay_hoa_don::date = $1" : "ngay_hoa_don >= $1"}
+            AND ${dateFilter === "$1" ? "ngay_hoa_don::date = $1" : "ngay_hoa_don::date BETWEEN $1 AND $3"}
             ${warehouseCond}
           UNION ALL
           SELECT 'MAINTENANCE' as source, SUM(tong_tien) as total 
           FROM tm_bao_tri 
           WHERE trang_thai = 'HOAN_THANH' 
-            AND ${dateFilter === "$1" ? "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1" : "COALESCE(thoi_gian_ket_thuc, updated_at) >= $1"}
+            AND ${dateFilter === "$1" ? "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1" : "COALESCE(thoi_gian_ket_thuc, updated_at)::date BETWEEN $1 AND $3"}
             ${ma_kho ? " AND ma_kho = $2" : ""}
         ) t GROUP BY source
       `;
 
-      // 2. Detailed Cash Collection Query (Today & Month)
+      // 2. Detailed Cash Collection Query (Range & Specific Day)
       const sqlCashDetailsQuery = (dateFilter, warehouseCond) => `
         SELECT type, SUM(so_tien) as total FROM (
           SELECT 
@@ -1155,7 +1162,7 @@ class BaoCaoService {
           FROM tm_phieu_thu_chi
           WHERE loai_phieu = 'THU' 
             AND trang_thai = 'DA_DUYET' 
-            AND ${dateFilter === "$1" ? "ngay_giao_dich::date = $1" : "ngay_giao_dich >= $1"}
+            AND ${dateFilter === "$1" ? "ngay_giao_dich::date = $1" : "ngay_giao_dich::date BETWEEN $1 AND $3"}
             ${warehouseCond}
         ) t GROUP BY type
       `;
@@ -1184,28 +1191,28 @@ class BaoCaoService {
 
       const [
         revTodayRes,
-        revMonthRes,
+        revRangeRes,
         cashTodayRes,
-        cashMonthRes,
+        cashRangeRes,
         stockXeRes,
         stockXeFixingRes,
         lowStockRes,
       ] = await Promise.all([
         client.query(
           sqlRevenueQuery("$1", whereKho),
-          ma_kho ? [today, ma_kho] : [today],
+          ma_kho ? [todayRef, ma_kho] : [todayRef],
         ),
         client.query(
-          sqlRevenueQuery(">= $1", whereKho),
-          ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+          sqlRevenueQuery("BETWEEN", whereKho),
+          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, null, denNgay],
         ),
         client.query(
           sqlCashDetailsQuery("$1", whereKhoTC),
-          ma_kho ? [today, ma_kho] : [today],
+          ma_kho ? [todayRef, ma_kho] : [todayRef],
         ),
         client.query(
-          sqlCashDetailsQuery(">= $1", whereKhoTC),
-          ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+          sqlCashDetailsQuery("BETWEEN", whereKhoTC),
+          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, null, denNgay],
         ),
         client.query(sqlStockXe, ma_kho ? [ma_kho] : []),
         client.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
@@ -1227,7 +1234,7 @@ class BaoCaoService {
         "SALES",
         "MAINTENANCE",
       ]);
-      const revMonth = formatBreakdown(revMonthRes.rows, [
+      const revMonth = formatBreakdown(revRangeRes.rows, [
         "SALES",
         "MAINTENANCE",
       ]);
@@ -1236,7 +1243,7 @@ class BaoCaoService {
         "MAINTENANCE",
         "OTHER",
       ]);
-      const cashMonth = formatBreakdown(cashMonthRes.rows, [
+      const cashMonth = formatBreakdown(cashRangeRes.rows, [
         "SALES",
         "MAINTENANCE",
         "OTHER",

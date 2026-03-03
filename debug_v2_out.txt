@@ -1,0 +1,10 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+Today ICT (Filter): 2026-03-03
+Standard Cast: 0
+UTC to ICT Conversion Cast: 0
+Created At Cast (Production fallback check): 0
+Latest transaction values (Raw): {
+  so_phieu_tc: 'TTNB-1770153692492',
+  ngay_giao_dich: 2026-02-03T21:21:32.492Z,
+  created_at: 2026-02-03T21:21:32.492Z
+}
