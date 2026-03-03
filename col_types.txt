@@ -1,0 +1,5 @@
+tm_hoa_don.ngay_hoa_don: date
+tm_phieu_thu_chi.ngay_giao_dich: timestamp without time zone
+tm_phieu_thu_chi.created_at: timestamp without time zone
+tm_bao_tri.created_at: timestamp without time zone
+tm_bao_tri.thoi_gian_ket_thuc: timestamp without time zone

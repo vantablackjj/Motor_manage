@@ -1106,88 +1106,164 @@ class BaoCaoService {
 
   async dashboard(filters = {}) {
     const { ma_kho, tu_ngay } = filters;
+    const client = await pool.connect();
 
-    // Set session timezone to ICT to ensure date casts work correctly for local time
-    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
+    try {
+      // Set session timezone to ICT to ensure date casts work correctly for local time
+      // Using shared client ensures this applies to ALL subsequent queries in this method
+      await client.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
 
-    // Get "today" in ICT
-    const nowICT = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-    const today = tu_ngay || nowICT.toISOString().split("T")[0];
+      // Get "today" in ICT
+      const nowICT = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+      const today = tu_ngay || nowICT.toISOString().split("T")[0];
+      const firstDayOfMonth = today.substring(0, 8) + "01";
 
-    const firstDayOfMonth = today.substring(0, 8) + "01";
+      const whereKho = ma_kho ? ` AND ma_ben_xuat = $2` : "";
+      const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
+      const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
+      const whereKhoBT = ma_kho ? ` AND ma_kho = $2` : "";
+      const whereKhoTC = ma_kho ? ` AND ma_kho = $2` : "";
 
-    const whereKho = ma_kho ? ` AND ma_ben_xuat = $2` : "";
-    const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
-    const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
-
-    const sqlRevenueToday = `
-      SELECT SUM(total) as total FROM (
-        SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don::date = $1${whereKho}
-        UNION ALL
-        SELECT SUM(tong_tien) as total FROM tm_bao_tri WHERE trang_thai = 'HOAN_THANH' AND COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1${ma_kho ? ` AND ma_kho = $2` : ""}
-      ) t
-    `;
-    const sqlRevenueMonth = `
-      SELECT SUM(total) as total FROM (
-        SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}
-        UNION ALL
-        SELECT SUM(tong_tien) as total FROM tm_bao_tri WHERE trang_thai = 'HOAN_THANH' AND COALESCE(thoi_gian_ket_thuc, updated_at) >= $1${ma_kho ? ` AND ma_kho = $2` : ""}
-      ) t
-    `;
-    const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
-    const sqlStockXeFixing = `
-      SELECT COUNT(DISTINCT ma_serial) as total 
-      FROM tm_bao_tri 
-      WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
-      ${ma_kho ? " AND ma_kho = $1" : ""}
-    `;
-    const sqlLowStockPT = `
-      SELECT COUNT(*) as total 
-      FROM tm_hang_hoa_ton_kho tk 
-      JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa 
-      WHERE (pt.ma_nhom_hang NOT IN (
-        WITH RECURSIVE nhom_tree AS (
-          SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE'
+      // 1. Detailed Revenue Query (Today & Month)
+      const sqlRevenueQuery = (dateFilter, warehouseCond) => `
+        SELECT source, SUM(total) as total FROM (
+          SELECT 'SALES' as source, SUM(thanh_tien) as total 
+          FROM tm_hoa_don 
+          WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
+            AND loai_hoa_don = 'BAN_HANG' 
+            AND ${dateFilter === "$1" ? "ngay_hoa_don::date = $1" : "ngay_hoa_don >= $1"}
+            ${warehouseCond}
           UNION ALL
-          SELECT n.ma_nhom FROM dm_nhom_hang n INNER JOIN nhom_tree nt ON n.ma_nhom_cha = nt.ma_nhom
-        ) SELECT ma_nhom FROM nhom_tree
-      ) OR pt.ma_nhom_hang IS NULL) 
-      AND (tk.so_luong_ton <= COALESCE(tk.so_luong_toi_thieu, 0) OR tk.so_luong_ton = 0)
-      ${whereKhoPT}
-    `;
+          SELECT 'MAINTENANCE' as source, SUM(tong_tien) as total 
+          FROM tm_bao_tri 
+          WHERE trang_thai = 'HOAN_THANH' 
+            AND ${dateFilter === "$1" ? "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1" : "COALESCE(thoi_gian_ket_thuc, updated_at) >= $1"}
+            ${ma_kho ? " AND ma_kho = $2" : ""}
+        ) t GROUP BY source
+      `;
 
-    const sqlCashCollectionToday = `SELECT SUM(so_tien) as total FROM tm_phieu_thu_chi WHERE loai_phieu = 'THU' AND trang_thai = 'DA_DUYET' AND ngay_giao_dich::date = $1${ma_kho ? " AND ma_kho = $2" : ""}`;
-    const sqlCashCollectionMonth = `SELECT SUM(so_tien) as total FROM tm_phieu_thu_chi WHERE loai_phieu = 'THU' AND trang_thai = 'DA_DUYET' AND ngay_giao_dich >= $1${ma_kho ? " AND ma_kho = $2" : ""}`;
+      // 2. Detailed Cash Collection Query (Today & Month)
+      const sqlCashDetailsQuery = (dateFilter, warehouseCond) => `
+        SELECT type, SUM(so_tien) as total FROM (
+          SELECT 
+            CASE 
+              WHEN ma_hoa_don IS NOT NULL THEN 'SALES'
+              WHEN noi_dung ILIKE '%bảo trì%' OR noi_dung ILIKE '%sửa chữa%' OR noi_dung ILIKE '%BT000%' THEN 'MAINTENANCE'
+              ELSE 'OTHER'
+            END as type,
+            so_tien
+          FROM tm_phieu_thu_chi
+          WHERE loai_phieu = 'THU' 
+            AND trang_thai = 'DA_DUYET' 
+            AND ${dateFilter === "$1" ? "ngay_giao_dich::date = $1" : "ngay_giao_dich >= $1"}
+            ${warehouseCond}
+        ) t GROUP BY type
+      `;
 
-    const [
-      revTodayRes,
-      revMonthRes,
-      cashTodayRes,
-      cashMonthRes,
-      stockXeRes,
-      stockXeFixingRes,
-      lowStockRes,
-    ] = await Promise.all([
-      pool.query(sqlRevenueToday, ma_kho ? [today, ma_kho] : [today]),
-      pool.query(
-        sqlRevenueMonth,
-        ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
-      ),
-      pool.query(sqlCashCollectionToday, ma_kho ? [today, ma_kho] : [today]),
-      pool.query(
-        sqlCashCollectionMonth,
-        ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
-      ),
-      pool.query(sqlStockXe, ma_kho ? [ma_kho] : []),
-      pool.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
-      pool.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
-    ]);
+      const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
+      const sqlStockXeFixing = `
+        SELECT COUNT(DISTINCT ma_serial) as total 
+        FROM tm_bao_tri 
+        WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
+        ${ma_kho ? " AND ma_kho = $1" : ""}
+      `;
+      const sqlLowStockPT = `
+        SELECT COUNT(*) as total 
+        FROM tm_hang_hoa_ton_kho tk 
+        JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa 
+        WHERE (pt.ma_nhom_hang NOT IN (
+          WITH RECURSIVE nhom_tree AS (
+            SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = 'XE'
+            UNION ALL
+            SELECT n.ma_nhom FROM dm_nhom_hang n INNER JOIN nhom_tree nt ON n.ma_nhom_cha = nt.ma_nhom
+          ) SELECT ma_nhom FROM nhom_tree
+        ) OR pt.ma_nhom_hang IS NULL) 
+        AND (tk.so_luong_ton <= COALESCE(tk.so_luong_toi_thieu, 0) OR tk.so_luong_ton = 0)
+        ${whereKhoPT}
+      `;
 
-    const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
-    const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
-    const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
+      const [
+        revTodayRes,
+        revMonthRes,
+        cashTodayRes,
+        cashMonthRes,
+        stockXeRes,
+        stockXeFixingRes,
+        lowStockRes,
+      ] = await Promise.all([
+        client.query(
+          sqlRevenueQuery("$1", whereKho),
+          ma_kho ? [today, ma_kho] : [today],
+        ),
+        client.query(
+          sqlRevenueQuery(">= $1", whereKho),
+          ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+        ),
+        client.query(
+          sqlCashDetailsQuery("$1", whereKhoTC),
+          ma_kho ? [today, ma_kho] : [today],
+        ),
+        client.query(
+          sqlCashDetailsQuery(">= $1", whereKhoTC),
+          ma_kho ? [firstDayOfMonth, ma_kho] : [firstDayOfMonth],
+        ),
+        client.query(sqlStockXe, ma_kho ? [ma_kho] : []),
+        client.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
+        client.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
+      ]);
 
-    const sqlRecentActivities = `
+      const formatBreakdown = (rows, keys) => {
+        const result = {};
+        keys.forEach((k) => (result[k] = 0));
+        rows.forEach((r) => {
+          if (keys.includes(r.source || r.type)) {
+            result[r.source || r.type] = Number(r.total || 0);
+          }
+        });
+        return result;
+      };
+
+      const revToday = formatBreakdown(revTodayRes.rows, [
+        "SALES",
+        "MAINTENANCE",
+      ]);
+      const revMonth = formatBreakdown(revMonthRes.rows, [
+        "SALES",
+        "MAINTENANCE",
+      ]);
+      const cashToday = formatBreakdown(cashTodayRes.rows, [
+        "SALES",
+        "MAINTENANCE",
+        "OTHER",
+      ]);
+      const cashMonth = formatBreakdown(cashMonthRes.rows, [
+        "SALES",
+        "MAINTENANCE",
+        "OTHER",
+      ]);
+
+      const totalRevenueToday = Object.values(revToday).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      const totalRevenueMonth = Object.values(revMonth).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      const totalCashToday = Object.values(cashToday).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      const totalCashMonth = Object.values(cashMonth).reduce(
+        (a, b) => a + b,
+        0,
+      );
+
+      const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
+      const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
+      const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
+
+      const sqlRecentActivities = `
       SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
         SELECT 
           so_hoa_don as so_phieu, 
@@ -1224,27 +1300,34 @@ class BaoCaoService {
       LIMIT 10
     `;
 
-    const [intDebtRes, custDebtRes, suppDebtRes, recentActivitiesRes] =
-      await Promise.all([
-        pool.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
-        pool.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
-        pool.query(sqlSupplierDebt, ma_kho ? [ma_kho] : []),
-        pool.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
-      ]);
+      const [intDebtRes, custDebtRes, suppDebtRes, recentActivitiesRes] =
+        await Promise.all([
+          client.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
+          client.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
+          client.query(sqlSupplierDebt, ma_kho ? [ma_kho] : []),
+          client.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
+        ]);
 
-    return {
-      revenue_today: Number(revTodayRes.rows[0].total || 0),
-      revenue_month: Number(revMonthRes.rows[0].total || 0),
-      cash_collection_today: Number(cashTodayRes.rows[0].total || 0),
-      cash_collection_month: Number(cashMonthRes.rows[0].total || 0),
-      stock_xe: Number(stockXeRes.rows[0].total || 0),
-      stock_xe_fixing: Number(stockXeFixingRes.rows[0].total || 0),
-      low_stock_pt: Number(lowStockRes.rows[0].total || 0),
-      internal_debt: Number(intDebtRes.rows[0].total || 0),
-      customer_debt: Number(custDebtRes.rows[0].total || 0),
-      supplier_debt: Number(suppDebtRes.rows[0].total || 0),
-      giao_dich_gan_day: recentActivitiesRes.rows,
-    };
+      return {
+        revenue_today: totalRevenueToday,
+        revenue_today_detail: revToday,
+        revenue_month: totalRevenueMonth,
+        revenue_month_detail: revMonth,
+        cash_collection_today: totalCashToday,
+        cash_collection_today_detail: cashToday,
+        cash_collection_month: totalCashMonth,
+        cash_collection_month_detail: cashMonth,
+        stock_xe: Number(stockXeRes.rows[0].total || 0),
+        stock_xe_fixing: Number(stockXeFixingRes.rows[0].total || 0),
+        low_stock_pt: Number(lowStockRes.rows[0].total || 0),
+        internal_debt: Number(intDebtRes.rows[0].total || 0),
+        customer_debt: Number(custDebtRes.rows[0].total || 0),
+        supplier_debt: Number(suppDebtRes.rows[0].total || 0),
+        giao_dich_gan_day: recentActivitiesRes.rows,
+      };
+    } finally {
+      client.release();
+    }
   }
 
   async bieuDoDoanhThu(filters = {}) {

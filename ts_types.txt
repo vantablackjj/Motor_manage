@@ -1,0 +1,10 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+┌─────────┬────────────────────┬──────────────────────┬───────────────────────────────┐
+│ (index) │     table_name     │     column_name      │           data_type           │
+├─────────┼────────────────────┼──────────────────────┼───────────────────────────────┤
+│    0    │    'tm_hoa_don'    │    'ngay_hoa_don'    │            'date'             │
+│    1    │ 'tm_phieu_thu_chi' │   'ngay_giao_dich'   │ 'timestamp without time zone' │
+│    2    │ 'tm_phieu_thu_chi' │     'created_at'     │ 'timestamp without time zone' │
+│    3    │    'tm_bao_tri'    │     'created_at'     │ 'timestamp without time zone' │
+│    4    │    'tm_bao_tri'    │ 'thoi_gian_ket_thuc' │ 'timestamp without time zone' │
+└─────────┴────────────────────┴──────────────────────┴───────────────────────────────┘
