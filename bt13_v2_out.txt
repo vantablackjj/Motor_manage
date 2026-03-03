@@ -1,0 +1,10 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+BT00000013 Data: []
+Total Maintenance Tickets: 1
+Latest Maintenance Tickets (by created_at): [
+  {
+    "ma_phieu": "BT00000001",
+    "trang_thai": "HOAN_THANH",
+    "created_at": "2026-02-27T18:10:57.197Z"
+  }
+]

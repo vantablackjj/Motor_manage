@@ -1,0 +1,37 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+--- MAINTENANCE REVENUE DEBUG ---
+All Completed Maintenance Records: [
+  {
+    "ma_phieu": "BT00000001",
+    "tong_tien": "111.00",
+    "trang_thai": "HOAN_THANH",
+    "ngay_bao_tri": "2026-02-27T18:10:57.197Z",
+    "thoi_gian_ket_thuc": "2026-02-27T18:13:01.444Z",
+    "created_at": "2026-02-27T18:10:57.197Z",
+    "finish_date": "2026-02-28"
+  }
+]
+
+--- CASH COLLECTION DEBUG ---
+error: column "dien_giai" does not exist
+    at C:\Users\admin\Documents\Motor_Manage\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async run (C:\Users\admin\Documents\Motor_Manage\check_march_revenue.js:20:19) {
+  length: 109,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '77',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3827',
+  routine: 'errorMissingColumn'
+}

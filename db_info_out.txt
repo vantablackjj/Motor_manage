@@ -1,0 +1,16 @@
+✅ Cấu trúc backend Node.js đã được tạo!
+DB TimeZone: { TimeZone: 'Asia/Bangkok' }
+DB Time info: {
+  now: 2026-03-03T12:19:48.249Z,
+  current_date: 2026-03-02T17:00:00.000Z,
+  date_cast: '2026-03-03'
+}
+Recent Maintenance: [
+  {
+    "ma_phieu": "BT00000001",
+    "tong_tien": "111.00",
+    "trang_thai": "HOAN_THANH",
+    "thoi_gian_ket_thuc": "2026-02-27T18:13:01.444Z",
+    "date_only": "2026-02-28"
+  }
+]

@@ -120,6 +120,7 @@ class BaoCaoService {
   // ============================================================
 
   async doanhThuTheoThang(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
     const { nam, ma_kho, tu_ngay, den_ngay, loai } = filters;
     const params = [];
     let paramIndex = 1;
@@ -243,6 +244,7 @@ class BaoCaoService {
   }
 
   async doanhThuTheoKho(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
     const { tu_ngay, den_ngay, ma_kho } = filters;
     const params = [];
     let paramIndex = 1;
@@ -332,6 +334,7 @@ class BaoCaoService {
   }
 
   async doanhThuTheoSanPham(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
     const { tu_ngay, den_ngay, ma_kho, loai } = filters;
     let sql = "";
     const params = [];
@@ -378,6 +381,7 @@ class BaoCaoService {
   }
 
   async doanhThuTongHop(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
     const { tu_ngay, den_ngay, ma_kho } = filters;
     const params = [];
     let paramIndex = 1;
@@ -933,6 +937,7 @@ class BaoCaoService {
   // ============================================================
 
   async thuChiTheoNgay(filters = {}) {
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
     const { tu_ngay, den_ngay, ma_kho, loai } = filters;
     let sql = `
       SELECT 
@@ -1101,21 +1106,34 @@ class BaoCaoService {
 
   async dashboard(filters = {}) {
     const { ma_kho, tu_ngay } = filters;
-    const today = tu_ngay || new Date().toISOString().split("T")[0];
-    const firstDayOfMonth = new Date(
-      new Date(today).getFullYear(),
-      new Date(today).getMonth(),
-      1,
-    )
-      .toISOString()
-      .split("T")[0];
+
+    // Set session timezone to ICT to ensure date casts work correctly for local time
+    await pool.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
+
+    // Get "today" in ICT
+    const nowICT = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+    const today = tu_ngay || nowICT.toISOString().split("T")[0];
+
+    const firstDayOfMonth = today.substring(0, 8) + "01";
 
     const whereKho = ma_kho ? ` AND ma_ben_xuat = $2` : "";
     const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
     const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
 
-    const sqlRevenueToday = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don::date = $1${whereKho}`;
-    const sqlRevenueMonth = `SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}`;
+    const sqlRevenueToday = `
+      SELECT SUM(total) as total FROM (
+        SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don::date = $1${whereKho}
+        UNION ALL
+        SELECT SUM(tong_tien) as total FROM tm_bao_tri WHERE trang_thai = 'HOAN_THANH' AND COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1${ma_kho ? ` AND ma_kho = $2` : ""}
+      ) t
+    `;
+    const sqlRevenueMonth = `
+      SELECT SUM(total) as total FROM (
+        SELECT SUM(thanh_tien) as total FROM tm_hoa_don WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') AND loai_hoa_don = 'BAN_HANG' AND ngay_hoa_don >= $1${whereKho}
+        UNION ALL
+        SELECT SUM(tong_tien) as total FROM tm_bao_tri WHERE trang_thai = 'HOAN_THANH' AND COALESCE(thoi_gian_ket_thuc, updated_at) >= $1${ma_kho ? ` AND ma_kho = $2` : ""}
+      ) t
+    `;
     const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
     const sqlStockXeFixing = `
       SELECT COUNT(DISTINCT ma_serial) as total 
@@ -1192,6 +1210,18 @@ class BaoCaoService {
         FROM tm_don_hang 
         WHERE loai_don_hang IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
         ${ma_kho ? "AND (ma_ben_nhap = $1 OR ma_ben_xuat = $1)" : ""}
+
+        UNION ALL
+
+        SELECT 
+          id,
+          ma_phieu as so_phieu,
+          'DICH_VU_BAO_TRI'::varchar as loai_giao_dich,
+          tong_tien,
+          COALESCE(thoi_gian_ket_thuc, created_at)::timestamp as ngay_lap
+        FROM tm_bao_tri
+        WHERE trang_thai = 'HOAN_THANH'
+        ${ma_kho ? "AND ma_kho = $1" : ""}
       ) as combined
       ORDER BY ngay_lap DESC
       LIMIT 10
