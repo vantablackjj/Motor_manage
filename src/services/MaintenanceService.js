@@ -420,16 +420,19 @@ class MaintenanceService {
         // --- GHI NHẬN CÔNG NỢ & DÒNG TIỀN ---
         if (phieuData.tong_tien > 0) {
           // 1. Ghi nhận công nợ (Luôn ghi nhận để theo dõi lịch sử)
+          // Lưu ý: so_hoa_don = null vì phiếu bảo trì không nằm trong tm_hoa_don (FK constraint)
+          // Mã phiếu bảo trì được ghi trong ghi_chu để đối soát
           await CongNoService.recordDoiTacDebt(client, {
             ma_doi_tac: phieuData.ma_doi_tac,
             loai_cong_no: "PHAI_THU",
-            so_hoa_don: ma_phieu, // Gắn mã phiếu bảo trì vào để dễ đối soát
+            so_hoa_don: null,
             ngay_phat_sinh: new Date(),
             so_tien: phieuData.tong_tien,
             ghi_chu: `Dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
           });
 
           // 2. Mặc định tạo phiếu thu (dòng tiền) nếu hoàn thành
+          // ma_hoa_don = null vì phiếu bảo trì không nằm trong tm_hoa_don (FK constraint)
           const ThuChiService = require("./thuChi.service");
           const phieuThu = await ThuChiService.taoPhieu(
             {
@@ -441,7 +444,7 @@ class MaintenanceService {
               loai: "THU",
               hinh_thuc: hinh_thuc_thanh_toan || "TIEN_MAT",
               dien_giai: `Thu tiền dịch vụ sửa chữa/bảo trì xe theo phiếu ${ma_phieu}`,
-              ma_hoa_don: ma_phieu,
+              ma_hoa_don: null,
             },
             client,
           );
