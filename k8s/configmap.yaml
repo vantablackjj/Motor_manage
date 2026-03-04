@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: motor-manage
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  API_PREFIX: "/api"
+  DB_HOST: "postgres-service" # Assuming a postgres service exists
+  DB_PORT: "5432"
+  DB_NAME: "Manage_Warehouse"
+  DB_USER: "postgres"
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "10"
+  LOG_LEVEL: "info"
+  LOG_FILE: "logs/app.log"
+  CORS_ORIGIN: "https://your-frontend-domain.com"
+  VAPID_SUBJECT: "mailto:admin@motor-manage.com"

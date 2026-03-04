@@ -32,6 +32,7 @@ async function startServer() {
       logger.info("Checking/Fixing sys_user structure...");
       await pool.query(`
         DO $$
+        BEGIN
             IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sys_user') THEN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
                     ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);

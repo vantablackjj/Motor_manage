@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: motor-manage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: motor-manage-be
+  template:
+    metadata:
+      labels:
+        app: motor-manage-be
+    spec:
+      containers:
+        - name: backend
+          image: vantablackj/motor-manage:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          # If the app needs persistence for uploads:
+          # volumeMounts:
+          # - name: uploads-storage
+          #   mountPath: /app/uploads
+      # volumes:
+      # - name: uploads-storage
+      #   persistentVolumeClaim:
+      #     claimName: uploads-pvc

@@ -43,22 +43,56 @@ class MigrationRunner {
     const filepath = path.join(this.migrationsDir, filename);
     const sql = await fs.readFile(filepath, "utf8");
 
+    // PostgreSQL limitation: ALTER TYPE ... ADD VALUE cannot be used in the same transaction
+    // where the new value is referenced. We detect this to skip the manual transaction.
+    const useTransaction = !(
+      sql.includes("ALTER TYPE") && sql.includes("ADD VALUE")
+    );
+
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      if (useTransaction) {
+        await client.query("BEGIN");
+      }
 
-      logger.info(`Executing migration: ${filename}`);
-      await client.query(sql);
-
-      await client.query(
-        "INSERT INTO schema_migrations (migration_name) VALUES ($1)",
-        [filename],
+      logger.info(
+        `Executing migration: ${filename} (Transaction: ${useTransaction})`,
       );
 
-      await client.query("COMMIT");
+      // Split by semicolon if not using transaction?
+      // Actually, pg.query can handle multiple statements in one call,
+      // but they run in an implicit transaction.
+      // For ALTER TYPE ADD VALUE, we need it to commit.
+
+      // If NOT using transaction, we should run statements one by one or
+      // hope that pg handles it. Actually, the best way is to run them one by one.
+      if (!useTransaction) {
+        // Simple semicolon split (careful with strings/functions, but usually OK for migrations)
+        const statements = sql.split(";").filter((st) => st.trim() !== "");
+        for (const statement of statements) {
+          await client.query(statement);
+        }
+      } else {
+        await client.query(sql);
+      }
+
+      if (useTransaction) {
+        await client.query(
+          "INSERT INTO schema_migrations (migration_name) VALUES ($1)",
+          [filename],
+        );
+        await client.query("COMMIT");
+      } else {
+        await pool.query(
+          "INSERT INTO schema_migrations (migration_name) VALUES ($1)",
+          [filename],
+        );
+      }
       logger.info(`✅ Migration completed: ${filename}`);
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (useTransaction) {
+        await client.query("ROLLBACK");
+      }
       logger.error(`❌ Migration failed: ${filename}`, error);
       throw error;
     } finally {

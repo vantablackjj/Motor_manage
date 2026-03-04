@@ -11,4 +11,4 @@ tests/
 Dockerfile
 .dockerignore
 ecosystem.config.js
-package-lock.json
+
