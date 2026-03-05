@@ -13,11 +13,10 @@ const warehouseIsolation = (req, res, next) => {
     return sendError(res, "Unauthorized", 401);
   }
 
-  // Admin, Quản lý và Kế toán có quyền xem toàn bộ kho
+  // Admin và Quản lý có quyền xem toàn bộ kho
   const hasFullAccess = [
     ROLES.ADMIN,
     ROLES.QUAN_LY,
-    ROLES.KE_TOAN,
     ROLES.QUAN_LY_CTY,
   ].includes(user.vai_tro);
 

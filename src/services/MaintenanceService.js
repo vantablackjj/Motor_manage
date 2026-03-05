@@ -156,16 +156,28 @@ class MaintenanceService {
       };
     }
 
-    // Bước 0.1: Kiểm tra bàn nâng có đang trống không (nếu có chọn bàn nâng)
+    // Bước 0.1: Kiểm tra bàn nâng có đang trống không và thuộc đúng kho không
     if (data.ma_ban_nang) {
       const banNangStatus = await query(
-        `SELECT trang_thai FROM dm_ban_nang WHERE ma_ban_nang = $1`,
+        `SELECT trang_thai, ma_kho FROM dm_ban_nang WHERE ma_ban_nang = $1`,
         [data.ma_ban_nang],
       );
-      if (
-        banNangStatus.rows.length > 0 &&
-        banNangStatus.rows[0].trang_thai !== "TRONG"
-      ) {
+
+      if (banNangStatus.rows.length === 0) {
+        throw {
+          status: 400,
+          message: `Bàn nâng ${data.ma_ban_nang} không tồn tại.`,
+        };
+      }
+
+      if (data.ma_kho && banNangStatus.rows[0].ma_kho !== data.ma_kho) {
+        throw {
+          status: 400,
+          message: `Bàn nâng ${data.ma_ban_nang} không thuộc về kho bạn đang chọn.`,
+        };
+      }
+
+      if (banNangStatus.rows[0].trang_thai !== "TRONG") {
         throw {
           status: 400,
           message: `Bàn nâng ${data.ma_ban_nang} đang bận. Vui lòng chọn bàn khác.`,
@@ -265,8 +277,8 @@ class MaintenanceService {
       // Cập nhật trạng thái bàn nâng nếu có gắn xe vào bàn
       if (data.ma_ban_nang) {
         await client.query(
-          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1`,
-          [data.ma_ban_nang],
+          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1 AND ma_kho = $2`,
+          [data.ma_ban_nang, data.ma_kho],
         );
       }
 
@@ -296,21 +308,31 @@ class MaintenanceService {
     };
   }
 
-  // Lấy danh sách bàn nâng
-  static async getBanNang() {
-    const res = await query(`
+  // Lấy danh sách bàn nâng theo kho
+  static async getBanNang(filters = {}) {
+    const { ma_kho } = filters;
+    let sql = `
       SELECT bn.*, 
              t.ma_phieu, t.ma_serial, t.tien_cong, t.tien_phu_tung, t.ktv_chinh as ktv_id,
              u.ho_ten as ten_ktv
       FROM dm_ban_nang bn
       LEFT JOIN (
-         SELECT ma_phieu, ma_ban_nang, ma_serial, tien_cong, tien_phu_tung, ktv_chinh 
+         SELECT ma_phieu, ma_ban_nang, ma_serial, tien_cong, tien_phu_tung, ktv_chinh, ma_kho
          FROM tm_bao_tri 
          WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
-      ) t ON bn.ma_ban_nang = t.ma_ban_nang
+      ) t ON bn.ma_ban_nang = t.ma_ban_nang AND bn.ma_kho = t.ma_kho
       LEFT JOIN sys_user u ON t.ktv_chinh = u.id
-      ORDER BY bn.ma_ban_nang ASC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (ma_kho) {
+      params.push(ma_kho);
+      sql += ` AND bn.ma_kho = $${params.length}`;
+    }
+
+    sql += " ORDER BY bn.ma_ban_nang ASC";
+    const res = await query(sql, params);
     return res.rows;
   }
 
@@ -325,15 +347,28 @@ class MaintenanceService {
     return await transaction(async (client) => {
       // Nếu đổi bàn nâng
       if (ma_ban_nang && ma_ban_nang !== phieuData.ma_ban_nang) {
-        // Kiểm tra bàn mới có trống không
+        // Kiểm tra bàn mới có thuộc kho hiện tại không và có trống không
         const banNangStatus = await client.query(
-          `SELECT trang_thai FROM dm_ban_nang WHERE ma_ban_nang = $1`,
+          `SELECT trang_thai, ma_kho FROM dm_ban_nang WHERE ma_ban_nang = $1`,
           [ma_ban_nang],
         );
-        if (
-          banNangStatus.rows.length > 0 &&
-          banNangStatus.rows[0].trang_thai !== "TRONG"
-        ) {
+
+        if (banNangStatus.rows.length === 0) {
+          throw {
+            status: 400,
+            message: `Bàn nâng ${ma_ban_nang} không tồn tại.`,
+          };
+        }
+
+        const currentKho = ma_kho || phieuData.ma_kho;
+        if (currentKho && banNangStatus.rows[0].ma_kho !== currentKho) {
+          throw {
+            status: 400,
+            message: `Bàn nâng ${ma_ban_nang} không thuộc kho ${currentKho}.`,
+          };
+        }
+
+        if (banNangStatus.rows[0].trang_thai !== "TRONG") {
           throw {
             status: 400,
             message: `Bàn nâng ${ma_ban_nang} đang bận. Vui lòng chọn bàn khác.`,
@@ -343,14 +378,14 @@ class MaintenanceService {
         // Trả bàn nâng cũ về 'TRONG'
         if (phieuData.ma_ban_nang) {
           await client.query(
-            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
-            [phieuData.ma_ban_nang],
+            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1 AND ma_kho = $2`,
+            [phieuData.ma_ban_nang, phieuData.ma_kho],
           );
         }
         // Gắn bàn mới
         await client.query(
-          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1`,
-          [ma_ban_nang],
+          `UPDATE dm_ban_nang SET trang_thai = 'DANG_SUA' WHERE ma_ban_nang = $1 AND ma_kho = $2`,
+          [ma_ban_nang, currentKho],
         );
       }
 
@@ -406,8 +441,8 @@ class MaintenanceService {
         // Giải phóng bàn nâng
         if (phieuData.ma_ban_nang || ma_ban_nang) {
           await client.query(
-            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
-            [ma_ban_nang || phieuData.ma_ban_nang],
+            `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1 AND ma_kho = $2`,
+            [ma_ban_nang || phieuData.ma_ban_nang, khoXuat],
           );
         }
 
@@ -461,8 +496,8 @@ class MaintenanceService {
       // Nếu HỦY phiếu thì giải phóng bàn nâng
       if (trang_thai === "DA_HUY" && (phieuData.ma_ban_nang || ma_ban_nang)) {
         await client.query(
-          `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1`,
-          [ma_ban_nang || phieuData.ma_ban_nang],
+          `UPDATE dm_ban_nang SET trang_thai = 'TRONG' WHERE ma_ban_nang = $1 AND ma_kho = $2`,
+          [ma_ban_nang || phieuData.ma_ban_nang, ma_kho || phieuData.ma_kho],
         );
       }
 

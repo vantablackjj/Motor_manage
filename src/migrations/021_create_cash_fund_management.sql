@@ -6,6 +6,27 @@
 -- =====================================================
 
 -- =====================================================
+-- ADD ENUM TYPES
+-- =====================================================
+DO $$ 
+BEGIN
+    -- Loại quỹ
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_loai_quy') THEN
+        CREATE TYPE enum_loai_quy AS ENUM ('TIEN_MAT', 'NGAN_HANG', 'VI_DIEN_TU');
+    END IF;
+    
+    -- Loại biến động quỹ
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_loai_bien_dong_quy') THEN
+        CREATE TYPE enum_loai_bien_dong_quy AS ENUM ('TANG', 'GIAM');
+    END IF;
+
+    -- Trạng thái chung (nếu chưa có)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_trang_thai') THEN
+        CREATE TYPE enum_trang_thai AS ENUM ('NHAP', 'DA_DUYET', 'HUY');
+    END IF;
+END $$;
+
+-- =====================================================
 -- QUỸ TIỀN MẶT (Cash Fund per Warehouse)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS tm_quy_tien_mat (
@@ -25,9 +46,9 @@ CREATE TABLE IF NOT EXISTS tm_quy_tien_mat (
     UNIQUE(ma_kho, loai_quy, ten_quy)
 );
 
-CREATE INDEX idx_tm_quy_tien_mat_kho ON tm_quy_tien_mat(ma_kho);
-CREATE INDEX idx_tm_quy_tien_mat_loai ON tm_quy_tien_mat(loai_quy);
-CREATE INDEX idx_tm_quy_tien_mat_status ON tm_quy_tien_mat(trang_thai);
+CREATE INDEX IF NOT EXISTS idx_tm_quy_tien_mat_kho ON tm_quy_tien_mat(ma_kho);
+CREATE INDEX IF NOT EXISTS idx_tm_quy_tien_mat_loai ON tm_quy_tien_mat(loai_quy);
+CREATE INDEX IF NOT EXISTS idx_tm_quy_tien_mat_status ON tm_quy_tien_mat(trang_thai);
 
 COMMENT ON TABLE tm_quy_tien_mat IS 'Quỹ tiền mặt/ngân hàng của từng kho';
 COMMENT ON COLUMN tm_quy_tien_mat.loai_quy IS 'TIEN_MAT, NGAN_HANG, VI_DIEN_TU';
@@ -49,27 +70,11 @@ CREATE TABLE IF NOT EXISTS tm_lich_su_quy (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_tm_lich_su_quy_ma_quy ON tm_lich_su_quy(ma_quy);
-CREATE INDEX idx_tm_lich_su_quy_phieu ON tm_lich_su_quy(so_phieu_tc);
-CREATE INDEX idx_tm_lich_su_quy_ngay ON tm_lich_su_quy(ngay_giao_dich DESC);
+CREATE INDEX IF NOT EXISTS idx_tm_lich_su_quy_ma_quy ON tm_lich_su_quy(ma_quy);
+CREATE INDEX IF NOT EXISTS idx_tm_lich_su_quy_phieu ON tm_lich_su_quy(so_phieu_tc);
+CREATE INDEX IF NOT EXISTS idx_tm_lich_su_quy_ngay ON tm_lich_su_quy(ngay_giao_dich DESC);
 
 COMMENT ON TABLE tm_lich_su_quy IS 'Lịch sử biến động quỹ tiền mặt';
-
--- =====================================================
--- ADD ENUM TYPES
--- =====================================================
-DO $$ 
-BEGIN
-    -- Loại quỹ
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_loai_quy') THEN
-        CREATE TYPE enum_loai_quy AS ENUM ('TIEN_MAT', 'NGAN_HANG', 'VI_DIEN_TU');
-    END IF;
-    
-    -- Loại biến động quỹ
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_loai_bien_dong_quy') THEN
-        CREATE TYPE enum_loai_bien_dong_quy AS ENUM ('TANG', 'GIAM');
-    END IF;
-END $$;
 
 -- =====================================================
 -- ADD COLUMNS TO tm_phieu_thu_chi

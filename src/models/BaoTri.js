@@ -118,6 +118,11 @@ class BaoTri {
       sql += ` AND b.ma_serial = $${params.length}`;
     }
 
+    if (filters.ma_kho) {
+      params.push(filters.ma_kho);
+      sql += ` AND b.ma_kho = $${params.length}`;
+    }
+
     // Filter: chỉ xe cửa hàng hoặc chỉ xe ngoài
     if (filters.la_xe_cua_hang !== undefined) {
       params.push(

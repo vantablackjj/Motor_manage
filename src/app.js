@@ -13,7 +13,12 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 // ─── 1. Security middleware (đặt đầu tiên) ───────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, // Tắt CSP nếu đang dev/test bị chặn, hoặc cấu hình chi tiết sau
+  }),
+);
 
 // ─── 2. Compression (phải trước routes để nén response) ──────────────────────
 app.use(compression());
@@ -43,18 +48,25 @@ app.use(
     origin: (origin, callback) => {
       // Cho phép request không có origin (ví dụ: curl, mobile app, Postman)
       if (!origin) return callback(null, true);
-      if (
+
+      const isAllowed =
         allowedOrigins.includes(origin) ||
         allowedOrigins.includes("*") ||
-        origin.endsWith(".vercel.app") // Cho phép các domain preview tự động của Vercel
-      ) {
-        return callback(null, true);
+        origin.endsWith(".vercel.app") ||
+        origin.includes("54.254.173.166"); // Fix cứng IP hiện tại nếu cần hoặc dựa vào allowedOrigins đã update
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        logger.warn(`CORS blocked for origin: ${origin}`);
+        callback(null, false);
       }
-      callback(new Error(`CORS: Origin '${origin}' không được phép`));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   }),
 );
 

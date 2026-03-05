@@ -39,50 +39,90 @@ class MigrationRunner {
     return files.filter((f) => f.endsWith(".sql")).sort();
   }
 
+  splitSqlStatements(sql) {
+    const statements = [];
+    let currentStatement = "";
+    let inQuote = false;
+    let inDollarQuote = false;
+    let dollarTag = "";
+
+    for (let i = 0; i < sql.length; i++) {
+      const char = sql[i];
+
+      // Handle dollar quoting ($$ or $tag$)
+      if (!inQuote && char === "$") {
+        let j = i + 1;
+        while (
+          j < sql.length &&
+          sql[j] !== "$" &&
+          /[a-zA-Z0-9_]/.test(sql[j])
+        ) {
+          j++;
+        }
+        if (j < sql.length && sql[j] === "$") {
+          const tag = sql.substring(i, j + 1);
+          if (!inDollarQuote) {
+            inDollarQuote = true;
+            dollarTag = tag;
+          } else if (tag === dollarTag) {
+            inDollarQuote = false;
+            dollarTag = "";
+          }
+          currentStatement += tag;
+          i = j;
+          continue;
+        }
+      }
+
+      if (!inDollarQuote && (char === "'" || char === '"')) {
+        if (!inQuote) inQuote = char;
+        else if (inQuote === char) inQuote = false;
+      }
+
+      if (char === ";" && !inQuote && !inDollarQuote) {
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+        }
+        currentStatement = "";
+      } else {
+        currentStatement += char;
+      }
+    }
+    if (currentStatement.trim()) {
+      statements.push(currentStatement.trim());
+    }
+    return statements;
+  }
+
   async executeMigration(filename) {
     const filepath = path.join(this.migrationsDir, filename);
     const sql = await fs.readFile(filepath, "utf8");
 
     // PostgreSQL limitation: ALTER TYPE ... ADD VALUE cannot be used in the same transaction
     // where the new value is referenced. We detect this to skip the manual transaction.
-    const useTransaction = !(
-      sql.includes("ALTER TYPE") && sql.includes("ADD VALUE")
-    );
+    const hasEnumAlter =
+      sql.includes("ALTER TYPE") && sql.includes("ADD VALUE");
+    const useTransaction = !hasEnumAlter;
 
     const client = await pool.connect();
     try {
       if (useTransaction) {
         await client.query("BEGIN");
-      }
-
-      logger.info(
-        `Executing migration: ${filename} (Transaction: ${useTransaction})`,
-      );
-
-      // Split by semicolon if not using transaction?
-      // Actually, pg.query can handle multiple statements in one call,
-      // but they run in an implicit transaction.
-      // For ALTER TYPE ADD VALUE, we need it to commit.
-
-      // If NOT using transaction, we should run statements one by one or
-      // hope that pg handles it. Actually, the best way is to run them one by one.
-      if (!useTransaction) {
-        // Simple semicolon split (careful with strings/functions, but usually OK for migrations)
-        const statements = sql.split(";").filter((st) => st.trim() !== "");
-        for (const statement of statements) {
-          await client.query(statement);
-        }
-      } else {
+        logger.info(`Executing migration: ${filename} (via Transaction)`);
         await client.query(sql);
-      }
-
-      if (useTransaction) {
         await client.query(
           "INSERT INTO schema_migrations (migration_name) VALUES ($1)",
           [filename],
         );
         await client.query("COMMIT");
       } else {
+        logger.info(
+          `Executing migration: ${filename} (Statement by Statement for Enum safety)`,
+        );
+        const statements = this.splitSqlStatements(sql);
+        for (const statement of statements) {
+          await client.query(statement);
+        }
         await pool.query(
           "INSERT INTO schema_migrations (migration_name) VALUES ($1)",
           [filename],
