@@ -44,7 +44,9 @@ class KhachHangService {
   static async create(data) {
     const { generateCode } = require("../utils/codeGenerator");
     const loai_doi_tac =
-      data.loai_doi_tac || (data.la_ncc ? "NHA_CUNG_CAP" : "KHACH_HANG");
+      data.la_ncc === true || data.la_ncc === "true"
+        ? "NHA_CUNG_CAP"
+        : data.loai_doi_tac || "KHACH_HANG";
     const prefix = loai_doi_tac === "NHA_CUNG_CAP" ? "NCC" : "KH";
 
     // Check trùng mã replaced by auto-gen
@@ -82,7 +84,7 @@ class KhachHangService {
         data.dien_thoai || null,
         data.email || null,
         data.ho_khau || null,
-        data.loai_doi_tac || (data.la_ncc ? "NHA_CUNG_CAP" : "KHACH_HANG"),
+        loai_doi_tac,
         data.status ?? true,
       ],
     );
@@ -97,6 +99,20 @@ class KhachHangService {
     const current = await this.getById(maKh);
     if (!current) {
       throw new Error("Khách hàng không tồn tại");
+    }
+
+    // Xác định lại loai_doi_tac:
+    // - Nếu client gửi la_ncc (true/false) thì ưu tiên dùng để map sang NHA_CUNG_CAP / KHACH_HANG
+    // - Nếu không gửi la_ncc nhưng có loai_doi_tac thì dùng loai_doi_tac gửi lên
+    // - Nếu không gửi gì thì giữ nguyên giá trị hiện tại
+    let loai_doi_tac_new = current.loai_doi_tac;
+
+    if (data.la_ncc === true || data.la_ncc === "true") {
+      loai_doi_tac_new = "NHA_CUNG_CAP";
+    } else if (data.la_ncc === false || data.la_ncc === "false") {
+      loai_doi_tac_new = "KHACH_HANG";
+    } else if (data.loai_doi_tac) {
+      loai_doi_tac_new = data.loai_doi_tac;
     }
 
     const result = await query(
@@ -121,13 +137,7 @@ class KhachHangService {
         data.dien_thoai || current.dien_thoai,
         data.email || current.email,
         data.ho_khau || current.ho_khau,
-        data.loai_doi_tac !== undefined
-          ? data.loai_doi_tac
-          : data.la_ncc !== undefined
-            ? data.la_ncc
-              ? "NHA_CUNG_CAP"
-              : "KHACH_HANG"
-            : current.loai_doi_tac,
+        loai_doi_tac_new,
         data.status !== undefined ? data.status : current.status,
         maKh,
       ],

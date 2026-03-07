@@ -1371,37 +1371,46 @@ class BaoCaoService {
       const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
 
       const sqlRecentActivities = `
-      SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap FROM (
+      SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap, dien_giai, ten_doi_tac FROM (
         SELECT 
-          so_hoa_don as so_phieu, 
-          loai_hoa_don::varchar as loai_giao_dich, 
-          thanh_tien as tong_tien, 
-          ngay_hoa_don::timestamp as ngay_lap 
-        FROM tm_hoa_don 
-        WHERE loai_hoa_don IN ('BAN_HANG')
-        ${ma_kho ? "AND ma_ben_xuat = $1" : ""}
+          h.so_hoa_don as so_phieu, 
+          h.loai_hoa_don::varchar as loai_giao_dich, 
+          h.thanh_tien as tong_tien, 
+          h.ngay_hoa_don::timestamp as ngay_lap,
+          COALESCE(h.ghi_chu, 'Hóa đơn bán hàng') as dien_giai,
+          dt.ten_doi_tac
+        FROM tm_hoa_don h
+        LEFT JOIN dm_doi_tac dt ON h.ma_ben_nhap = dt.ma_doi_tac
+        WHERE h.loai_hoa_don IN ('BAN_HANG')
+        ${ma_kho ? "AND h.ma_ben_xuat = $1" : ""}
         
         UNION ALL
         
         SELECT 
-          so_don_hang as so_phieu, 
-          CASE WHEN loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE loai_don_hang::varchar END as loai_giao_dich, 
-          thanh_tien as tong_tien, 
-          ngay_dat_hang::timestamp as ngay_lap 
-        FROM tm_don_hang 
-        WHERE loai_don_hang IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
-        ${ma_kho ? "AND (ma_ben_nhap = $1 OR ma_ben_xuat = $1)" : ""}
+          h.so_don_hang as so_phieu, 
+          CASE WHEN h.loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE h.loai_don_hang::varchar END as loai_giao_dich, 
+          h.thanh_tien as tong_tien, 
+          h.ngay_dat_hang::timestamp as ngay_lap,
+          COALESCE(h.ghi_chu, 'Đơn mua hàng/chuyển kho') as dien_giai,
+          dt.ten_doi_tac
+        FROM tm_don_hang h
+        LEFT JOIN dm_doi_tac dt ON (h.ma_ben_xuat = dt.ma_doi_tac OR h.ma_ben_nhap = dt.ma_doi_tac)
+        WHERE h.loai_don_hang IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
+        ${ma_kho ? "AND (h.ma_ben_nhap = $1 OR h.ma_ben_xuat = $1)" : ""}
 
         UNION ALL
 
         SELECT 
-          ma_phieu as so_phieu,
+          b.ma_phieu as so_phieu,
           'DICH_VU_BAO_TRI'::varchar as loai_giao_dich,
-          tong_tien,
-          COALESCE(thoi_gian_ket_thuc, created_at)::timestamp as ngay_lap
-        FROM tm_bao_tri
-        WHERE trang_thai = 'HOAN_THANH'
-        ${ma_kho ? "AND ma_kho = $1" : ""}
+          b.tong_tien,
+          COALESCE(b.thoi_gian_ket_thuc, b.created_at)::timestamp as ngay_lap,
+          'Dịch vụ sửa chữa xe ' || b.ma_serial as dien_giai,
+          dt.ten_doi_tac
+        FROM tm_bao_tri b
+        LEFT JOIN dm_doi_tac dt ON b.ma_doi_tac = dt.ma_doi_tac
+        WHERE b.trang_thai = 'HOAN_THANH'
+        ${ma_kho ? "AND b.ma_kho = $1" : ""}
       ) as combined
       ORDER BY ngay_lap DESC
       LIMIT 10

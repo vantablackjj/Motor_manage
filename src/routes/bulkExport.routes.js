@@ -27,6 +27,7 @@ router.get("/thu-chi", BulkExportController.exportThuChi);
 router.get("/nhap-kho", BulkExportController.exportNhapKho);
 router.get("/nhap-kho-xe", BulkExportController.exportNhapKhoXe);
 router.get("/xuat-kho", BulkExportController.exportXuatKho);
+router.get("/xuat-kho-xe", BulkExportController.exportXuatKhoXe);
 router.get("/transfer-xe", BulkExportController.exportTransferXe);
 router.get("/transfer-pt", BulkExportController.exportTransferPT);
 

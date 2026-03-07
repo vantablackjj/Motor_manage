@@ -14,11 +14,11 @@ class BulkExportService {
       // Thiết lập header cho response để trình duyệt hiểu là tải file
       res.setHeader(
         "Content-Type",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=${encodeURIComponent(fileName)}`
+        `attachment; filename=${encodeURIComponent(fileName)}`,
       );
 
       const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
@@ -30,7 +30,15 @@ class BulkExportService {
       const worksheet = workbook.addWorksheet("Sheet1");
 
       // Định nghĩa các cột
-      worksheet.columns = columns;
+      worksheet.columns = columns.map((col) => {
+        if (typeof col === "string")
+          return { header: col, key: col, width: 15 };
+        return {
+          header: col.header || col.title || "Untitled",
+          key: col.key || col.dataIndex || "",
+          width: col.width || 15,
+        };
+      });
 
       // Add data rows
       for (const row of data) {

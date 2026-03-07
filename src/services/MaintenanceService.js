@@ -1,6 +1,6 @@
 const BaoTri = require("../models/BaoTri");
 const NhacNho = require("../models/NhacNho");
-const Notification = require("../models/Notification");
+const NotificationService = require("./notification.service");
 const User = require("../models/User");
 const PushNotificationService = require("./pushNotification.service");
 const CongNoService = require("./congNo.service");
@@ -298,6 +298,14 @@ class MaintenanceService {
       );
     });
 
+    // Notify Managers/Reception about new car arrival
+    NotificationService.notifyManagers(
+      "Tiếp nhận xe mới",
+      `Xe ${data.ma_serial} đã được tiếp nhận tại kho ${data.ma_kho || "Hệ thống"}.`,
+      `/maintenance/view/${data.ma_phieu}`,
+      "MAINTENANCE",
+    ).catch((err) => console.error("Notification Error:", err));
+
     // Fetch full record to return names (ten_kho, ten_ktv, etc.)
     const fullPhieu = await BaoTri.getById(data.ma_phieu);
 
@@ -519,6 +527,15 @@ class MaintenanceService {
         ],
       );
 
+      if (trang_thai === "HOAN_THANH") {
+        NotificationService.notifyManagers(
+          "Sửa chữa hoàn thành",
+          `Xe ${phieuData.ma_serial} đã hoàn thành sửa chữa (Phiếu: ${ma_phieu}). Tổng tiền: ${Number(phieuData.tong_tien).toLocaleString()}đ.`,
+          `/maintenance/view/${ma_phieu}`,
+          "MAINTENANCE",
+        ).catch((err) => console.error("Notification Error:", err));
+      }
+
       return { ma_phieu, status: trang_thai };
     });
   }
@@ -714,6 +731,78 @@ class MaintenanceService {
     });
 
     return { remindersSent };
+  }
+
+  /**
+   * Lấy danh sách thợ (KTV) theo kho và đúng vai trò
+   */
+  static async getTechnicians(filters = {}) {
+    const { ma_kho } = filters;
+    let sql = `
+      SELECT DISTINCT u.id, u.username, u.ho_ten, u.ma_kho,
+             r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro
+      FROM sys_user u
+      JOIN sys_role r ON u.role_id = r.id
+      LEFT JOIN sys_user_kho uk ON u.id = uk.user_id
+      WHERE u.status = TRUE
+        AND (r.ma_quyen = 'KY_THUAT' OR r.ma_quyen = 'ADMIN' OR r.ma_quyen = 'QUAN_LY')
+    `;
+    const params = [];
+
+    if (ma_kho) {
+      params.push(ma_kho);
+      sql += ` AND (u.ma_kho = $${params.length} OR uk.ma_kho = $${params.length})`;
+    }
+
+    sql += " ORDER BY u.ho_ten ASC";
+    const res = await query(sql, params);
+    return res.rows;
+  }
+
+  // Quản lý bàn nâng: Thêm bàn nâng
+  static async addBanNang(data) {
+    const { ma_ban_nang, ten_ban_nang, ma_kho, ghi_chu } = data;
+    const res = await query(
+      `INSERT INTO dm_ban_nang (ma_ban_nang, ten_ban_nang, ma_kho, ghi_chu)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [ma_ban_nang, ten_ban_nang, ma_kho, ghi_chu],
+    );
+    return res.rows[0];
+  }
+
+  // Quản lý bàn nâng: Sửa bàn nâng
+  static async updateBanNang(id, data) {
+    const { ten_ban_nang, ma_kho, ghi_chu, trang_thai } = data;
+    const res = await query(
+      `UPDATE dm_ban_nang 
+       SET ten_ban_nang = COALESCE($1, ten_ban_nang),
+           ma_kho = COALESCE($2, ma_kho),
+           ghi_chu = COALESCE($3, ghi_chu),
+           trang_thai = COALESCE($4, trang_thai),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+       RETURNING *`,
+      [ten_ban_nang, ma_kho, ghi_chu, trang_thai, id],
+    );
+    return res.rows[0];
+  }
+
+  // Quản lý bàn nâng: Xóa bàn nâng
+  static async deleteBanNang(id) {
+    // Kiểm tra xem bàn nâng có đang bận không
+    const check = await query(
+      `SELECT trang_thai FROM dm_ban_nang WHERE id = $1`,
+      [id],
+    );
+    if (check.rows.length > 0 && check.rows[0].trang_thai !== "TRONG") {
+      throw {
+        status: 400,
+        message: "Không thể xóa bàn nâng đang bận sửa chữa.",
+      };
+    }
+    await query(`DELETE FROM dm_ban_nang WHERE id = $1`, [id]);
+    return true;
   }
 }
 

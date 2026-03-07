@@ -11,7 +11,17 @@ const generateExcel = async (data, columns, sheetName = "Sheet1") => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(sheetName);
 
-  worksheet.columns = columns;
+  // Ensure columns are valid objects with headers
+  const validColumns = columns.map((col) => {
+    if (typeof col === "string") return { header: col, key: col, width: 15 };
+    return {
+      header: col.header || col.title || "Untitled",
+      key: col.key || col.dataIndex || "",
+      width: col.width || 15,
+    };
+  });
+
+  worksheet.columns = validColumns;
 
   // Add rows
   worksheet.addRows(data);

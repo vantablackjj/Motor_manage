@@ -29,7 +29,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Nhan_hieu.xlsx"
+        "Danh_sach_Nhan_hieu.xlsx",
       );
     } catch (error) {
       next(error);
@@ -48,7 +48,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Mau.xlsx"
+        "Danh_sach_Mau.xlsx",
       );
     } catch (error) {
       next(error);
@@ -69,7 +69,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Kho.xlsx"
+        "Danh_sach_Kho.xlsx",
       );
     } catch (error) {
       next(error);
@@ -87,7 +87,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Noi_San_Xuat.xlsx"
+        "Danh_sach_Noi_San_Xuat.xlsx",
       );
     } catch (error) {
       next(error);
@@ -111,7 +111,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Loai_Xe.xlsx"
+        "Danh_sach_Loai_Xe.xlsx",
       );
     } catch (error) {
       next(error);
@@ -133,7 +133,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Khach_Hang.xlsx"
+        "Danh_sach_Khach_Hang.xlsx",
       );
     } catch (error) {
       next(error);
@@ -156,7 +156,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Danh_sach_Phu_Tung.xlsx"
+        "Danh_sach_Phu_Tung.xlsx",
       );
     } catch (error) {
       next(error);
@@ -181,7 +181,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Bao_cao_Thu_Chi.xlsx"
+        "Bao_cao_Thu_Chi.xlsx",
       );
     } catch (error) {
       next(error);
@@ -205,7 +205,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Chi_tiet_Nhap_Kho_PT.xlsx"
+        "Chi_tiet_Nhap_Kho_PT.xlsx",
       );
     } catch (error) {
       next(error);
@@ -214,12 +214,12 @@ class BulkExportController {
 
   static async exportXuatKho(req, res, next) {
     try {
-      // Xuất kho ở đây là chi tiết hóa đơn bán
+      // Xuất kho ở đây là chi tiết hóa đơn bán phụ tùng
       const data = await HoaDonBanService.getAllDetails(req.query);
       const columns = [
         { header: "Số Hóa Đơn", key: "ma_hd", width: 20 },
         { header: "Ngày Xuất", key: "ngay_lap", width: 20 },
-        { header: "Mã PT", key: "ma_pt", width: 15 },
+        { header: "Mã PT", key: "ma_hang_hoa", width: 15 },
         { header: "Tên Phụ Tùng", key: "ten_pt", width: 30 },
         { header: "Số Lượng", key: "so_luong", width: 12 },
         { header: "Đơn Giá", key: "don_gia", width: 15 },
@@ -229,7 +229,31 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Chi_tiet_Xuat_Kho_PT.xlsx"
+        "Chi_tiet_Xuat_Kho_PT.xlsx",
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async exportXuatKhoXe(req, res, next) {
+    try {
+      // Xuất kho ở đây là chi tiết hóa đơn bán xe
+      const data = await HoaDonBanService.getAllXeDetails(req.query);
+      const columns = [
+        { header: "Số Hóa Đơn", key: "ma_hd", width: 20 },
+        { header: "Ngày Xuất", key: "ngay_lap", width: 20 },
+        { header: "Tên Xe", key: "ten_xe", width: 25 },
+        { header: "Số Khung", key: "so_khung", width: 20 },
+        { header: "Số Máy", key: "so_may", width: 20 },
+        { header: "Màu", key: "ten_mau", width: 15 },
+        { header: "Giá Bán", key: "gia_ban", width: 15 },
+      ];
+      await BulkExportService.exportToExcel(
+        res,
+        data,
+        columns,
+        "Chi_tiet_Xuat_Kho_Xe.xlsx",
       );
     } catch (error) {
       next(error);
@@ -251,7 +275,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Chuyen_Kho_Xe.xlsx"
+        "Chuyen_Kho_Xe.xlsx",
       );
     } catch (error) {
       next(error);
@@ -274,7 +298,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Chuyen_Kho_Phu_Tung.xlsx"
+        "Chuyen_Kho_Phu_Tung.xlsx",
       );
     } catch (error) {
       next(error);
@@ -299,7 +323,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Ton_Kho_Xe.xlsx"
+        "Ton_Kho_Xe.xlsx",
       );
     } catch (error) {
       next(error);
@@ -323,7 +347,7 @@ class BulkExportController {
         res,
         data,
         columns,
-        "Lich_Su_Nhap_Kho_Xe.xlsx"
+        "Lich_Su_Nhap_Kho_Xe.xlsx",
       );
     } catch (error) {
       next(error);

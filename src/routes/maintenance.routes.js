@@ -59,6 +59,30 @@ router.get(
   MaintenanceController.getBanNang,
 );
 
+router.post(
+  "/ban-nang",
+  checkPermission("inventory", "edit"),
+  MaintenanceController.addBanNang,
+);
+
+router.put(
+  "/ban-nang/:id",
+  checkPermission("inventory", "edit"),
+  MaintenanceController.updateBanNang,
+);
+
+router.delete(
+  "/ban-nang/:id",
+  checkPermission("inventory", "edit"),
+  MaintenanceController.deleteBanNang,
+);
+
+router.get(
+  "/technicians/list",
+  checkPermission("inventory", "view"),
+  MaintenanceController.getTechnicians,
+);
+
 router.get(
   "/:id",
   checkPermission("inventory", "view"),

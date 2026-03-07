@@ -393,7 +393,7 @@ class DonHangMuaXeService {
         AND trang_thai = $3::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP, userId],
+      [soPhieu, TRANG_THAI.CHO_DUYET, TRANG_THAI.NHAP, userId],
     );
 
     if (!result.rowCount) {
@@ -423,13 +423,13 @@ class DonHangMuaXeService {
         AND trang_thai = $4::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.GUI_DUYET],
+      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.CHO_DUYET],
     );
 
     if (!result.rowCount) {
       throw {
         status: 400,
-        message: "Đơn chưa ở trạng thái chờ duyệt (GUI_DUYET)",
+        message: `Đơn chưa ở trạng thái chờ duyệt (${TRANG_THAI.CHO_DUYET})`,
       };
     }
 
@@ -450,11 +450,14 @@ class DonHangMuaXeService {
         AND trang_thai = $5::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.GUI_DUYET],
+      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.CHO_DUYET],
     );
 
     if (!result.rowCount) {
-      throw { status: 400, message: "Đơn không ở trạng thái chờ duyệt" };
+      throw {
+        status: 400,
+        message: `Đơn không ở trạng thái chờ duyệt (${TRANG_THAI.CHO_DUYET})`,
+      };
     }
 
     return result.rows[0];
@@ -516,7 +519,7 @@ class DonHangMuaXeService {
       LEFT JOIN sys_kho k ON h.ma_ben_nhap = k.ma_kho
       LEFT JOIN dm_doi_tac dt ON h.ma_ben_xuat = dt.ma_doi_tac
       LEFT JOIN sys_user u_tao ON (CASE WHEN h.nguoi_tao ~ '^[0-9]+$' THEN h.nguoi_tao::integer ELSE NULL END) = u_tao.id
-      LEFT JOIN sys_user u_gui ON h.nguoi_gui = u_gui.id
+      LEFT JOIN sys_user u_gui ON (CASE WHEN h.nguoi_gui ~ '^[0-9]+$' THEN h.nguoi_gui::integer ELSE NULL END) = u_gui.id
       LEFT JOIN sys_user u_duyet ON (CASE WHEN h.nguoi_duyet ~ '^[0-9]+$' THEN h.nguoi_duyet::integer ELSE NULL END) = u_duyet.id
       WHERE h.so_don_hang = $1 
          OR (CASE WHEN $1 ~ '^\\d+$' THEN h.id = $1::int ELSE FALSE END)

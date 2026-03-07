@@ -125,6 +125,47 @@ class MaintenanceController {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
+  // Lấy danh sách kỹ thuật viên
+  static async getTechnicians(req, res) {
+    try {
+      const results = await MaintenanceService.getTechnicians(req.query);
+      res.json({ success: true, data: results });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // CRUD Bàn nâng
+  static async addBanNang(req, res) {
+    try {
+      const result = await MaintenanceService.addBanNang(req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async updateBanNang(req, res) {
+    try {
+      const result = await MaintenanceService.updateBanNang(
+        req.params.id,
+        req.body,
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async deleteBanNang(req, res) {
+    try {
+      await MaintenanceService.deleteBanNang(req.params.id);
+      res.json({ success: true, message: "Xóa bàn nâng thành công" });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
 module.exports = MaintenanceController;

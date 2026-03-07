@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
+const NotificationService = require("./notification.service");
 
 class ThuChiService {
   // Helper: Sinh mã phiếu tự động (PT/PC + YYYYMMDD + Sequence)
@@ -89,7 +90,23 @@ class ThuChiService {
       throw new Error("Phiếu không hợp lệ để gửi duyệt");
     }
 
-    return result.rows[0];
+    const phieu = result.rows[0];
+
+    // Notify Managers
+    const ten_nguoi_gui = await pool
+      .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoi_gui])
+      .then((r) => r.rows[0]?.ho_ten || nguoi_gui);
+
+    const loai_ten = phieu.loai_phieu === "THU" ? "Phiếu Thu" : "Phiếu Chi";
+
+    NotificationService.notifyManagers(
+      `Yêu cầu duyệt ${loai_ten}`,
+      `${loai_ten} ${so_phieu} trị giá ${Number(phieu.so_tien).toLocaleString()}đ đã được ${ten_nguoi_gui} gửi yêu cầu phê duyệt.`,
+      `/financial/details/${so_phieu}`,
+      "APPROVAL",
+    ).catch((err) => console.error("Notification Error:", err));
+
+    return phieu;
   }
 
   async pheDuyet(so_phieu, nguoi_duyet, externalClient = null) {
@@ -155,6 +172,24 @@ class ThuChiService {
       }
 
       if (shouldManageTransaction) await client.query("COMMIT");
+
+      // Notify the person who submitted
+      if (phieu.nguoi_gui) {
+        const ten_quan_ly = await client
+          .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoi_duyet])
+          .then((r) => r.rows[0]?.ho_ten || "Quản lý");
+
+        const loai_ten = phieu.loai_phieu === "THU" ? "Phiếu Thu" : "Phiếu Chi";
+
+        NotificationService.notifyUser(
+          phieu.nguoi_gui,
+          `${loai_ten} đã được duyệt`,
+          `${loai_ten} ${phieu.so_phieu_tc} của bạn đã được ${ten_quan_ly} phê duyệt.`,
+          `/financial/details/${phieu.so_phieu_tc}`,
+          "APPROVAL",
+        ).catch((err) => console.error("Notification Error:", err));
+      }
+
       return phieu;
     } catch (error) {
       if (shouldManageTransaction) await client.query("ROLLBACK");

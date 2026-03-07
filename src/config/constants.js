@@ -17,6 +17,7 @@ module.exports = {
   TRANG_THAI: {
     NHAP: "NHAP",
     GUI_DUYET: "GUI_DUYET",
+    CHO_DUYET: "CHO_DUYET",
     DA_DUYET: "DA_DUYET",
     TU_CHOI: "TU_CHOI",
     DA_HUY: "DA_HUY",

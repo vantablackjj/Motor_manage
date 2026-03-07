@@ -875,8 +875,6 @@ class OrderService {
       `UPDATE tm_don_hang 
        SET 
         trang_thai = $1::enum_trang_thai_don_hang, 
-        updated_at = NOW(), 
-        updated_by = $2::integer,
         nguoi_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN $2::text ELSE nguoi_duyet END,
         ngay_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN NOW() ELSE ngay_duyet END
        WHERE so_don_hang = $3 

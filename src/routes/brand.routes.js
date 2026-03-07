@@ -7,6 +7,7 @@ const router = express.Router();
 const brandSchema = Joi.object({
   ma_nh: Joi.string().max(50),
   ten_nh: Joi.string().required().max(200),
+  ma_nhom_cha: Joi.string().max(50).default("XE"),
   status: Joi.boolean().default(true),
 });
 

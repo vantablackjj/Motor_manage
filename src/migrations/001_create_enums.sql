@@ -43,10 +43,14 @@ CREATE TYPE enum_loai_don_hang AS ENUM (
 
 CREATE TYPE enum_trang_thai_don_hang AS ENUM (
     'NHAP',
+    'GUI_DUYET',
+    'CHO_DUYET',
     'DA_DUYET',
+    'TU_CHOI',
     'DANG_GIAO',
     'HOAN_THANH',
-    'HUY'
+    'HUY',
+    'DA_HUY'
 );
 
 -- Hóa đơn

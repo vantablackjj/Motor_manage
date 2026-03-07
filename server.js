@@ -3,6 +3,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 const http = require("http");
+const cron = require("node-cron");
 const { Server } = require("socket.io");
 const app = require("./src/app");
 const logger = require("./src/utils/logger");
@@ -27,33 +28,6 @@ async function startServer() {
     // Khởi tạo VAPID cho Web Push Notifications
     PushNotificationService.init();
 
-    // LỰC LƯỢNG CƯỠNG ÉP: Đảm bảo cột ma_kho tồn tại
-    try {
-      logger.info("Checking/Fixing sys_user structure...");
-      await pool.query(`
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sys_user') THEN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'ma_kho') THEN
-                    ALTER TABLE sys_user ADD COLUMN ma_kho VARCHAR(50);
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sys_user' AND column_name = 'vai_tro') THEN
-                    ALTER TABLE sys_user ADD COLUMN vai_tro VARCHAR(50);
-                END IF;
-            END IF;
-
-            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tm_hang_hoa_serial') THEN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tm_hang_hoa_serial' AND column_name = 'han_dang_kiem') THEN
-                    ALTER TABLE tm_hang_hoa_serial ADD COLUMN han_dang_kiem DATE;
-                END IF;
-            END IF;
-        END $$;
-      `);
-      logger.info("✅ sys_user structure verified");
-    } catch (dbErr) {
-      logger.error("❌ Failed to force update sys_user structure", dbErr);
-    }
-
     // Tự động chạy Migration
     logger.info("Running migrations runner...");
     const runner = new MigrationRunner();
@@ -77,7 +51,7 @@ async function startServer() {
     // Initialize HTTP Server and Socket.io
     const server = http.createServer(app);
     // Tăng timeout cho các tác vụ import lớn
-    server.timeout = 10 * 60 * 1000; // 10 phút
+    server.timeout = 10 * 60 * 1000;
     server.keepAliveTimeout = 65 * 1000;
 
     const io = new Server(server, {
@@ -91,44 +65,40 @@ async function startServer() {
     NotificationService.setIo(io);
 
     io.on("connection", (socket) => {
-      logger.info(`🔌 New client connected: ${socket.id}`);
-
+      logger.info(` New client connected: ${socket.id}`);
       socket.on("join", (user_id) => {
         if (user_id) {
           socket.join(`user_${user_id}`);
-          logger.info(`👤 User ${user_id} joined their private room`);
+          logger.info(` User ${user_id} joined their private room`);
         }
       });
-
       socket.on("disconnect", () => {
-        logger.info(`🔌 Client disconnected: ${socket.id}`);
+        logger.info(` Client disconnected: ${socket.id}`);
       });
     });
 
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
 
-      // Chạy trình nhắc nhở mỗi 24 giờ
-      setInterval(
-        async () => {
-          try {
-            logger.info("Auto-triggering daily maintenance reminders...");
-            await MaintenanceService.runDailyReminders();
-          } catch (err) {
-            logger.error("Error in daily reminder scheduler:", err);
-          }
-        },
-        24 * 60 * 60 * 1000,
-      );
-
-      // Chạy lần đầu sau khi start 1 phút để tránh overload lúc khởi động
-      setTimeout(async () => {
+      // Chạy trình nhắc nhở mỗi ngày lúc 08:00 sáng
+      cron.schedule("0 8 * * *", async () => {
         try {
+          logger.info("Cron trigger: Running daily maintenance reminders...");
           await MaintenanceService.runDailyReminders();
         } catch (err) {
-          logger.error("Error in initial reminder trigger:", err);
+          logger.error("Error in cron reminder task:", err);
         }
-      }, 60 * 1000);
+      });
+
+      // Chạy lần đầu sau khi start 30 giây để đảm bảo DB đã sẵn sàng hoàn toàn
+      setTimeout(async () => {
+        try {
+          logger.info("Initial check: Running maintenance reminders check...");
+          await MaintenanceService.runDailyReminders();
+        } catch (err) {
+          logger.error("Error in initial reminder check:", err);
+        }
+      }, 30000);
     });
 
     process.on("SIGTERM", () => {

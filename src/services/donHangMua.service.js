@@ -2,6 +2,7 @@ const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
 const PhuTung = require("../models/PhuTung");
 const CongNoService = require("./congNo.service");
+const NotificationService = require("./notification.service");
 
 class DonHangMuaService {
   // Helper: Sinh mã phiếu tự động (POP + YYYYMMDD + Sequence)
@@ -49,7 +50,7 @@ class DonHangMuaService {
           ma_ncc,
           ck,
           vat,
-          "NHAP",
+          TRANG_THAI.NHAP,
           dien_giai,
         ],
       );
@@ -84,7 +85,7 @@ class DonHangMuaService {
         throw new Error("Đơn hàng không tồn tại");
       }
 
-      if (donResult.rows[0].trang_thai !== "NHAP") {
+      if (donResult.rows[0].trang_thai !== TRANG_THAI.NHAP) {
         throw new Error(
           `Không thể sửa đơn ở trạng thái ${donResult.rows[0].trang_thai}`,
         );
@@ -140,15 +141,27 @@ class DonHangMuaService {
   async guiDuyet(ma_phieu, nguoi_gui) {
     const result = await pool.query(
       `UPDATE tm_don_hang
-       SET trang_thai = 'GUI_DUYET'
+       SET trang_thai = $2
        WHERE (so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)) 
-         AND trang_thai = 'NHAP'`,
-      [ma_phieu],
+         AND trang_thai = $3`,
+      [ma_phieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP],
     );
 
     if (result.rowCount === 0) {
       throw new Error("Phiếu không hợp lệ để gửi duyệt");
     }
+
+    // Notify Managers
+    const ten_nguoi_gui = await pool
+      .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoi_gui])
+      .then((r) => r.rows[0]?.ho_ten || nguoi_gui);
+
+    NotificationService.notifyManagers(
+      "Yêu cầu duyệt đơn mua hàng",
+      `Đơn hàng ${ma_phieu} đã được ${ten_nguoi_gui} gửi yêu cầu phê duyệt.`,
+      `/purchase/orders/view/${ma_phieu}`,
+      "APPROVAL",
+    ).catch((err) => console.error("Notification Error:", err));
 
     return { success: true, message: "Đã gửi duyệt thành công" };
   }
@@ -158,19 +171,30 @@ class DonHangMuaService {
   async pheDuyet(ma_phieu, nguoi_duyet) {
     const result = await pool.query(
       `UPDATE tm_don_hang
-       SET trang_thai = 'DA_DUYET', 
+       SET trang_thai = $3, 
            nguoi_duyet = $2,
            ngay_duyet = CURRENT_TIMESTAMP
        WHERE (so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)) 
-         AND trang_thai = 'GUI_DUYET'
+         AND trang_thai = $4
        RETURNING *`,
-      [ma_phieu, nguoi_duyet],
+      [ma_phieu, nguoi_duyet, TRANG_THAI.DA_DUYET, TRANG_THAI.GUI_DUYET],
     );
 
-    if (result.rowCount === 0) {
-      throw new Error(
-        "Đơn hàng không hợp lệ để duyệt (Phải ở trạng thái GUI_DUYET)",
-      );
+    const don = result.rows[0];
+
+    // Notify the person who submitted
+    if (don.nguoi_gui) {
+      const ten_quan_ly = await pool
+        .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoi_duyet])
+        .then((r) => r.rows[0]?.ho_ten || "Quản lý");
+
+      NotificationService.notifyUser(
+        don.nguoi_gui,
+        "Đơn mua hàng đã được duyệt",
+        `Đơn hàng ${don.so_don_hang} của bạn đã được ${ten_quan_ly} phê duyệt.`,
+        `/purchase/orders/view/${don.so_don_hang}`,
+        "APPROVAL",
+      ).catch((err) => console.error("Notification Error:", err));
     }
 
     return { success: true, message: "Đã duyệt đơn hàng thành công" };
@@ -382,12 +406,12 @@ class DonHangMuaService {
 
       if (parseInt(checkDone.rows[0].remaining) === 0) {
         await client.query(
-          `UPDATE tm_don_hang SET trang_thai = 'HOAN_THANH', updated_at = NOW() WHERE so_don_hang = $1`,
+          `UPDATE tm_don_hang SET trang_thai = 'HOAN_THANH' WHERE so_don_hang = $1`,
           [don.so_don_hang],
         );
       } else {
         await client.query(
-          `UPDATE tm_don_hang SET trang_thai = 'DANG_GIAO', updated_at = NOW() WHERE so_don_hang = $1`,
+          `UPDATE tm_don_hang SET trang_thai = 'DANG_GIAO' WHERE so_don_hang = $1`,
           [don.so_don_hang],
         );
       }
