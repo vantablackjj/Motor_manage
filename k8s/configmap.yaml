@@ -17,5 +17,5 @@ data:
   DATABASE_URL: "postgresql://postgres:password@postgres-service:5432/Manage_Warehouse"
   LOG_LEVEL: "info"
   LOG_FILE: "logs/app.log"
-  CORS_ORIGIN: "https://your-frontend-domain.com,http://54.254.173.166:32031"
+  CORS_ORIGIN: "https://motor-manage.duckdns.org,https://motor-manage.ddns.net,http://54.254.173.166:32031"
   VAPID_SUBJECT: "mailto:admin@motor-manage.com"

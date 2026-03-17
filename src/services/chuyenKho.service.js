@@ -625,12 +625,12 @@ class ChuyenKhoService {
 
   async getDanhSach(filters = {}) {
     const { trang_thai, ma_kho_xuat, ma_kho_nhap, tu_ngay, den_ngay } = filters;
-    const conditions = ["h.loai_don_hang = 'CHUYEN_KHO'"];
+    const conditions = ["h.loai_don_hang::text = 'CHUYEN_KHO'"];
     const values = [];
     let idx = 1;
 
     if (trang_thai) {
-      conditions.push(`h.trang_thai = $${idx++}`);
+      conditions.push(`h.trang_thai::text = $${idx++}`);
       values.push(trang_thai);
     }
     if (ma_kho_xuat) {
@@ -732,7 +732,7 @@ class ChuyenKhoService {
       FROM tm_don_hang_chi_tiet ct
       JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN sys_user u ON h.created_by::text = u.id::text
-      WHERE h.loai_don_hang = 'CHUYEN_KHO'
+      WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
         AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NOT NULL
       ORDER BY h.created_at DESC
     `;
@@ -756,7 +756,7 @@ class ChuyenKhoService {
       FROM tm_don_hang_chi_tiet ct
       JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
-      WHERE h.loai_don_hang = 'CHUYEN_KHO'
+      WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
         AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NULL
       ORDER BY h.created_at DESC
     `;

@@ -662,7 +662,7 @@ class OrderService {
     let idx = 1;
 
     // Validate loai_don_hang enum value
-    const validOrderTypes = ["MUA_HANG", "BAN_HANG", "CHUYEN_KHO"];
+    const validOrderTypes = ["MUA_HANG", "BAN_HANG", "CHUYEN_KHO", "MUA_XE", "BAN_XE"];
     if (loai_don_hang) {
       if (!validOrderTypes.includes(loai_don_hang)) {
         throw new Error(
@@ -671,7 +671,7 @@ class OrderService {
             `Note: XUAT_KHO is a warehouse transaction type (loai_phieu_kho), not an order type (loai_don_hang).`,
         );
       }
-      conditions.push(`d.loai_don_hang = $${idx++}`);
+      conditions.push(`d.loai_don_hang::text = $${idx++}`);
       values.push(loai_don_hang);
     }
     if (ma_ben_xuat) {
@@ -683,7 +683,7 @@ class OrderService {
       values.push(ma_ben_nhap);
     }
     if (trang_thai) {
-      conditions.push(`d.trang_thai = $${idx++}`);
+      conditions.push(`d.trang_thai::text = $${idx++}`);
       values.push(trang_thai);
     }
 

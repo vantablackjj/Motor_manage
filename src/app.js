@@ -11,6 +11,7 @@ const logger = require("./utils/logger");
 const cookieParser = require("cookie-parser");
 
 const app = express();
+app.set("trust proxy", 1);
 
 // ─── 1. Security middleware (đặt đầu tiên) ───────────────────────────────────
 app.use(

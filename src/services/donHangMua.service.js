@@ -443,14 +443,14 @@ class DonHangMuaService {
       INNER JOIN sys_kho k ON d.ma_ben_nhap = k.ma_kho
       INNER JOIN dm_doi_tac kh ON d.ma_ben_xuat = kh.ma_doi_tac
       LEFT JOIN sys_user u_tao ON d.created_by::text = u_tao.id::text
-      WHERE d.loai_don_hang = 'MUA_HANG'
+      WHERE d.loai_don_hang::text = 'MUA_HANG'
     `;
 
     const params = [];
 
     if (filters.trang_thai) {
       params.push(filters.trang_thai);
-      sql += ` AND d.trang_thai = $${params.length}`;
+      sql += ` AND d.trang_thai::text = $${params.length}`;
     }
 
     if (filters.ma_kho_nhap) {
@@ -527,7 +527,7 @@ class DonHangMuaService {
       FROM tm_don_hang_chi_tiet ct
       INNER JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE h.loai_don_hang = 'MUA_HANG'
+      WHERE h.loai_don_hang::text = 'MUA_HANG'
     `;
     const params = [];
     const result = await pool.query(sql, params);

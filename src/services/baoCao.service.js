@@ -1381,21 +1381,21 @@ class BaoCaoService {
           dt.ten_doi_tac
         FROM tm_hoa_don h
         LEFT JOIN dm_doi_tac dt ON h.ma_ben_nhap = dt.ma_doi_tac
-        WHERE h.loai_hoa_don IN ('BAN_HANG')
+        WHERE h.loai_hoa_don::text IN ('BAN_HANG')
         ${ma_kho ? "AND h.ma_ben_xuat = $1" : ""}
         
         UNION ALL
         
         SELECT 
           h.so_don_hang as so_phieu, 
-          CASE WHEN h.loai_don_hang IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE h.loai_don_hang::varchar END as loai_giao_dich, 
+          CASE WHEN h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE h.loai_don_hang::text END as loai_giao_dich, 
           h.thanh_tien as tong_tien, 
           h.ngay_dat_hang::timestamp as ngay_lap,
           COALESCE(h.ghi_chu, 'Đơn mua hàng/chuyển kho') as dien_giai,
           dt.ten_doi_tac
         FROM tm_don_hang h
         LEFT JOIN dm_doi_tac dt ON (h.ma_ben_xuat = dt.ma_doi_tac OR h.ma_ben_nhap = dt.ma_doi_tac)
-        WHERE h.loai_don_hang IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
+        WHERE h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
         ${ma_kho ? "AND (h.ma_ben_nhap = $1 OR h.ma_ben_xuat = $1)" : ""}
 
         UNION ALL

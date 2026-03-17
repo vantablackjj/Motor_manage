@@ -49,7 +49,7 @@ class DonHangMuaXeService {
 
   async _checkTrangThai(soPhieu, expectedStatus, client) {
     const result = await client.query(
-      `SELECT trang_thai FROM tm_don_hang 
+      `SELECT trang_thai::text as trang_thai FROM tm_don_hang 
        WHERE so_don_hang = $1 
           OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)`,
       [soPhieu],
@@ -617,12 +617,12 @@ class DonHangMuaXeService {
       limit = 20,
     } = filters;
 
-    const conditions = ["loai_don_hang = 'MUA_XE'"];
+    const conditions = ["loai_don_hang::text = 'MUA_XE'"];
     const values = [];
     let idx = 1;
 
     if (trang_thai) {
-      conditions.push(`trang_thai = $${idx++}`);
+      conditions.push(`trang_thai::text = $${idx++}`);
       values.push(trang_thai);
     }
 
@@ -721,7 +721,7 @@ class DonHangMuaXeService {
       const so_don_hang = order.so_don_hang;
 
       // Allow Approved or Partially Receiving
-      const validStatuses = ["DA_DUYET", "DANG_NHAP_KHO"];
+      const validStatuses = ["DA_DUYET", "DANG_NHAP_KHO", "DANG_GIAO"];
       if (!validStatuses.includes(order.trang_thai)) {
         throw {
           status: 400,
@@ -892,7 +892,7 @@ class DonHangMuaXeService {
       INNER JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN dm_mau m ON (ct.yeu_cau_dac_biet->>'ma_mau') = m.ma_mau
-      WHERE 1=1
+      WHERE h.loai_don_hang::text = 'MUA_XE'
     `;
     const params = [];
     const result = await pool.query(sql, params);

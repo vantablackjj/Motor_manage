@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { pool } = require("./src/config/database");
+const { pool } = require("../src/config/database");
 
 /**
  * Script áp dụng permissions - xử lý unique constraint trên ten_quyen
@@ -158,12 +158,12 @@ async function applyPermissions() {
           export: true,
         },
         payments: {
-          view: false,
-          create: false,
+          view: true,
+          create: true,
           edit: false,
           delete: false,
           approve: false,
-          export: false,
+          export: true,
         },
         reports: { view: true, export: true, view_financial: false },
         settings: { view: false, edit: false, export: false },
@@ -209,7 +209,7 @@ async function applyPermissions() {
         purchase_orders: {
           view: true,
           create: true,
-          edit: false,
+          edit: true,
           delete: false,
           approve: false,
           export: true,
@@ -281,12 +281,18 @@ async function applyPermissions() {
           delete: false,
           approve: true,
         },
-        invoices: { view: true, create: false, edit: true, delete: false },
+        invoices: {
+          view: true,
+          create: false,
+          edit: true,
+          delete: false,
+          approve: true,
+        },
         inventory: {
           view: true,
-          import: false,
-          export: false,
-          transfer: false,
+          import: true,
+          export: true,
+          transfer: true,
           adjust: true,
         },
         debt: { view: true, create: true, edit: true, delete: true },

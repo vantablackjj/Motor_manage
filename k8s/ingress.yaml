@@ -13,6 +13,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: backend-service
+                name: motor-be-service
                 port:
-                  number: 80
+                  number: 5000
