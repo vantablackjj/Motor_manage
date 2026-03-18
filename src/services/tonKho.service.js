@@ -1,4 +1,5 @@
 const { query } = require("../config/database");
+const NotificationService = require("./notification.service");
 
 class InventoryService {
   // Lấy tất cả tồn kho
@@ -104,7 +105,20 @@ class InventoryService {
     `;
 
     const result = await query(sql, [ma_kho, ma_pt, qty]);
-    return result.rows[0];
+    const updated = result.rows[0];
+
+    // Notification if stock is low
+    if (updated.so_luong_ton <= (updated.so_luong_toi_thieu || 0)) {
+      NotificationService.notifyWarehouseStaff(
+        ma_kho,
+        "Cảnh báo hết hàng / tồn kho thấp",
+        `Mặt hàng ${ma_pt} tại kho ${ma_kho} hiện chỉ còn ${updated.so_luong_ton}. Vui lòng nhập thêm.`,
+        `/inventory/stock?ma_kho=${ma_kho}&ma_pt=${ma_pt}`,
+        "INVENTORY",
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
+    return updated;
   }
 
   // Chuyển kho

@@ -56,7 +56,16 @@ async function startServer() {
 
     const io = new Server(server, {
       cors: {
-        origin: "*",
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          const allowedOrigins = (process.env.CORS_ORIGIN || "").split(",").map(o => o.trim());
+          const isAllowed = allowedOrigins.includes(origin) || allowedOrigins.includes("*") || origin.endsWith(".vercel.app");
+          if (isAllowed) {
+            callback(null, true);
+          } else {
+            callback(null, false);
+          }
+        },
         methods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"],
         credentials: true,
       },

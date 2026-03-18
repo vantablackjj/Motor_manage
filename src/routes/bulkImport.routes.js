@@ -118,6 +118,18 @@ router.post(
   BulkImportController.importVehicleType,
 );
 
+/**
+ * @route   POST /api/import/vehicle-category
+ * @desc    Import loại hình xe (Xe ga, xe số...)
+ */
+router.post(
+  "/vehicle-category",
+  authenticate,
+  authorize(["ADMIN"]),
+  upload.single("file"),
+  BulkImportController.importLoaiHinh,
+);
+
 // Alias for consistency with frontend
 router.post(
   "/model-car",

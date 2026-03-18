@@ -423,6 +423,7 @@ class ThuChiService {
         tc.so_tien,
         tc.trang_thai,
         tc.ma_kho,
+        k.ten_kho,
         tc.ma_doi_tac as ma_kh,
         kh.ten_doi_tac as ten_kh,
         tc.ngay_giao_dich,
@@ -433,6 +434,7 @@ class ThuChiService {
         tc.noi_dung as dien_giai
       FROM tm_phieu_thu_chi tc
       LEFT JOIN dm_doi_tac kh ON tc.ma_doi_tac = kh.ma_doi_tac
+      LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
       LEFT JOIN sys_user u_tao ON tc.created_by::text = u_tao.id::text
       ${whereClause}
       ORDER BY tc.created_at DESC

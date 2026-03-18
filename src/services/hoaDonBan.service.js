@@ -550,6 +550,7 @@ class HoaDonBanService {
         ct.so_hoa_don as ma_hd,
         h.ngay_hoa_don as ngay_lap,
         h.ma_ben_xuat as ma_kho_xuat,
+        k.ten_kho as ten_kho_xuat,
         hh.ten_hang_hoa as ten_xe,
         s.serial_identifier as so_khung,
         s.thuoc_tinh_rieng->>'so_may' as so_may,
@@ -559,7 +560,8 @@ class HoaDonBanService {
       INNER JOIN tm_hoa_don h ON ct.so_hoa_don = h.so_hoa_don
       LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN tm_hang_hoa_serial s ON ct.ma_serial = s.ma_serial
-      LEFT JOIN dm_mau_xe m ON s.ma_mau = m.ma_mau
+      LEFT JOIN dm_mau m ON s.thuoc_tinh_rieng->>'ma_mau' = m.ma_mau
+      LEFT JOIN sys_kho k ON h.ma_ben_xuat = k.ma_kho
       WHERE h.loai_hoa_don = 'BAN_HANG' AND ct.ma_serial IS NOT NULL
     `;
     const params = [];

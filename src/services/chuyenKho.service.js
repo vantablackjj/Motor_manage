@@ -2,6 +2,7 @@ const { pool } = require("../config/database");
 const { TRANG_THAI } = require("../config/constants");
 const PhuTung = require("../models/PhuTung");
 const CongNoService = require("./congNo.service");
+const NotificationService = require("./notification.service");
 
 class ChuyenKhoService {
   /* =====================================================
@@ -302,6 +303,16 @@ class ChuyenKhoService {
         [so_phieu, nguoi_huy, ly_do],
       );
 
+      // Notify creator
+      if (phieu.created_by) {
+        NotificationService.notifyUser(
+          phieu.created_by,
+          "Phiếu chuyển kho bị hủy/từ chối",
+          `Phiếu ${so_phieu} đã bị hủy bởi ${nguoi_huy}. Lý do: ${ly_do}`,
+          `/inventory/transfer/${so_phieu}`,
+        ).catch((err) => console.error("Notification Error:", err));
+      }
+
       await client.query("COMMIT");
       return { success: true, message: "Hủy phiếu thành công" };
     } catch (err) {
@@ -332,6 +343,13 @@ class ChuyenKhoService {
     if (result.rowCount === 0) {
       throw new Error("Phiếu không hợp lệ để gửi duyệt");
     }
+
+    // Notify managers
+    NotificationService.notifyManagers(
+      "Yêu cầu chuyển kho mới",
+      `Có phiếu chuyển kho ${so_phieu} đang chờ duyệt.`,
+      `/inventory/transfer/${so_phieu}`,
+    ).catch((err) => console.error("Notification Error:", err));
 
     return { success: true };
   }
@@ -375,6 +393,24 @@ class ChuyenKhoService {
          WHERE so_don_hang = $1`,
         [so_phieu, nguoi_duyet],
       );
+
+      // Notify creator
+      if (phieu.created_by) {
+        NotificationService.notifyUser(
+          phieu.created_by,
+          "Phiếu chuyển kho đã được duyệt",
+          `Phiếu ${so_phieu} đã được duyệt. Vui lòng thực hiện vận chuyển.`,
+          `/inventory/transfer/${so_phieu}`,
+        ).catch((err) => console.error("Notification Error:", err));
+      }
+
+      // Notify receiving warehouse staff
+      NotificationService.notifyWarehouseStaff(
+        phieu.ma_kho_nhap,
+        "Thông báo hàng sắp về",
+        `Có hàng đang chuyển về kho từ phiếu ${so_phieu}.`,
+        `/inventory/transfer/${so_phieu}`,
+      ).catch((err) => console.error("Notification Error:", err));
 
       await client.query("COMMIT");
       return { success: true, message: "Duyệt phiếu thành công" };
@@ -604,6 +640,14 @@ class ChuyenKhoService {
           `UPDATE tm_don_hang SET trang_thai = 'HOAN_THANH' WHERE so_don_hang = $1`,
           [so_phieu],
         );
+
+        // Notify creator
+        NotificationService.notifyUser(
+          phieu.created_by,
+          "Chuyển kho hoàn tất",
+          `Phiếu ${so_phieu} đã được nhập kho đầy đủ.`,
+          `/inventory/transfer/${so_phieu}`,
+        ).catch((err) => console.error("Notification Error:", err));
       }
 
       await client.query("COMMIT");
@@ -727,11 +771,15 @@ class ChuyenKhoService {
         h.created_at,
         (ct.yeu_cau_dac_biet->>'ma_serial') as xe_key,
         h.ma_ben_xuat as tu_ma_kho,
+        kx.ten_kho as tu_ten_kho,
         h.ma_ben_nhap as den_ma_kho,
+        kn.ten_kho as den_ten_kho,
         COALESCE(u.ho_ten, u.username) as nguoi_tao_ten
       FROM tm_don_hang_chi_tiet ct
       JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN sys_user u ON h.created_by::text = u.id::text
+      LEFT JOIN sys_kho kx ON h.ma_ben_xuat = kx.ma_kho
+      LEFT JOIN sys_kho kn ON h.ma_ben_nhap = kn.ma_kho
       WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
         AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NOT NULL
       ORDER BY h.created_at DESC
@@ -752,10 +800,14 @@ class ChuyenKhoService {
         hh.ten_hang_hoa as ten_pt,
         ct.so_luong_dat as so_luong,
         h.ma_ben_xuat as tu_ma_kho,
-        h.ma_ben_nhap as den_ma_kho
+        kx.ten_kho as tu_ten_kho,
+        h.ma_ben_nhap as den_ma_kho,
+        kn.ten_kho as den_ten_kho
       FROM tm_don_hang_chi_tiet ct
       JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
+      LEFT JOIN sys_kho kx ON h.ma_ben_xuat = kx.ma_kho
+      LEFT JOIN sys_kho kn ON h.ma_ben_nhap = kn.ma_kho
       WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
         AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NULL
       ORDER BY h.created_at DESC

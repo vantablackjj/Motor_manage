@@ -28,13 +28,19 @@ class PhuTung {
     }
 
     if (filters.nhom_pt) {
+      sql += ` AND pt.ma_nhom_hang IN (
+        WITH RECURSIVE h AS (
+          SELECT ma_nhom FROM dm_nhom_hang WHERE ma_nhom = $${params.length + 1}
+          UNION ALL
+          SELECT n.ma_nhom FROM dm_nhom_hang n JOIN h ON n.ma_nhom_cha = h.ma_nhom
+        ) SELECT ma_nhom FROM h
+      )`;
       params.push(filters.nhom_pt);
-      sql += ` AND pt.ma_nhom_hang = $${params.length}`;
     }
 
     if (filters.search) {
+      sql += ` AND (pt.ten_hang_hoa ILIKE $${params.length + 1} OR pt.ma_hang_hoa ILIKE $${params.length + 1})`;
       params.push(`%${filters.search}%`);
-      sql += ` AND (pt.ten_hang_hoa ILIKE $${params.length} OR pt.ma_hang_hoa ILIKE $${params.length})`;
     }
 
     sql += " ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa, pt.ma_hang_hoa";

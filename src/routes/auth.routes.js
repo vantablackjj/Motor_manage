@@ -154,6 +154,12 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
     // Remove sensitive data
     delete user.password_hash;
 
+    // Bổ sung: Nếu là ADMIN và permissions bị null, gán full quyền cho FE
+    if (user.vai_tro === ROLES.ADMIN && (!user.permissions || Object.keys(user.permissions).length === 0)) {
+      const { FULL_ADMIN_PERMISSIONS } = require("../config/constants");
+      user.permissions = FULL_ADMIN_PERMISSIONS;
+    }
+
     logger.info(`User logged in successfully: ${username}`);
 
     // Set refresh token in HTTP-only cookie
@@ -301,13 +307,19 @@ router.get("/me", authenticate, async (req, res, next) => {
     }
 
     // Get warehouse permissions
-    const permissions = await User.getWarehousePermissions(user.id);
+    const wh_permissions = await User.getWarehousePermissions(user.id);
+
+    // Bổ sung: Nếu là ADMIN và permissions bị null, trả về full quyền để FE hiển thị đủ nút
+    if (user.vai_tro === ROLES.ADMIN && (!user.permissions || Object.keys(user.permissions).length === 0)) {
+      const { FULL_ADMIN_PERMISSIONS } = require("../config/constants");
+      user.permissions = FULL_ADMIN_PERMISSIONS;
+    }
 
     sendSuccess(
       res,
       {
         ...user,
-        warehouse_permissions: permissions,
+        warehouse_permissions: wh_permissions,
       },
       "Lấy thông tin người dùng thành công",
     );

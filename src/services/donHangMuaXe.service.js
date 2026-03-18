@@ -3,6 +3,7 @@ const { TRANG_THAI } = require("../config/constants");
 const { withTransaction } = require("../utils/transaction");
 const VehicleService = require("./themXe.service");
 const CongNoService = require("./congNo.service");
+const NotificationService = require("./notification.service");
 
 class DonHangMuaXeService {
   /* =========================
@@ -393,7 +394,7 @@ class DonHangMuaXeService {
         AND trang_thai = $3::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.CHO_DUYET, TRANG_THAI.NHAP, userId],
+      [soPhieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP, userId],
     );
 
     if (!result.rowCount) {
@@ -403,7 +404,14 @@ class DonHangMuaXeService {
       };
     }
 
-    return result.rows[0];
+    const order = result.rows[0];
+    NotificationService.notifyManagers(
+      "Đơn mua xe mới chờ duyệt",
+      `Đơn ${soPhieu} đã được gửi duyệt bởi người dùng ${userId}.`,
+      `/purchase/order/${soPhieu}`,
+    ).catch((err) => console.error("Notification Error:", err));
+
+    return order;
   }
 
   /* =========================
@@ -423,17 +431,27 @@ class DonHangMuaXeService {
         AND trang_thai = $4::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.CHO_DUYET],
+      [soPhieu, TRANG_THAI.DA_DUYET, userId, TRANG_THAI.GUI_DUYET],
     );
 
     if (!result.rowCount) {
       throw {
         status: 400,
-        message: `Đơn chưa ở trạng thái chờ duyệt (${TRANG_THAI.CHO_DUYET})`,
+        message: `Đơn chưa ở trạng thái chờ duyệt (${TRANG_THAI.GUI_DUYET})`,
       };
     }
 
-    return result.rows[0];
+    const order = result.rows[0];
+    if (order.nguoi_tao && !isNaN(order.nguoi_tao)) {
+      NotificationService.notifyUser(
+        parseInt(order.nguoi_tao),
+        "Đơn mua xe đã được duyệt",
+        `Đơn ${soPhieu} đã được duyệt. Bạn có thể thực hiện nhập kho.`,
+        `/purchase/order/${soPhieu}`,
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
+    return order;
   }
 
   async tuChoiDonHang(soPhieu, userId, lyDo) {
@@ -450,17 +468,27 @@ class DonHangMuaXeService {
         AND trang_thai = $5::enum_trang_thai_don_hang
       RETURNING *
       `,
-      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.CHO_DUYET],
+      [soPhieu, TRANG_THAI.DA_HUY, userId, lyDo, TRANG_THAI.GUI_DUYET],
     );
 
     if (!result.rowCount) {
       throw {
         status: 400,
-        message: `Đơn không ở trạng thái chờ duyệt (${TRANG_THAI.CHO_DUYET})`,
+        message: `Đơn không ở trạng thái chờ duyệt (${TRANG_THAI.GUI_DUYET})`,
       };
     }
 
-    return result.rows[0];
+    const order = result.rows[0];
+    if (order.nguoi_tao && !isNaN(order.nguoi_tao)) {
+      NotificationService.notifyUser(
+        parseInt(order.nguoi_tao),
+        "Đơn mua xe bị từ chối",
+        `Đơn ${soPhieu} đã bị từ chối. Lý do: ${lyDo}`,
+        `/purchase/order/${soPhieu}`,
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
+    return order;
   }
 
   async deleteChiTietById(soPhieu, id) {

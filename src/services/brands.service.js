@@ -13,13 +13,11 @@ class BrandService {
     // Filter by Parent Group (ma_nhom_cha)
     // Support both 'ma_nhom_cha' and 'type' query parameters
     const parentGroup = filters.ma_nhom_cha || filters.type;
-    if (parentGroup) {
+    if (parentGroup && parentGroup !== "all") {
       sql += ` AND ma_nhom_cha = $${idx++}`;
       params.push(parentGroup);
-    } else {
-      // Default to 'XE' (Vehicles) if not specified to preserve backward compatibility
-      sql += ` AND ma_nhom_cha = 'XE'`;
     }
+    // Removed default 'XE' to allow seeing all categories if requested
 
     // Filter by status
     if (filters.status !== undefined) {
@@ -41,13 +39,16 @@ class BrandService {
   }
 
   // Lấy theo mã thương hiệu (ma_nhom)
-  static async getById(ma_nh, ma_nhom_cha = "XE") {
-    const result = await query(
-      `SELECT id, ma_nhom as ma_nh, ten_nhom as ten_nh, status
-             FROM dm_nhom_hang
-             WHERE ma_nhom = $1 AND ma_nhom_cha = $2`,
-      [ma_nh, ma_nhom_cha],
-    );
+  static async getById(ma_nh, ma_nhom_cha = null) {
+    let sql = `SELECT id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha
+               FROM dm_nhom_hang
+               WHERE ma_nhom = $1`;
+    const params = [ma_nh];
+    if (ma_nhom_cha) {
+      sql += ` AND ma_nhom_cha = $2`;
+      params.push(ma_nhom_cha);
+    }
+    const result = await query(sql, params);
     return result.rows[0];
   }
 
@@ -95,35 +96,51 @@ class BrandService {
 
   // Cập nhật
   static async update(ma_nh_old, data) {
-    const { ma_nh, ten_nh, ma_nhom_cha = "XE" } = data;
+    const { ma_nh, ten_nh, status, ma_nhom_cha = null } = data;
     const exists = await this.getById(ma_nh_old, ma_nhom_cha);
     if (!exists) throw new Error("Thương hiệu không tồn tại");
+
+    const real_ma_nhom_cha = exists.ma_nhom_cha;
 
     const result = await query(
       `UPDATE dm_nhom_hang
              SET ma_nhom = $1,
                  ten_nhom = $2,
+                 status = $5,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE ma_nhom = $3 AND ma_nhom_cha = $4
+             WHERE ma_nhom = $3 AND (ma_nhom_cha = $4 OR ($4 IS NULL AND ma_nhom_cha IS NULL))
              RETURNING id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha`,
-      [String(ma_nh).trim(), String(ten_nh).trim(), ma_nh_old, ma_nhom_cha],
+      [
+        String(ma_nh || ma_nh_old).trim(),
+        String(ten_nh || exists.ten_nh).trim(),
+        ma_nh_old,
+        real_ma_nhom_cha,
+        status !== undefined ? status : exists.status,
+      ],
     );
     return result.rows[0];
   }
 
   // Xóa mềm
-  static async delete(ma_nh, ma_nhom_cha = "XE") {
+  static async delete(ma_nh, ma_nhom_cha = null) {
     const exists = await this.getById(ma_nh, ma_nhom_cha);
     if (!exists) throw new Error("Thương hiệu không tồn tại");
+
+    const real_ma_nhom_cha = exists.ma_nhom_cha;
 
     const result = await query(
       `UPDATE dm_nhom_hang
              SET status = false,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE ma_nhom = $1 AND ma_nhom_cha = $2
+             WHERE ma_nhom = $1 AND (ma_nhom_cha = $2 OR ($2 IS NULL AND ma_nhom_cha IS NULL))
              RETURNING id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha`,
-      [ma_nh, ma_nhom_cha],
+      [ma_nh, real_ma_nhom_cha],
     );
+
+    if (result.rowCount === 0) {
+      throw new Error("Không thể cập nhật trạng thái xóa");
+    }
+
     return result.rows[0];
   }
 }

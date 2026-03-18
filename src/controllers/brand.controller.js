@@ -12,9 +12,12 @@ exports.getAll = async (req, res, next) => {
 
 exports.getOne = async (req, res, next) => {
   try {
-    const data = await BrandService.getById(req.params.id);
+    const data = await BrandService.getById(
+      req.params.id,
+      req.query.type || req.query.ma_nhom_cha,
+    );
     if (!data) {
-      return sendError(res, "Hãng không tồn tại", 401);
+      return sendError(res, "Hãng không tồn tại", 404);
     }
     sendSuccess(res, data);
   } catch (err) {
@@ -47,7 +50,10 @@ exports.update = async (req, res, next) => {
 };
 exports.delete = async (req, res, next) => {
   try {
-    const data = await BrandService.delete(req.params.id);
+    const data = await BrandService.delete(
+      req.params.id,
+      req.query.type || req.query.ma_nhom_cha,
+    );
     sendSuccess(res, data);
   } catch (err) {
     next(err);

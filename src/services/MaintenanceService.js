@@ -306,6 +306,17 @@ class MaintenanceService {
       "MAINTENANCE",
     ).catch((err) => console.error("Notification Error:", err));
 
+    // Notify the Technician (KTV) if assigned
+    if (data.ktv_chinh && !isNaN(data.ktv_chinh)) {
+      NotificationService.notifyUser(
+        parseInt(data.ktv_chinh),
+        "Phân công sửa chữa",
+        `Bạn được phân công sửa chữa xe ${data.ma_serial}${data.ma_ban_nang ? ` tại bàn nâng ${data.ma_ban_nang}` : ""}.`,
+        `/maintenance/view/${data.ma_phieu}`,
+        "MAINTENANCE",
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
     // Fetch full record to return names (ten_kho, ten_ktv, etc.)
     const fullPhieu = await BaoTri.getById(data.ma_phieu);
 
@@ -534,6 +545,17 @@ class MaintenanceService {
           `/maintenance/view/${ma_phieu}`,
           "MAINTENANCE",
         ).catch((err) => console.error("Notification Error:", err));
+      } else {
+        // For other status changes, notify relevant users (e.g. Creator or assigned KTV)
+        if (phieuData.ktv_chinh && !isNaN(phieuData.ktv_chinh)) {
+          NotificationService.notifyUser(
+            parseInt(phieuData.ktv_chinh),
+            "Cập nhật trạng thái sửa chữa",
+            `Phiếu ${ma_phieu} đã chuyển sang trạng thái: ${trang_thai}`,
+            `/maintenance/view/${ma_phieu}`,
+            "MAINTENANCE",
+          ).catch((err) => console.error("Notification Error:", err));
+        }
       }
 
       return { ma_phieu, status: trang_thai };
@@ -727,6 +749,15 @@ class MaintenanceService {
           );
           remindersSent++;
         }
+      }
+
+      if (remindersSent > 0) {
+        NotificationService.notifyManagers(
+          "Lịch nhắc bảo trì mới",
+          `Hệ thống vừa tạo ${remindersSent} nhắc nhở bảo trì mới hôm nay.`,
+          "/maintenance/reminders",
+          "SYSTEM",
+        ).catch((err) => console.error("Notification Error:", err));
       }
     });
 

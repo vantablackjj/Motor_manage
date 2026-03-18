@@ -62,13 +62,12 @@ class NotificationService {
   // --- Specialized notification methods ---
 
   static async notifyManagers(title, content, link, type = "SYSTEM") {
-    // Get all users with QUAN_LY or ADMIN role
+    // Get all users with QUAN_LY, ADMIN or KE_TOAN role
     const managers = await query(
       `SELECT u.id FROM sys_user u
        LEFT JOIN sys_role r ON u.role_id = r.id
-       WHERE r.ma_quyen IN ('QUAN_LY', 'QUAN_LY_CTY', 'QUAN_LY_CHI_NHANH', 'ADMIN') 
-          OR r.ten_quyen IN ('QUAN_LY', 'QUAN_LY_CTY', 'QUAN_LY_CHI_NHANH', 'ADMIN')
-          OR u.vai_tro IN ('QUAN_LY', 'QUAN_LY_CTY', 'QUAN_LY_CHI_NHANH', 'ADMIN')`,
+       WHERE r.ten_quyen IN ('QUAN_LY', 'ADMIN', 'KE_TOAN')
+          OR u.vai_tro IN ('QUAN_LY', 'ADMIN', 'KE_TOAN')`,
     );
 
     const notifications = [];
@@ -76,6 +75,31 @@ class NotificationService {
       notifications.push(
         await this.createNotification({
           user_id: manager.id,
+          title,
+          content,
+          link,
+          type,
+        }),
+      );
+    }
+    return notifications;
+  }
+
+  static async notifyWarehouseStaff(ma_kho, title, content, link, type = "SYSTEM") {
+    // Get users in this warehouse with KHO or BAN_HANG role
+    const staff = await query(
+      `SELECT u.id FROM sys_user u
+       LEFT JOIN sys_role r ON u.role_id = r.id
+       WHERE u.ma_kho = $1 
+         AND (r.ten_quyen IN ('KHO', 'BAN_HANG') OR u.vai_tro IN ('KHO', 'BAN_HANG'))`,
+      [ma_kho],
+    );
+
+    const notifications = [];
+    for (const s of staff.rows) {
+      notifications.push(
+        await this.createNotification({
+          user_id: s.id,
           title,
           content,
           link,

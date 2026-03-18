@@ -31,4 +31,11 @@ router.get("/xuat-kho-xe", BulkExportController.exportXuatKhoXe);
 router.get("/transfer-xe", BulkExportController.exportTransferXe);
 router.get("/transfer-pt", BulkExportController.exportTransferPT);
 
+// --- REPORTS ---
+router.get("/revenue-month", BulkExportController.exportRevenueByMonth);
+router.get("/revenue-warehouse", BulkExportController.exportRevenueByWarehouse);
+router.get("/revenue-product", BulkExportController.exportRevenueByProduct);
+router.get("/revenue-summary", BulkExportController.exportRevenueSummary);
+router.get("/revenue-detail", BulkExportController.exportRevenueDetail);
+
 module.exports = router;

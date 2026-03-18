@@ -66,4 +66,21 @@ module.exports = {
     DEFAULT_LIMIT: 20,
     MAX_LIMIT: 100,
   },
+
+  // Full Admin Permissions (Fallback for UI)
+  FULL_ADMIN_PERMISSIONS: {
+    users: { view: true, create: true, edit: true, delete: true },
+    roles: { view: true, create: true, edit: true, delete: true },
+    warehouses: { view: true, create: true, edit: true, delete: true },
+    products: { view: true, create: true, edit: true, delete: true, view_cost: true },
+    partners: { view: true, create: true, edit: true, delete: true },
+    purchase_orders: { view: true, create: true, edit: true, delete: true, approve: true },
+    sales_orders: { view: true, create: true, edit: true, delete: true, approve: true },
+    invoices: { view: true, create: true, edit: true, delete: true },
+    inventory: { view: true, import: true, export: true, transfer: true, adjust: true },
+    debt: { view: true, create: true, edit: true, delete: true },
+    payments: { view: true, create: true, edit: true, delete: true, approve: true },
+    reports: { view: true, export: true, view_financial: true },
+    settings: { view: true, edit: true },
+  },
 };

@@ -521,12 +521,16 @@ class DonHangMuaService {
         ct.so_don_hang as ma_phieu,
         h.ngay_dat_hang as ngay_lap,
         h.ma_ben_nhap as ma_kho_nhap,
+        k.ten_kho as ten_kho_nhap,
+        ct.ma_hang_hoa as ma_pt,
         pt.ten_hang_hoa as ten_pt,
         pt.don_vi_tinh,
+        ct.so_luong_dat as so_luong,
         ct.don_gia as gia_nhap
       FROM tm_don_hang_chi_tiet ct
       INNER JOIN tm_don_hang h ON ct.so_don_hang = h.so_don_hang
       LEFT JOIN tm_hang_hoa pt ON ct.ma_hang_hoa = pt.ma_hang_hoa
+      LEFT JOIN sys_kho k ON h.ma_ben_nhap = k.ma_kho
       WHERE h.loai_don_hang::text = 'MUA_HANG'
     `;
     const params = [];
