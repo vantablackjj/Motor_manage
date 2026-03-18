@@ -19,6 +19,10 @@ class UserService {
     return User.getAll(filters);
   }
 
+  static async getAllRoles() {
+    return User.getAllRoles();
+  }
+
   static async create(data) {
     // Có thể thêm check trùng username ở đây nếu muốn
     return User.create(data);

@@ -7,14 +7,13 @@ const router = express.Router();
 const brandSchema = Joi.object({
   ma_nh: Joi.string().max(50),
   ten_nh: Joi.string().required().max(200),
-  ma_nhom_cha: Joi.string().max(50).default("XE"),
-  status: Joi.boolean().default(true),
+  ma_nhom_cha: Joi.string().max(50),
+  status: Joi.boolean(),
 });
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 
 const controller = require("../controllers/brand.controller");
 
@@ -24,7 +23,7 @@ router.get("/:id", authenticate, controller.getOne);
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "create"),
   validate(brandSchema),
   controller.create,
 );
@@ -32,11 +31,11 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "edit"),
   validate(brandSchema),
   controller.update,
 );
 
-router.delete("/:id", authenticate, checkRole(ROLES.ADMIN), controller.delete);
+router.delete("/:id", authenticate, checkPermission("products", "delete"), controller.delete);
 
 module.exports = router;

@@ -5,9 +5,8 @@ const express = require("express");
 const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 
 const controller = require("../controllers/modelCar.controller");
 
@@ -47,7 +46,7 @@ router.get("/:ma_loai", authenticate, controller.getOne);
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "create"),
   validate(modelSchema),
   controller.create,
 );
@@ -55,7 +54,7 @@ router.post(
 router.put(
   "/:ma_loai",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "edit"),
   validate(updateModelSchema),
   controller.update,
 );
@@ -63,7 +62,7 @@ router.put(
 router.delete(
   "/:ma_loai",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "delete"),
   controller.remove,
 );
 

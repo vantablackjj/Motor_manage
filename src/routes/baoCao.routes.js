@@ -5,7 +5,7 @@ const { authenticate } = require("../middleware/auth");
 const {
   checkPermission,
   checkAnyPermission,
-} = require("../middleware/permissions");
+} = require("../middleware/roleCheck");
 const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 
 // Áp dụng xác thực và cách ly kho cho toàn bộ route báo cáo

@@ -20,9 +20,8 @@ const updateColorSchema = Joi.object({
 });
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 
 const colorController = require("../controllers/color.controller");
 
@@ -32,7 +31,7 @@ router.get("/:ma_mau", authenticate, colorController.getOne);
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "create"),
   validate(colorSchema),
   colorController.create,
 );
@@ -40,7 +39,7 @@ router.post(
 router.put(
   "/:ma_mau",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "edit"),
   validate(updateColorSchema),
   colorController.update,
 );
@@ -48,7 +47,7 @@ router.put(
 router.delete(
   "/:ma_mau",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "delete"),
   colorController.remove,
 );
 

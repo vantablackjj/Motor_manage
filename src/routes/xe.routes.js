@@ -3,7 +3,7 @@ const router = express.Router();
 const xeController = require("../controllers/xe.controller");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validation");
-const { checkPermission } = require("../middleware/permissions");
+const { checkPermission } = require("../middleware/roleCheck");
 const {
   themXeSchema,
   capNhatXeSchema,

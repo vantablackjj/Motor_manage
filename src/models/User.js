@@ -5,12 +5,26 @@ class User {
   // Lấy user theo username
   static async getByUsername(username) {
     const result = await query(
-      `SELECT u.*, 
-              COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro, 
-              COALESCE(r.ma_quyen, u.vai_tro) as vai_tro, 
-              r.permissions, u.role_id
+      `WITH user_roles AS (
+          SELECT ur.user_id, r.id as role_id, r.ma_quyen as vai_tro, r.ten_quyen as ten_vai_tro, r.permissions
+          FROM sys_user_role ur
+          JOIN sys_role r ON ur.role_id = r.id
+          WHERE ur.user_id = (SELECT id FROM sys_user WHERE username = $1)
+       ),
+       user_authorities AS (
+          SELECT ra.role_id, a.ma_authority
+          FROM sys_role_authority ra
+          JOIN sys_authority a ON ra.authority_id = a.id
+          WHERE ra.role_id IN (SELECT role_id FROM user_roles)
+       )
+       SELECT u.*, 
+              (SELECT json_agg(json_build_object('id', role_id, 'ma_quyen', vai_tro, 'ten_quyen', ten_vai_tro)) FROM user_roles) as roles,
+              (SELECT json_agg(DISTINCT ma_authority) FROM user_authorities) as authorities,
+              -- Legacy fields for compatibility
+              COALESCE((SELECT vai_tro FROM user_roles LIMIT 1), u.vai_tro) as vai_tro,
+              COALESCE((SELECT ten_vai_tro FROM user_roles LIMIT 1), u.vai_tro) as ten_vai_tro,
+              COALESCE((SELECT permissions FROM user_roles LIMIT 1), (SELECT permissions FROM sys_role WHERE id = u.role_id)) as permissions
        FROM sys_user u
-       LEFT JOIN sys_role r ON u.role_id = r.id
        WHERE u.username = $1`,
       [username],
     );
@@ -20,13 +34,27 @@ class User {
   // Lấy user theo ID
   static async getById(id) {
     const result = await query(
-      `SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho, u.role_id,
-              COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro, 
-              COALESCE(r.ma_quyen, u.vai_tro) as vai_tro, 
-              r.permissions,
+      `WITH user_roles AS (
+          SELECT ur.user_id, r.id as role_id, r.ma_quyen as vai_tro, r.ten_quyen as ten_vai_tro, r.permissions
+          FROM sys_user_role ur
+          JOIN sys_role r ON ur.role_id = r.id
+          WHERE ur.user_id = $1
+       ),
+       user_authorities AS (
+          SELECT ra.role_id, a.ma_authority
+          FROM sys_role_authority ra
+          JOIN sys_authority a ON ra.authority_id = a.id
+          WHERE ra.role_id IN (SELECT role_id FROM user_roles)
+       )
+       SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho, u.role_id,
+              (SELECT json_agg(json_build_object('id', role_id, 'ma_quyen', vai_tro, 'ten_quyen', ten_vai_tro)) FROM user_roles) as roles,
+              (SELECT json_agg(DISTINCT ma_authority) FROM user_authorities) as authorities,
+              -- Legacy fields
+              COALESCE((SELECT vai_tro FROM user_roles LIMIT 1), u.vai_tro) as vai_tro,
+              COALESCE((SELECT ten_vai_tro FROM user_roles LIMIT 1), u.vai_tro) as ten_vai_tro,
+              COALESCE((SELECT permissions FROM user_roles LIMIT 1), (SELECT permissions FROM sys_role WHERE id = u.role_id)) as permissions,
               u.status, u.created_at, u.updated_at
        FROM sys_user u
-       LEFT JOIN sys_role r ON u.role_id = r.id
        WHERE u.id = $1`,
       [id],
     );
@@ -39,7 +67,13 @@ class User {
       SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho,
              COALESCE(r.ma_quyen, u.vai_tro) as vai_tro,
              COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro,
-             u.role_id, u.status, u.created_at
+             u.role_id, u.status, u.created_at,
+             (
+                SELECT json_agg(json_build_object('id', sr.id, 'ma_quyen', sr.ma_quyen, 'ten_quyen', sr.ten_quyen))
+                FROM sys_user_role sur
+                JOIN sys_role sr ON sur.role_id = sr.id
+                WHERE sur.user_id = u.id
+             ) as roles
       FROM sys_user u
       LEFT JOIN sys_role r ON u.role_id = r.id
       WHERE 1=1
@@ -116,6 +150,19 @@ class User {
 
     const user = result.rows[0];
     if (user) {
+      // 4. Handle multiple roles in sys_user_role
+      let roleIds = [];
+      if (data.role_ids && Array.isArray(data.role_ids)) {
+        roleIds = data.role_ids;
+      } else if (targetRoleId) {
+        roleIds = [targetRoleId];
+      }
+
+      if (roleIds.length > 0) {
+        const insertRoleValues = roleIds.map((rid) => `(${user.id}, ${rid})`).join(",");
+        await query(`INSERT INTO sys_user_role (user_id, role_id) VALUES ${insertRoleValues} ON CONFLICT DO NOTHING`);
+      }
+      
       user.vai_tro = vai_tro || null;
     }
     return user;
@@ -139,17 +186,7 @@ class User {
     const ma_kho = data.ma_kho !== undefined ? data.ma_kho : existing.ma_kho;
 
     // 3. Nếu có cập nhật vai_tro bằng string, cần resolve role_id mới
-    if (data.vai_tro && data.role_id === undefined) {
-      const roleRes = await query(
-        "SELECT id FROM sys_role WHERE ma_quyen = $1 OR ten_quyen = $1",
-        [data.vai_tro.toUpperCase()],
-      );
-      if (roleRes.rows.length > 0) {
-        role_id = roleRes.rows[0].id;
-        vai_tro = data.vai_tro;
-      }
-    }
-
+    // 4. Execute Update
     const result = await query(
       `UPDATE sys_user
        SET ho_ten = $1, email = $2, dien_thoai = $3, role_id = $4, vai_tro = $5, ma_kho = $6
@@ -157,6 +194,17 @@ class User {
        RETURNING id, username, ho_ten, email, role_id, vai_tro, ma_kho`,
       [ho_ten, email, dien_thoai, role_id, vai_tro, ma_kho, id],
     );
+
+    // 5. Sync multiple roles in sys_user_role if provided
+    if (data.role_ids && Array.isArray(data.role_ids)) {
+      // Clear existing
+      await query("DELETE FROM sys_user_role WHERE user_id = $1", [id]);
+      // Insert new
+      if (data.role_ids.length > 0) {
+        const insertRoleValues = data.role_ids.map((rid) => `(${id}, ${rid})`).join(",");
+        await query(`INSERT INTO sys_user_role (user_id, role_id) VALUES ${insertRoleValues}`);
+      }
+    }
 
     const user = result.rows[0];
     if (user && vai_tro) {
@@ -292,6 +340,12 @@ class User {
       ma_kho,
     ]);
     return true;
+  }
+
+  // Lấy tất cả các vai trò có trong hệ thống
+  static async getAllRoles() {
+    const result = await query("SELECT id, ma_quyen, ten_quyen, permissions FROM sys_role ORDER BY id ASC");
+    return result.rows;
   }
 }
 

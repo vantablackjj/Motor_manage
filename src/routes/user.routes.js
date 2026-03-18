@@ -2,8 +2,7 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user.controller");
 const { authenticate } = require("../middleware/auth");
-const { checkPermission } = require("../middleware/permissions");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkRole, checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 const {
   createUserSchema,
@@ -22,6 +21,18 @@ router.get(
   authenticate,
   checkPermission("users", "view"),
   userController.getAll,
+);
+
+/**
+ * @route   GET /api/users/roles/all
+ * @desc    Lấy tất cả các vai trò
+ * @access  Private (users.view)
+ */
+router.get(
+  "/roles/all",
+  authenticate,
+  checkPermission("users", "view"),
+  userController.getRoles,
 );
 
 /**
@@ -51,7 +62,7 @@ router.get(
 router.get(
   "/:id/warehouses",
   authenticate,
-  checkRole("ADMIN"),
+  checkPermission("users", "view"),
   userController.getWarehousePermissions,
 );
 

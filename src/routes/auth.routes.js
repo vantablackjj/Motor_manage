@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { validate } = require("../middleware/validation");
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkRole, checkPermission } = require("../middleware/roleCheck");
 const { sendSuccess, sendError } = require("../utils/response");
 const User = require("../services/user.service");
 const {
@@ -442,7 +442,7 @@ router.post("/logout", authenticate, async (req, res, next) => {
 router.get(
   "/users",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("users.view"),
   async (req, res, next) => {
     try {
       const filters = {

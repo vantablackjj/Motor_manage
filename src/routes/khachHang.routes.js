@@ -26,9 +26,8 @@ const brandSchema = Joi.object({
 });
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 
 const controller = require("../controllers/khachHang.controller");
 
@@ -38,7 +37,7 @@ router.get("/:ma_kh", authenticate, controller.getOne);
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.NHAN_VIEN_BAN_HANG),
+  checkPermission("partners", "create"),
   validate(brandSchema),
   controller.create,
 );
@@ -46,7 +45,7 @@ router.post(
 router.put(
   "/:ma_kh",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.NHAN_VIEN_BAN_HANG),
+  checkPermission("partners", "edit"),
   validate(brandSchema),
   controller.update,
 );
@@ -54,7 +53,7 @@ router.put(
 router.delete(
   "/:ma_kh",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("partners", "delete"),
   controller.remove,
 );
 

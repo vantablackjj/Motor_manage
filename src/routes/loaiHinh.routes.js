@@ -3,9 +3,8 @@ const express = require("express");
 const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 
 const loaiHinhShema = Joi.object({
   ma_lh: Joi.string().required().max(50),
@@ -29,7 +28,7 @@ router.get("/:id", authenticate, controller.getOne);
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "create"),
   validate(loaiHinhShema),
   controller.create,
 );
@@ -37,11 +36,11 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "edit"),
   validate(updateLoaiHinhSchema),
   controller.update,
 );
 
-router.delete("/:id", authenticate, checkRole(ROLES.ADMIN), controller.remove);
+router.delete("/:id", authenticate, checkPermission("products", "delete"), controller.remove);
 
 module.exports = router;

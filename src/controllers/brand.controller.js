@@ -39,7 +39,8 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const data = await BrandService.update(req.params.id, req.body);
+    const parent = req.query.type || req.query.ma_nhom_cha;
+    const data = await BrandService.update(req.params.id, req.body, parent);
     sendSuccess(res, data, "Cập nhật hãng xe thành công");
   } catch (err) {
     if (err.message.includes("không tồn tại")) {

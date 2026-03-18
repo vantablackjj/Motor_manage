@@ -3,9 +3,8 @@ const router = express.Router();
 
 const Joi = require("joi");
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
-const { ROLES } = require("../config/constants");
 const BrandService = require("../services/brands.service");
 const { sendSuccess, sendError } = require("../utils/response");
 
@@ -45,11 +44,10 @@ router.get("/:id", authenticate, async (req, res, next) => {
   }
 });
 
-// Tạo mới nhóm hàng (phụ tùng)
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "create"),
   validate(nhomHangSchema),
   async (req, res, next) => {
     try {
@@ -68,11 +66,10 @@ router.post(
   },
 );
 
-// Cập nhật nhóm hàng (phụ tùng)
 router.put(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "edit"),
   validate(nhomHangSchema),
   async (req, res, next) => {
     try {
@@ -91,11 +88,10 @@ router.put(
   },
 );
 
-// Xóa mềm nhóm hàng (phụ tùng)
 router.delete(
   "/:id",
   authenticate,
-  checkRole(ROLES.ADMIN),
+  checkPermission("products", "delete"),
   async (req, res, next) => {
     try {
       const ma_nhom_cha = req.query.ma_nhom_cha || "PT";

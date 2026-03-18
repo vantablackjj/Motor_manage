@@ -11,6 +11,15 @@ class UserController {
     }
   }
 
+  async getRoles(req, res, next) {
+    try {
+      const roles = await userService.getAllRoles();
+      sendSuccess(res, roles, "Lấy danh sách vai trò thành công");
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getPermissions(req, res, next) {
     try {
       const user = await userService.getById(req.params.id);

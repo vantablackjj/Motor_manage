@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
-const { checkPermission } = require("../middleware/permissions");
+const { checkPermission } = require("../middleware/roleCheck");
 const { sendSuccess } = require("../utils/response");
 const congNoService = require("../services/congNo.service");
 

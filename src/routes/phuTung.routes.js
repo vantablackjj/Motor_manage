@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
-const { checkRole, checkWarehouseAccess } = require("../middleware/roleCheck");
+const {
+  checkRole,
+  checkPermission,
+  checkWarehouseAccess,
+} = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../utils/response");
 const PhuTung = require("../services/phuTung.service");
@@ -121,11 +125,10 @@ router.get(
   },
 );
 
-//PUT /api/phu-tung
 router.put(
   "/:ma_pt",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("products", "edit"),
   validate(createPhuTungSchema),
   async (req, res, next) => {
     try {
@@ -145,12 +148,7 @@ router.put(
 router.post(
   "/phu-tung/nhap-kho",
   authenticate,
-  checkRole(
-    ROLES.ADMIN,
-    ROLES.QUAN_LY_CTY,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN,
-  ),
+  checkPermission("inventory", "import"),
   async (req, res, next) => {
     try {
       await PhuTungNhapKhoService.nhapKho({
@@ -169,7 +167,7 @@ router.post(
 router.post(
   "/",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("products", "create"),
   validate(createPhuTungSchema),
   async (req, res, next) => {
     try {
@@ -184,7 +182,7 @@ router.post(
 router.delete(
   "/:ma_pt",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY),
+  checkPermission("products", "delete"),
   async (req, res, next) => {
     try {
       const { ma_pt } = req.params;
@@ -204,7 +202,7 @@ router.delete(
 router.post(
   "/lock",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {
       await PhuTung.lock({
@@ -222,7 +220,7 @@ router.post(
 router.post(
   "/unlock/:so_phieu",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {
       await PhuTung.unlock(req.params.so_phieu);

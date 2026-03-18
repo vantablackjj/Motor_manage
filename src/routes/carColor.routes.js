@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 
 const { authenticate } = require('../middleware/auth');
-const { checkRole } = require('../middleware/roleCheck');
+const { checkPermission } = require('../middleware/roleCheck');
 const { validate } = require('../middleware/validation');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -16,7 +16,7 @@ const carColor = Joi.object({
     status : Joi.boolean().default(true)
 })
 
-router.get('/', authenticate, checkRole('ADMIN'), async (req, res, next) => {
+router.get('/', authenticate, checkPermission('products', 'view'), async (req, res, next) => {
     try {
         const data = await CarColorService.getAll();
         sendSuccess(res, data);
@@ -47,7 +47,7 @@ router.get(
 router.post(
   '/models/colors',
   authenticate,
-  checkRole('ADMIN'),
+  checkPermission('products', 'create'),
   validate(carColor),
   async (req, res, next) => {
     try {
@@ -65,7 +65,7 @@ router.post(
 router.delete(
   '/models/:ma_loai_xe/colors/:ma_mau',
   authenticate,
-  checkRole('ADMIN'),
+  checkPermission('products', 'delete'),
   async (req, res, next) => {
     try {
       const data = await CarColorService.removeColor(

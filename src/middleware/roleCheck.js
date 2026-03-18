@@ -13,10 +13,48 @@ const checkRole = (...allowedRoles) => {
       return sendError(res, 'Unauthorized', 401);
     }
 
+    // Admin bypasses all checks
+    if (req.user.vai_tro === ROLES.ADMIN) {
+      return next();
+    }
+
     if (!allowedRoles.includes(req.user.vai_tro)) {
       return sendError(res, 'Insufficient permissions', 403, {
         required_roles: allowedRoles,
         your_role: req.user.vai_tro
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware kiểm tra quyền cụ thể (Authority-based)
+ * Hỗ trợ cả 2 cách gọi: 
+ * 1. checkPermission('users.view')
+ * 2. checkPermission('users', 'view')
+ * @param {string} moduleOrFull - Tên module hoặc mã quyền đầy đủ
+ * @param {string} [action] - Hành động (nếu tham số đầu là module)
+ */
+const checkPermission = (moduleOrFull, action = null) => {
+  const requiredPermission = action ? `${moduleOrFull}.${action}` : moduleOrFull;
+  
+  return (req, res, next) => {
+    if (!req.user) {
+      return sendError(res, 'Unauthorized', 401);
+    }
+
+    // Admin bypasses all checks
+    if (req.user.vai_tro === ROLES.ADMIN) {
+      return next();
+    }
+
+    const authorities = req.user.authorities || [];
+    if (!authorities.includes(requiredPermission)) {
+      return sendError(res, `Permission denied: ${requiredPermission}`, 403, {
+        required_permission: requiredPermission,
+        your_authorities: authorities
       });
     }
 
@@ -150,8 +188,43 @@ const checkOwnership = (getOwnerId) => {
   };
 };
 
+/**
+ * Middleware kiểm tra ít nhất 1 trong các quyền (OR logic)
+ * @param {...(string|[string, string])} permissions - Danh sách quyền
+ */
+const checkAnyPermission = (...permissions) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return sendError(res, 'Unauthorized', 401);
+    }
+
+    // Admin bypasses all checks
+    if (req.user.vai_tro === ROLES.ADMIN) {
+      return next();
+    }
+
+    const userAuthorities = req.user.authorities || [];
+    
+    const hasAny = permissions.some(p => {
+      const requiredPermission = Array.isArray(p) ? `${p[0]}.${p[1]}` : p;
+      return userAuthorities.includes(requiredPermission);
+    });
+
+    if (!hasAny) {
+      return sendError(res, 'Insufficient permissions', 403, {
+        required_any_of: permissions.map(p => Array.isArray(p) ? `${p[0]}.${p[1]}` : p),
+        your_authorities: userAuthorities
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   checkRole,
+  checkPermission,
+  checkAnyPermission,
   checkWarehouseAccess,
   checkWarehousePermission,
   checkOwnership

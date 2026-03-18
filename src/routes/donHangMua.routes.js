@@ -2,10 +2,9 @@ const express = require("express");
 const router = express.Router();
 const donHangMuaController = require("../controllers/donHangMua.controller");
 const { authenticate } = require("../middleware/auth");
-const { checkRole } = require("../middleware/roleCheck");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 const Joi = require("joi");
-const { ROLES } = require("../config/constants");
 
 // Validation schemas
 const taoDonHangSchema = Joi.object({
@@ -31,12 +30,7 @@ router.get("/:ma_phieu", authenticate, donHangMuaController.getChiTiet);
 router.post(
   "/",
   authenticate,
-  checkRole(
-    ROLES.ADMIN,
-    ROLES.QUAN_LY_CTY,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN,
-  ),
+  checkPermission("purchase_orders", "create"),
   validate(taoDonHangSchema),
   donHangMuaController.taoDonHang,
 );
@@ -44,12 +38,7 @@ router.post(
 router.post(
   "/:ma_phieu/chi-tiet",
   authenticate,
-  checkRole(
-    ROLES.ADMIN,
-    ROLES.QUAN_LY_CTY,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN,
-  ),
+  checkPermission("purchase_orders", "edit"),
   validate(themPhuTungSchema),
   donHangMuaController.themPhuTung,
 );
@@ -57,33 +46,28 @@ router.post(
 router.post(
   "/:ma_phieu/gui-duyet",
   authenticate,
-  checkRole(
-    ROLES.ADMIN,
-    ROLES.QUAN_LY_CTY,
-    ROLES.QUAN_LY_CHI_NHANH,
-    ROLES.NHAN_VIEN,
-  ),
+  checkPermission("purchase_orders", "create"),
   donHangMuaController.guiDuyet,
 );
 
 router.post(
   "/:ma_phieu/phe-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("purchase_orders", "approve"),
   donHangMuaController.pheDuyet,
 );
 
 router.post(
   "/:ma_phieu/nhap-kho",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH, ROLES.KHO),
+  checkPermission("inventory", "import"),
   donHangMuaController.nhapKho,
 );
 
 router.post(
   "/:ma_phieu/huy-duyet",
   authenticate,
-  checkRole(ROLES.ADMIN, ROLES.QUAN_LY_CTY, ROLES.QUAN_LY_CHI_NHANH),
+  checkPermission("purchase_orders", "approve"),
   donHangMuaController.huyDuyet,
 );
 

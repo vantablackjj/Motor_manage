@@ -6,7 +6,7 @@ const { validate } = require("../middleware/validation");
 const {
   createMaintenanceSchema,
 } = require("../validations/maintenance.validation");
-const { checkPermission } = require("../middleware/permissions");
+const { checkPermission } = require("../middleware/roleCheck");
 
 /**
  * @swagger

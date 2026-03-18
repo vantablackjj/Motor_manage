@@ -4,7 +4,7 @@ const Joi = require("joi");
 
 const controller = require("../controllers/donHangMuaXe.controller");
 const { authenticate } = require("../middleware/auth");
-const { checkPermission } = require("../middleware/permissions");
+const { checkPermission } = require("../middleware/roleCheck");
 const { validate } = require("../middleware/validation");
 
 const nhapXeMoiSchema = Joi.object({

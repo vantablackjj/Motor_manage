@@ -41,8 +41,8 @@ class BrandService {
   // Lấy theo mã thương hiệu (ma_nhom)
   static async getById(ma_nh, ma_nhom_cha = null) {
     let sql = `SELECT id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha
-               FROM dm_nhom_hang
-               WHERE ma_nhom = $1`;
+                FROM dm_nhom_hang
+                WHERE ma_nhom = $1`;
     const params = [ma_nh];
     if (ma_nhom_cha) {
       sql += ` AND ma_nhom_cha = $2`;
@@ -95,9 +95,9 @@ class BrandService {
   }
 
   // Cập nhật
-  static async update(ma_nh_old, data) {
-    const { ma_nh, ten_nh, status, ma_nhom_cha = null } = data;
-    const exists = await this.getById(ma_nh_old, ma_nhom_cha);
+  static async update(ma_nh_old, data, ma_nhom_cha_old = null) {
+    const { ma_nh, ten_nh, status, ma_nhom_cha: ma_nhom_cha_new } = data;
+    const exists = await this.getById(ma_nh_old, ma_nhom_cha_old);
     if (!exists) throw new Error("Thương hiệu không tồn tại");
 
     const real_ma_nhom_cha = exists.ma_nhom_cha;
@@ -107,6 +107,7 @@ class BrandService {
              SET ma_nhom = $1,
                  ten_nhom = $2,
                  status = $5,
+                 ma_nhom_cha = $6,
                  updated_at = CURRENT_TIMESTAMP
              WHERE ma_nhom = $3 AND (ma_nhom_cha = $4 OR ($4 IS NULL AND ma_nhom_cha IS NULL))
              RETURNING id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha`,
@@ -116,6 +117,7 @@ class BrandService {
         ma_nh_old,
         real_ma_nhom_cha,
         status !== undefined ? status : exists.status,
+        ma_nhom_cha_new !== undefined ? ma_nhom_cha_new : real_ma_nhom_cha,
       ],
     );
     return result.rows[0];
@@ -131,7 +133,7 @@ class BrandService {
     const result = await query(
       `UPDATE dm_nhom_hang
              SET status = false,
-                 updated_at = CURRENT_TIMESTAMP
+                  updated_at = CURRENT_TIMESTAMP
              WHERE ma_nhom = $1 AND (ma_nhom_cha = $2 OR ($2 IS NULL AND ma_nhom_cha IS NULL))
              RETURNING id, ma_nhom as ma_nh, ten_nhom as ten_nh, status, ma_nhom_cha`,
       [ma_nh, real_ma_nhom_cha],
