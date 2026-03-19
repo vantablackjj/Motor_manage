@@ -159,7 +159,7 @@ class DonHangMuaService {
     NotificationService.notifyManagers(
       "Yêu cầu duyệt đơn mua hàng",
       `Đơn hàng ${ma_phieu} đã được ${ten_nguoi_gui} gửi yêu cầu phê duyệt.`,
-      `/purchase/orders/view/${ma_phieu}`,
+      `/purchase/parts/${ma_phieu}`,
       "APPROVAL",
     ).catch((err) => console.error("Notification Error:", err));
 
@@ -192,7 +192,7 @@ class DonHangMuaService {
         don.nguoi_gui,
         "Đơn mua hàng đã được duyệt",
         `Đơn hàng ${don.so_don_hang} của bạn đã được ${ten_quan_ly} phê duyệt.`,
-        `/purchase/orders/view/${don.so_don_hang}`,
+        `/purchase/parts/${don.so_don_hang}`,
         "APPROVAL",
       ).catch((err) => console.error("Notification Error:", err));
     }

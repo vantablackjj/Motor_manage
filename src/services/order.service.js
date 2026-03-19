@@ -22,6 +22,49 @@ class OrderService {
   }
 
   /**
+   * Helper: Check and validate stock for sales/transfer orders
+   */
+  static async _checkStock(client, loai_don_hang, ma_ben_xuat, loai_ben_xuat, items) {
+    if (!["BAN_HANG", "CHUYEN_KHO", "BAN_XE"].includes(loai_don_hang)) return;
+    if (loai_ben_xuat !== "KHO") return;
+
+    for (const item of items) {
+      const { ma_hang_hoa, so_luong_dat } = item;
+
+      // Check if it's a serial or model
+      const serialRes = await client.query(
+        "SELECT ma_hang_hoa, trang_thai, locked FROM tm_hang_hoa_serial WHERE ma_serial = $1",
+        [ma_hang_hoa],
+      );
+
+      if (serialRes.rowCount > 0) {
+        // It's a specific vehicle serial
+        const serial = serialRes.rows[0];
+        if (serial.trang_thai !== "TON_KHO" || serial.locked) {
+          throw new Error(
+            `Kế hoạch bán xe ${ma_hang_hoa} thất bại: Xe không có trong kho hoặc đang bị khóa (Trạng thái: ${serial.trang_thai})`,
+          );
+        }
+      } else {
+        // It's a model or spare part
+        const tonKhoRes = await client.query(
+          "SELECT so_luong_ton, so_luong_khoa FROM tm_hang_hoa_ton_kho WHERE ma_hang_hoa = $1 AND ma_kho = $2",
+          [ma_hang_hoa, ma_ben_xuat],
+        );
+
+        const stock = tonKhoRes.rows[0];
+        const available = stock ? Number(stock.so_luong_ton) - Number(stock.so_luong_khoa) : 0;
+
+        if (available < so_luong_dat) {
+          throw new Error(
+            `Mã hàng ${ma_hang_hoa} không đủ tồn kho tại ${ma_ben_xuat}. Hiện khả dụng: ${available}, yêu cầu: ${so_luong_dat}`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Create a new order (PO, SO, or Transfer)
    */
   static async createOrder(data) {
@@ -44,6 +87,9 @@ class OrderService {
       await client.query("BEGIN");
 
       const so_don_hang = await this._generateOrderNo(client, loai_don_hang);
+
+      // Verify stock for Sales/Transfer
+      await this._checkStock(client, loai_don_hang, ma_ben_xuat, loai_ben_xuat, items);
 
       // Calculate totals
       const tong_gia_tri = items.reduce(
@@ -182,6 +228,15 @@ class OrderService {
           `Không thể thêm sản phẩm vào đơn hàng ở trạng thái ${order.trang_thai}. Chỉ được phép thêm sản phẩm khi đơn hàng ở trạng thái Nháp (NHAP).`,
         );
       }
+
+      // Verify stock for Sales/Transfer
+      await this._checkStock(
+        client,
+        order.loai_don_hang,
+        order.ma_ben_xuat,
+        order.loai_ben_xuat,
+        [{ ma_hang_hoa, so_luong_dat }],
+      );
 
       // 2. Get next STT
       const sttRes = await client.query(

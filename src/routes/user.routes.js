@@ -141,4 +141,28 @@ router.post(
   userController.resetPassword,
 );
 
+/**
+ * @route   POST /api/users/sync-authorities
+ * @desc    Đồng bộ quyền từ JSONB permissions sang RBAC v2 tables
+ * @access  Admin Only
+ */
+router.post(
+  "/sync-authorities",
+  authenticate,
+  checkRole(["ADMIN"]),
+  userController.syncAuthorities,
+);
+
+/**
+ * @route   GET /api/users/authorities/all
+ * @desc    Lấy tất cả các quyền chi tiết có trong hệ thống
+ * @access  Private (users.view)
+ */
+router.get(
+  "/authorities/all",
+  authenticate,
+  checkPermission("users", "view"),
+  userController.getAllAuthorities,
+);
+
 module.exports = router;

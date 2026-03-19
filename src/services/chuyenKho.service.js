@@ -309,7 +309,7 @@ class ChuyenKhoService {
           phieu.created_by,
           "Phiếu chuyển kho bị hủy/từ chối",
           `Phiếu ${so_phieu} đã bị hủy bởi ${nguoi_huy}. Lý do: ${ly_do}`,
-          `/inventory/transfer/${so_phieu}`,
+          `/chuyen-kho/${so_phieu}`,
         ).catch((err) => console.error("Notification Error:", err));
       }
 
@@ -348,7 +348,7 @@ class ChuyenKhoService {
     NotificationService.notifyManagers(
       "Yêu cầu chuyển kho mới",
       `Có phiếu chuyển kho ${so_phieu} đang chờ duyệt.`,
-      `/inventory/transfer/${so_phieu}`,
+      `/chuyen-kho/${so_phieu}`,
     ).catch((err) => console.error("Notification Error:", err));
 
     return { success: true };
@@ -400,7 +400,7 @@ class ChuyenKhoService {
           phieu.created_by,
           "Phiếu chuyển kho đã được duyệt",
           `Phiếu ${so_phieu} đã được duyệt. Vui lòng thực hiện vận chuyển.`,
-          `/inventory/transfer/${so_phieu}`,
+          `/chuyen-kho/${so_phieu}`,
         ).catch((err) => console.error("Notification Error:", err));
       }
 
@@ -409,7 +409,7 @@ class ChuyenKhoService {
         phieu.ma_kho_nhap,
         "Thông báo hàng sắp về",
         `Có hàng đang chuyển về kho từ phiếu ${so_phieu}.`,
-        `/inventory/transfer/${so_phieu}`,
+        `/chuyen-kho/${so_phieu}`,
       ).catch((err) => console.error("Notification Error:", err));
 
       await client.query("COMMIT");
@@ -646,7 +646,7 @@ class ChuyenKhoService {
           phieu.created_by,
           "Chuyển kho hoàn tất",
           `Phiếu ${so_phieu} đã được nhập kho đầy đủ.`,
-          `/inventory/transfer/${so_phieu}`,
+          `/chuyen-kho/${so_phieu}`,
         ).catch((err) => console.error("Notification Error:", err));
       }
 

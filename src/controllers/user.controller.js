@@ -113,6 +113,24 @@ class UserController {
       next(err);
     }
   }
+
+  async syncAuthorities(req, res, next) {
+    try {
+      await userService.syncAuthorities();
+      sendSuccess(res, null, "Đồng bộ quyền thành công từ JSONB!");
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getAllAuthorities(req, res, next) {
+    try {
+      const authorities = await userService.getAllAuthorities();
+      sendSuccess(res, authorities, "Lấy danh sách quyền chi tiết thành công");
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new UserController();

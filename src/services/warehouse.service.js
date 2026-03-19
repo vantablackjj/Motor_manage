@@ -194,7 +194,7 @@ class WarehouseService {
         NotificationService.notifyManagers(
           "Cảnh báo tồn kho thấp",
           `Sản phẩm ${ten_hang_hoa} (${ma_hang_hoa}) tại kho ${ma_kho} đã chạm ngưỡng tối thiểu (${stockInfo.so_luong_ton}/${stockInfo.so_luong_toi_thieu}).`,
-          `/inventory/parts/${ma_hang_hoa}`,
+          `/phu-tung/danh-sach?search=${ma_hang_hoa}`,
           "INVENTORY",
         ).catch((err) => console.error("Notification Error:", err));
       }

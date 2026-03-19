@@ -64,18 +64,32 @@ class User {
   // Lấy tất cả users
   static async getAll(filters = {}) {
     let sql = `
+      WITH user_roles_agg AS (
+        SELECT sur.user_id, 
+               json_agg(json_build_object('id', sr.id, 'ma_quyen', sr.ma_quyen, 'ten_quyen', sr.ten_quyen)) as roles,
+               array_agg(DISTINCT sr.ma_quyen) as role_codes
+        FROM sys_user_role sur
+        JOIN sys_role sr ON sur.role_id = sr.id
+        GROUP BY sur.user_id
+      ),
+      user_authorities_agg AS (
+        SELECT sur.user_id, 
+               json_agg(DISTINCT sa.ma_authority) as authorities
+        FROM sys_user_role sur
+        JOIN sys_role_authority sra ON sur.role_id = sra.role_id
+        JOIN sys_authority sa ON sra.authority_id = sa.id
+        GROUP BY sur.user_id
+      )
       SELECT u.id, u.username, u.ho_ten, u.email, u.dien_thoai, u.ma_kho,
              COALESCE(r.ma_quyen, u.vai_tro) as vai_tro,
              COALESCE(r.ten_quyen, u.vai_tro) as ten_vai_tro,
              u.role_id, u.status, u.created_at,
-             (
-                SELECT json_agg(json_build_object('id', sr.id, 'ma_quyen', sr.ma_quyen, 'ten_quyen', sr.ten_quyen))
-                FROM sys_user_role sur
-                JOIN sys_role sr ON sur.role_id = sr.id
-                WHERE sur.user_id = u.id
-             ) as roles
+             ra.roles,
+             aa.authorities
       FROM sys_user u
       LEFT JOIN sys_role r ON u.role_id = r.id
+      LEFT JOIN user_roles_agg ra ON u.id = ra.user_id
+      LEFT JOIN user_authorities_agg aa ON u.id = aa.user_id
       WHERE 1=1
     `;
 
@@ -83,7 +97,7 @@ class User {
 
     if (filters.vai_tro) {
       params.push(filters.vai_tro.toUpperCase());
-      sql += ` AND (r.ma_quyen = $${params.length} OR r.ten_quyen = $${params.length} OR u.vai_tro = $${params.length})`;
+      sql += ` AND (r.ma_quyen = $${params.length} OR r.ten_quyen = $${params.length} OR u.vai_tro = $${params.length} OR $${params.length} = ANY(ra.role_codes))`;
     }
 
     if (filters.ma_kho) {
@@ -344,7 +358,75 @@ class User {
 
   // Lấy tất cả các vai trò có trong hệ thống
   static async getAllRoles() {
-    const result = await query("SELECT id, ma_quyen, ten_quyen, permissions FROM sys_role ORDER BY id ASC");
+    const result = await query(`
+      SELECT r.id, r.ma_quyen, r.ten_quyen, r.permissions,
+             (
+               SELECT json_agg(sa.ma_authority)
+               FROM sys_role_authority sra
+               JOIN sys_authority sa ON sra.authority_id = sa.id
+               WHERE sra.role_id = r.id
+             ) as authorities
+      FROM sys_role r 
+      ORDER BY r.id ASC
+    `);
+    return result.rows;
+  }
+
+  /**
+   * Đồng bộ quyền từ JSONB permissions sang bảng sys_authority và sys_role_authority (RBAC v2)
+   * Dùng khi có thay đổi trong JSONB mà cần cập nhật sang hệ thống bảng granular
+   */
+  static async syncAuthorities() {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. Chèn các authority mới từ JSONB permissions
+      await client.query(`
+        INSERT INTO sys_authority (ma_authority, ten_authority, nhom_authority)
+        SELECT DISTINCT 
+            key || '.' || sub_key as ma_authority,
+            INITCAP(key) || ' ' || sub_key as ten_authority,
+            key as nhom_authority
+        FROM sys_role r
+        CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(r.permissions) = 'object' THEN r.permissions ELSE '{}'::jsonb END) as p(key, val)
+        CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(val) = 'object' THEN val ELSE '{}'::jsonb END) as s(sub_key, sub_val)
+        WHERE (sub_val::text = 'true' OR sub_val::text = '1')
+        ON CONFLICT (ma_authority) DO NOTHING
+      `);
+
+      // 2. Xóa các mapping cũ (để sync hoàn toàn)
+      // Lưu ý: Trong môi trường production thực tế có thể cần logic merge thay vì delete all
+      await client.query("DELETE FROM sys_role_authority");
+
+      // 3. Tạo lại mapping Role -> Authority dựa trên JSONB hiện tại
+      await client.query(`
+        INSERT INTO sys_role_authority (role_id, authority_id)
+        SELECT r.id, a.id
+        FROM sys_role r
+        CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(r.permissions) = 'object' THEN r.permissions ELSE '{}'::jsonb END) as p(key, val)
+        CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(val) = 'object' THEN val ELSE '{}'::jsonb END) as s(sub_key, sub_val),
+             sys_authority a
+        WHERE (sub_val::text = 'true' OR sub_val::text = '1')
+          AND a.ma_authority = key || '.' || sub_key
+        ON CONFLICT DO NOTHING
+      `);
+
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Lấy tất cả các quyền chi tiết có trong hệ thống
+  static async getAllAuthorities() {
+    const result = await query(
+      "SELECT ma_authority, ten_authority, nhom_authority FROM sys_authority ORDER BY nhom_authority, ma_authority",
+    );
     return result.rows;
   }
 }

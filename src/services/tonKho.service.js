@@ -113,7 +113,7 @@ class InventoryService {
         ma_kho,
         "Cảnh báo hết hàng / tồn kho thấp",
         `Mặt hàng ${ma_pt} tại kho ${ma_kho} hiện chỉ còn ${updated.so_luong_ton}. Vui lòng nhập thêm.`,
-        `/inventory/stock?ma_kho=${ma_kho}&ma_pt=${ma_pt}`,
+        `/phu-tung/danh-sach?search=${ma_pt}`,
         "INVENTORY",
       ).catch((err) => console.error("Notification Error:", err));
     }

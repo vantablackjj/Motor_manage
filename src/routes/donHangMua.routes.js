@@ -23,9 +23,9 @@ const themPhuTungSchema = Joi.object({
 });
 
 // Routes
-router.get("/", authenticate, donHangMuaController.getDanhSach);
+router.get("/", authenticate, checkPermission("purchase_orders", "view"), donHangMuaController.getDanhSach);
 
-router.get("/:ma_phieu", authenticate, donHangMuaController.getChiTiet);
+router.get("/:ma_phieu", authenticate, checkPermission("purchase_orders", "view"), donHangMuaController.getChiTiet);
 
 router.post(
   "/",
@@ -74,6 +74,7 @@ router.post(
 router.get(
   "/:ma_phieu/in-don-hang",
   authenticate,
+  checkPermission("purchase_orders", "view"),
   donHangMuaController.inDonHang,
 );
 

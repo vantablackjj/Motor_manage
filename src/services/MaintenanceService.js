@@ -302,7 +302,7 @@ class MaintenanceService {
     NotificationService.notifyManagers(
       "Tiếp nhận xe mới",
       `Xe ${data.ma_serial} đã được tiếp nhận tại kho ${data.ma_kho || "Hệ thống"}.`,
-      `/maintenance/view/${data.ma_phieu}`,
+      `/maintenance/${data.ma_phieu}`,
       "MAINTENANCE",
     ).catch((err) => console.error("Notification Error:", err));
 
@@ -312,7 +312,7 @@ class MaintenanceService {
         parseInt(data.ktv_chinh),
         "Phân công sửa chữa",
         `Bạn được phân công sửa chữa xe ${data.ma_serial}${data.ma_ban_nang ? ` tại bàn nâng ${data.ma_ban_nang}` : ""}.`,
-        `/maintenance/view/${data.ma_phieu}`,
+        `/maintenance/${data.ma_phieu}`,
         "MAINTENANCE",
       ).catch((err) => console.error("Notification Error:", err));
     }
@@ -542,7 +542,7 @@ class MaintenanceService {
         NotificationService.notifyManagers(
           "Sửa chữa hoàn thành",
           `Xe ${phieuData.ma_serial} đã hoàn thành sửa chữa (Phiếu: ${ma_phieu}). Tổng tiền: ${Number(phieuData.tong_tien).toLocaleString()}đ.`,
-          `/maintenance/view/${ma_phieu}`,
+          `/maintenance/${ma_phieu}`,
           "MAINTENANCE",
         ).catch((err) => console.error("Notification Error:", err));
       } else {
@@ -552,7 +552,7 @@ class MaintenanceService {
             parseInt(phieuData.ktv_chinh),
             "Cập nhật trạng thái sửa chữa",
             `Phiếu ${ma_phieu} đã chuyển sang trạng thái: ${trang_thai}`,
-            `/maintenance/view/${ma_phieu}`,
+            `/maintenance/${ma_phieu}`,
             "MAINTENANCE",
           ).catch((err) => console.error("Notification Error:", err));
         }

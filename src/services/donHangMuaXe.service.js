@@ -408,7 +408,7 @@ class DonHangMuaXeService {
     NotificationService.notifyManagers(
       "Đơn mua xe mới chờ duyệt",
       `Đơn ${soPhieu} đã được gửi duyệt bởi người dùng ${userId}.`,
-      `/purchase/order/${soPhieu}`,
+      `/purchase/vehicles/${soPhieu}`,
     ).catch((err) => console.error("Notification Error:", err));
 
     return order;
@@ -447,7 +447,7 @@ class DonHangMuaXeService {
         parseInt(order.nguoi_tao),
         "Đơn mua xe đã được duyệt",
         `Đơn ${soPhieu} đã được duyệt. Bạn có thể thực hiện nhập kho.`,
-        `/purchase/order/${soPhieu}`,
+        `/purchase/vehicles/${soPhieu}`,
       ).catch((err) => console.error("Notification Error:", err));
     }
 
@@ -484,7 +484,7 @@ class DonHangMuaXeService {
         parseInt(order.nguoi_tao),
         "Đơn mua xe bị từ chối",
         `Đơn ${soPhieu} đã bị từ chối. Lý do: ${lyDo}`,
-        `/purchase/order/${soPhieu}`,
+        `/purchase/vehicles/${soPhieu}`,
       ).catch((err) => console.error("Notification Error:", err));
     }
 

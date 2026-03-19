@@ -266,7 +266,7 @@ class VehicleService {
       NotificationService.notifyManagers(
         "Xe mới chờ duyệt",
         `Nhân viên ${ten_nhan_vien} đã nhập xe mới: ${fullData.ten_loai} (SK: ${fullData.so_khung}). Vui lòng phê duyệt.`,
-        `/approval/vehicle/${xeKey}`,
+        `/xe/danh-sach?search=${xeKey}`,
         "APPROVAL",
       ).catch((err) => console.error("Notification Error:", err));
 
@@ -630,7 +630,7 @@ class VehicleService {
     NotificationService.notifyManagers(
       "Yêu cầu duyệt xe",
       `Xe ${xeKey} đã được ${ten_nhan_vien} gửi yêu cầu phê duyệt.`,
-      `/approval/vehicle/${xeKey}`,
+      `/xe/danh-sach?search=${xeKey}`,
       "APPROVAL",
     ).catch((err) => console.error("Notification Error:", err));
 
@@ -701,7 +701,7 @@ class VehicleService {
           approvedXe.nguoi_gui_duyet,
           "Xe đã được duyệt",
           `Xe ${xeKey} của bạn đã được ${ten_quan_ly} phê duyệt nhập kho.`,
-          `/inventory/vehicle/${xeKey}`,
+          `/xe/danh-sach?search=${xeKey}`,
           "APPROVAL",
         ).catch((err) => console.error("Notification Error:", err));
       }
@@ -753,7 +753,7 @@ class VehicleService {
         rejectedXe.nguoi_gui_duyet,
         "Xe bị từ chối duyệt",
         `Xe ${xeKey} đã bị từ chối bởi ${ten_quan_ly}. Lý do: ${lyDo}`,
-        `/inventory/vehicle/${xeKey}`,
+        `/xe/danh-sach?search=${xeKey}`,
         "APPROVAL",
       ).catch((err) => console.error("Notification Error:", err));
     }

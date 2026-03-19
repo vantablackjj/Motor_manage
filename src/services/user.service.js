@@ -67,6 +67,14 @@ class UserService {
   static async removeWarehouse(userId, maKho) {
     return User.removeWarehouse(userId, maKho);
   }
+
+  static async syncAuthorities() {
+    return User.syncAuthorities();
+  }
+
+  static async getAllAuthorities() {
+    return User.getAllAuthorities();
+  }
 }
 
 module.exports = UserService;

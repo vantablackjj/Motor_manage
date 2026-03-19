@@ -19,26 +19,26 @@ router.use(authenticate);
 
 router.post(
   "/",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   validate(createMaintenanceSchema),
   MaintenanceController.create,
 );
 
 router.get(
   "/",
-  checkPermission("inventory", "view"),
+  checkPermission("maintenance", "view"),
   MaintenanceController.getAll,
 );
 
 router.get(
   "/reminders",
-  checkPermission("inventory", "view"),
+  checkPermission("maintenance", "view"),
   MaintenanceController.getReminders,
 );
 
 router.patch(
   "/reminders/:id",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   MaintenanceController.updateReminderStatus,
 );
 
@@ -55,37 +55,37 @@ router.post(
  */
 router.get(
   "/ban-nang/list",
-  checkPermission("inventory", "view"),
+  checkPermission("maintenance", "view"),
   MaintenanceController.getBanNang,
 );
 
 router.post(
   "/ban-nang",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   MaintenanceController.addBanNang,
 );
 
 router.put(
   "/ban-nang/:id",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   MaintenanceController.updateBanNang,
 );
 
 router.delete(
   "/ban-nang/:id",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   MaintenanceController.deleteBanNang,
 );
 
 router.get(
   "/technicians/list",
-  checkPermission("inventory", "view"),
+  checkPermission("maintenance", "view"),
   MaintenanceController.getTechnicians,
 );
 
 router.get(
   "/:id",
-  checkPermission("inventory", "view"),
+  checkPermission("maintenance", "view"),
   MaintenanceController.getById,
 );
 
@@ -96,7 +96,7 @@ router.get(
  */
 router.put(
   "/:id/status",
-  checkPermission("inventory", "edit"),
+  checkPermission("maintenance", "edit"),
   MaintenanceController.updateStatus,
 );
 
