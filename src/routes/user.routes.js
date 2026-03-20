@@ -24,15 +24,39 @@ router.get(
 );
 
 /**
- * @route   GET /api/users/roles/all
- * @desc    Lấy tất cả các vai trò
+ * @route   GET /api/users/sync-authorities
+ * @desc    Đồng bộ quyền từ JSONB permissions sang RBAC v2 tables
+ * @access  Admin Only
+ */
+router.get(
+  "/sync-authorities",
+  authenticate,
+  checkRole(["ADMIN"]),
+  userController.syncAuthorities,
+);
+
+/**
+ * @route   GET /api/users/authorities/all
+ * @desc    Lấy tất cả các quyền chi tiết có trong hệ thống
  * @access  Private (users.view)
  */
 router.get(
-  "/roles/all",
+  "/authorities/all",
   authenticate,
   checkPermission("users", "view"),
-  userController.getRoles,
+  userController.getAllAuthorities,
+);
+
+/**
+ * @route   PUT /api/users/roles/:role_id/authorities
+ * @desc    Cập nhật danh sách quyền cho một vai trò
+ * @access  Admin Only
+ */
+router.put(
+  "/roles/:role_id/authorities",
+  authenticate,
+  checkRole(["ADMIN"]),
+  userController.updateRoleAuthorities,
 );
 
 /**
@@ -141,28 +165,18 @@ router.post(
   userController.resetPassword,
 );
 
-/**
- * @route   POST /api/users/sync-authorities
- * @desc    Đồng bộ quyền từ JSONB permissions sang RBAC v2 tables
- * @access  Admin Only
- */
-router.post(
-  "/sync-authorities",
-  authenticate,
-  checkRole(["ADMIN"]),
-  userController.syncAuthorities,
-);
+
 
 /**
- * @route   GET /api/users/authorities/all
- * @desc    Lấy tất cả các quyền chi tiết có trong hệ thống
+ * @route   GET /api/users/roles/all
+ * @desc    Lấy tất cả các vai trò
  * @access  Private (users.view)
  */
 router.get(
-  "/authorities/all",
+  "/roles/all",
   authenticate,
   checkPermission("users", "view"),
-  userController.getAllAuthorities,
+  userController.getRoles,
 );
 
 module.exports = router;

@@ -429,6 +429,38 @@ class User {
     );
     return result.rows;
   }
+
+  // Cập nhật danh sách quyền chi tiết cho một vai trò
+  static async updateRoleAuthorities(role_id, authorities) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      // 1. Xóa hết mapping cũ của vai trò này
+      await client.query("DELETE FROM sys_role_authority WHERE role_id = $1", [role_id]);
+      
+      // 2. Chèn mapping mới
+      if (authorities && authorities.length > 0) {
+        // Tìm IDs dựa trên ma_authority
+        const authIdsRes = await client.query(
+          "SELECT id FROM sys_authority WHERE ma_authority = ANY($1)",
+          [authorities]
+        );
+        
+        if (authIdsRes.rows.length > 0) {
+          const values = authIdsRes.rows.map(row => `(${role_id}, ${row.id})`).join(",");
+          await client.query(`INSERT INTO sys_role_authority (role_id, authority_id) VALUES ${values}`);
+        }
+      }
+      
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = User;

@@ -1,5 +1,5 @@
-// controllers/order.controller.js
 const OrderService = require("../services/order.service");
+const ActivityLogger = require("../utils/activityLogger");
 
 class OrderController {
   /**
@@ -12,6 +12,7 @@ class OrderController {
         nguoi_tao: req.user ? req.user.id : null,
       };
       const order = await OrderService.createOrder(orderData);
+      await ActivityLogger.record(req, "CREATE", "orders", order.so_phieu, { orderData });
       res.status(201).json({ success: true, data: order });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -32,6 +33,7 @@ class OrderController {
         id,
         deliveryData,
       );
+      await ActivityLogger.record(req, "DELIVER", "orders", id, { deliveryData });
       res.json({ success: true, data: result });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -90,6 +92,7 @@ class OrderController {
       const { status } = req.body;
       const userId = req.user ? req.user.id : null;
       const order = await OrderService.updateStatus(id, status, userId);
+      await ActivityLogger.record(req, "UPDATE_STATUS", "orders", id, { status });
       res.json({ success: true, data: order });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });

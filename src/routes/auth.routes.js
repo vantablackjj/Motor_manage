@@ -16,6 +16,7 @@ const { query } = require("../config/database");
 const Joi = require("joi");
 const { ROLES } = require("../config/constants");
 const logger = require("../utils/logger");
+const ActivityLogger = require("../utils/activityLogger");
 
 // ============================================================
 // REFRESH TOKEN HELPERS (lưu/kiểm tra/thu hồi token trong DB)
@@ -161,6 +162,7 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
     }
 
     logger.info(`User logged in successfully: ${username}`);
+    await ActivityLogger.record(req, "LOGIN", "auth", user.id, { username });
 
     // Set refresh token in HTTP-only cookie
     res.cookie("refresh_token", refreshToken, {
@@ -428,6 +430,7 @@ router.post("/logout", authenticate, async (req, res, next) => {
     });
 
     logger.info(`User logged out: ${req.user.username}`);
+    await ActivityLogger.record(req, "LOGOUT", "auth", req.user.id, { username: req.user.username });
     sendSuccess(res, null, "Đăng xuất thành công");
   } catch (error) {
     next(error);

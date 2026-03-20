@@ -36,6 +36,7 @@ const notificationRoutes = require("./notification.routes");
 const pushRoutes = require("./push.routes");
 const maintenanceRoutes = require("./maintenance.routes");
 const dichVuSauBanRoutes = require("./dichVuSauBan.routes");
+const logRoutes = require("./log.routes");
 
 // 1. PUBLIC ROUTES (Không cần đăng nhập)
 router.use("/auth", authRoutes);
@@ -101,5 +102,6 @@ router.use("/notifications", notificationRoutes);
 router.use("/push", pushRoutes);
 router.use("/maintenance", maintenanceRoutes);
 router.use("/dich-vu-sau-ban", dichVuSauBanRoutes);
+router.use("/logs", logRoutes);
 
 module.exports = router;

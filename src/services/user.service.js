@@ -75,6 +75,10 @@ class UserService {
   static async getAllAuthorities() {
     return User.getAllAuthorities();
   }
+
+  static async updateRoleAuthorities(roleId, authorities) {
+    return User.updateRoleAuthorities(roleId, authorities);
+  }
 }
 
 module.exports = UserService;

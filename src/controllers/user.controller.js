@@ -1,5 +1,6 @@
 const userService = require("../services/user.service");
 const { sendSuccess, sendError } = require("../utils/response");
+const ActivityLogger = require("../utils/activityLogger");
 
 class UserController {
   async getAll(req, res, next) {
@@ -117,6 +118,7 @@ class UserController {
   async syncAuthorities(req, res, next) {
     try {
       await userService.syncAuthorities();
+      await ActivityLogger.record(req, "SYNC", "users", "all", { note: "Synchronized granular authorities from JSONB" });
       sendSuccess(res, null, "Đồng bộ quyền thành công từ JSONB!");
     } catch (err) {
       next(err);
@@ -127,6 +129,18 @@ class UserController {
     try {
       const authorities = await userService.getAllAuthorities();
       sendSuccess(res, authorities, "Lấy danh sách quyền chi tiết thành công");
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateRoleAuthorities(req, res, next) {
+    try {
+      const { role_id } = req.params;
+      const { authorities } = req.body;
+      await userService.updateRoleAuthorities(role_id, authorities);
+      await ActivityLogger.record(req, "UPDATE_PERMISSIONS", "roles", role_id, { authorities });
+      sendSuccess(res, null, "Cập nhật quyền cho vai trò thành công");
     } catch (err) {
       next(err);
     }
