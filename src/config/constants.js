@@ -4,6 +4,7 @@ module.exports = {
     ADMIN: "ADMIN", // Quản trị viên - Toàn quyền
     BAN_HANG: "BAN_HANG", // Nhân viên bán hàng
     KHO: "KHO", // Nhân viên kho
+    KY_THUAT: "KY_THUAT", // Kỹ thuật viên
     KE_TOAN: "KE_TOAN", // Kế toán
     QUAN_LY: "QUAN_LY", // Quản lý
 

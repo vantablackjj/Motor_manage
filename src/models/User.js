@@ -439,11 +439,28 @@ class User {
       await client.query("DELETE FROM sys_role_authority WHERE role_id = $1", [role_id]);
       
       // 2. Chèn mapping mới
-      if (authorities && authorities.length > 0) {
+      let authArray = Array.isArray(authorities) 
+        ? authorities 
+        : (authorities && typeof authorities === 'object' ? Object.values(authorities) : []);
+      
+      // Lọc bỏ các giá trị null/undefined/empty
+      authArray = authArray.filter(a => a && typeof a === 'string');
+
+      if (authArray.length > 0) {
         // Tìm IDs dựa trên ma_authority
         const authIdsRes = await client.query(
-          "SELECT id FROM sys_authority WHERE ma_authority = ANY($1)",
-          [authorities]
+          `SELECT id FROM sys_authority 
+           WHERE ma_authority = ANY($1)
+              OR ma_authority IN (
+                SELECT 'don_hang_ban_xe.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'sales_orders.%'
+                UNION ALL
+                SELECT 'sales_orders.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'don_hang_ban_xe.%'
+                UNION ALL
+                SELECT 'don_hang_mua_xe.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'purchase_orders.%'
+                UNION ALL
+                SELECT 'purchase_orders.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'don_hang_mua_xe.%'
+              )`,
+          [authArray]
         );
         
         if (authIdsRes.rows.length > 0) {
@@ -451,6 +468,9 @@ class User {
           await client.query(`INSERT INTO sys_role_authority (role_id, authority_id) VALUES ${values}`);
         }
       }
+
+      // 3. Rebuild and update the legacy JSONB permissions field for frontend compatibility
+      await this.rebuildRolePermissions(role_id, client);
       
       await client.query("COMMIT");
       return true;
@@ -459,6 +479,73 @@ class User {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * Đồng bộ ngược từ sys_role_authority sang sys_role.permissions JSONB
+   * Giúp frontend (đang dùng JSONB) luôn khớp với dữ liệu phân quyền mới
+   */
+  static async rebuildRolePermissions(role_id, client) {
+    const db = client || pool;
+    try {
+      // 1. Lấy toàn bộ danh sách quyền có thể có từ bảng sys_authority
+      const allAuthsRes = await db.query(
+        "SELECT ma_authority, nhom_authority FROM sys_authority",
+      );
+
+      // 2. Lấy danh sách quyền hiện có của role này
+      const roleAuthsRes = await db.query(
+        "SELECT a.ma_authority FROM sys_role_authority ra JOIN sys_authority a ON ra.authority_id = a.id WHERE ra.role_id = $1",
+        [role_id],
+      );
+
+      const hasAuth = new Set(roleAuthsRes.rows.map((r) => r.ma_authority));
+      const permissions = {};
+
+      // 3. Xây dựng cấu trúc JSONB đầy đủ (bao gồm cả true và false)
+      allAuthsRes.rows.forEach((auth) => {
+        const group = auth.nhom_authority;
+        const action = auth.ma_authority.split(".")[1] || "view";
+
+        if (!permissions[group]) permissions[group] = {};
+        permissions[group][action] = hasAuth.has(auth.ma_authority);
+      });
+
+      // 4. Xử lý đồng bộ các group trùng lặp (ví dụ don_hang_ban_xe <-> sales_orders)
+      const groupMappings = {
+        don_hang_ban_xe: "sales_orders",
+        sales_orders: "don_hang_ban_xe",
+        don_hang_mua_xe: "purchase_orders",
+        purchase_orders: "don_hang_mua_xe",
+        inventory: "inventory", // just in case
+      };
+
+      for (const src in groupMappings) {
+        const dest = groupMappings[src];
+        if (permissions[src] && !permissions[dest]) {
+          permissions[dest] = { ...permissions[src] };
+        } else if (permissions[src] && permissions[dest]) {
+          // Merge both, if any is true, both are true
+          for (const action in permissions[src]) {
+            if (permissions[src][action]) permissions[dest][action] = true;
+          }
+          for (const action in permissions[dest]) {
+            if (permissions[dest][action]) permissions[src][action] = true;
+          }
+        }
+      }
+
+      // 5. Cập nhật vào DB
+      await db.query("UPDATE sys_role SET permissions = $1 WHERE id = $2", [
+        JSON.stringify(permissions),
+        role_id,
+      ]);
+
+      return true;
+    } catch (error) {
+      console.error("rebuildRolePermissions error:", error);
+      throw error;
     }
   }
 }

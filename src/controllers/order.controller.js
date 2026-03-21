@@ -64,6 +64,30 @@ class OrderController {
           .status(404)
           .json({ success: false, message: "Đơn hàng không tồn tại" });
       }
+
+      // Warehouse isolation check
+      const { ROLES } = require("../config/constants");
+      const hasFullAccess = [
+        ROLES.ADMIN,
+        ROLES.QUAN_LY,
+        ROLES.QUAN_LY_CTY,
+        ROLES.KE_TOAN,
+      ].includes(req.user.vai_tro);
+
+      if (!hasFullAccess) {
+        const userKho = req.user.ma_kho;
+        const isRelated =
+          (order.loai_ben_xuat === "KHO" && order.ma_ben_xuat === userKho) ||
+          (order.loai_ben_nhap === "KHO" && order.ma_ben_nhap === userKho);
+
+        if (!isRelated) {
+          return res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền xem đơn hàng của kho khác",
+          });
+        }
+      }
+
       res.json({ success: true, data: order });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });

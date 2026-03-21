@@ -44,6 +44,23 @@ class MaintenanceController {
           .status(404)
           .json({ success: false, message: "Không tìm thấy phiếu" });
       }
+
+      // Warehouse isolation check
+      const { ROLES } = require("../config/constants");
+      const hasFullAccess = [
+        ROLES.ADMIN,
+        ROLES.QUAN_LY,
+        ROLES.QUAN_LY_CTY,
+        ROLES.KE_TOAN,
+      ].includes(req.user.vai_tro);
+
+      if (!hasFullAccess && result.ma_kho !== req.user.ma_kho) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem phiếu bảo trì của kho khác",
+        });
+      }
+
       res.json({ success: true, data: result });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });

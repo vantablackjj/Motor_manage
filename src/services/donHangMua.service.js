@@ -508,9 +508,25 @@ class DonHangMuaService {
       [soPhieu],
     );
 
+    // Lấy danh sách các phiếu nhập kho đã tạo cho đơn này
+    const receiptsResult = await pool.query(
+      `SELECT 
+        so_hoa_don as so_phieu, 
+        ngay_hoa_don as ngay_nhap, 
+        tong_tien, 
+        thanh_tien,
+        trang_thai,
+        nguoi_lap as nguoi_nhap
+       FROM tm_hoa_don 
+       WHERE so_don_hang = $1 AND loai_hoa_don = 'MUA_HANG'
+       ORDER BY created_at DESC`,
+      [soPhieu],
+    );
+
     return {
       ...headerResult.rows[0],
       chi_tiet: detailResult.rows,
+      phieu_nhap: receiptsResult.rows,
     };
   }
   // Lấy chi tiết đơn hàng cho export

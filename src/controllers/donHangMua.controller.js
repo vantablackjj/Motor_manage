@@ -191,33 +191,20 @@ class DonHangMuaController {
           })),
         };
       } else {
-        // Fetch as the whole Order
+        // Fetch as the whole Order (PO)
         const order = await DonHangMuaService.getChiTiet(ma_phieu);
         if (!order) {
           return res.status(404).json({ message: "Đơn hàng không tồn tại" });
         }
 
-        // Filter only received items and recalculate totals
-        const filteredChiTiet = (order.chi_tiet || []).filter(
-          (item) => (item.so_luong_da_giao || 0) > 0,
-        );
-
-        // Recalculate total for filtered items
-        const rawTongTien = filteredChiTiet.reduce(
-          (sum, item) =>
-            sum + Number(item.so_luong_da_giao) * Number(item.don_gia),
-          0,
-        );
-        const vatRate = Number(order.vat_percentage || 0);
-        const chietKhau = Number(order.chiet_khau || 0);
-        const vatTien = (rawTongTien - chietKhau) * (vatRate / 100);
-        const finalThanhToan = rawTongTien - chietKhau + vatTien;
+        // When printing the Order (PO), we print the ORIGINAL ordered quantities
+        // not just delivered quantities. This represents the Order Confirmation.
+        const orderChiTiet = order.chi_tiet || [];
 
         invoiceData = {
           so_hd: order.so_phieu,
           ngay_ban: order.ngay_dat_hang || order.created_at,
-          loai_hoa_don:
-            order.loai_don_hang === "MUA_HANG" ? "MUA_HANG" : "BAN_HANG",
+          loai_hoa_don: "MUA_HANG",
 
           ten_ben_xuat: order.ten_ncc || order.ma_ncc,
           dia_chi_ben_xuat: order.dia_chi_ncc || "",
@@ -227,20 +214,20 @@ class DonHangMuaController {
           dia_chi_ben_nhap: order.dia_chi_kho || "",
 
           ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
-          tong_tien: rawTongTien,
-          chiet_khau: chietKhau,
-          vat: vatTien,
-          thanh_toan: finalThanhToan,
+          tong_tien: Number(order.tong_gia_tri || 0),
+          chiet_khau: Number(order.chiet_khau || 0),
+          vat: (Number(order.tong_gia_tri || 0) - Number(order.chiet_khau || 0)) * (Number(order.vat_percentage || 0) / 100),
+          thanh_toan: Number(order.thanh_tien || 0),
           ghi_chu: order.ghi_chu || order.dien_giai,
           trang_thai: order.trang_thai,
 
-          chi_tiet_pt: filteredChiTiet.map((item, idx) => ({
+          chi_tiet_pt: orderChiTiet.map((item, idx) => ({
             stt: idx + 1,
             ten_hang_hoa: item.ten_pt || item.ma_hang_hoa,
             don_vi_tinh: item.don_vi_tinh || "Cái",
-            so_luong: item.so_luong_da_giao,
+            so_luong: item.so_luong, // In original quantity
             don_gia: item.don_gia,
-            thanh_tien: item.so_luong_da_giao * item.don_gia,
+            thanh_tien: item.so_luong * item.don_gia,
           })),
         };
       }

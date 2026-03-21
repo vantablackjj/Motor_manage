@@ -1448,7 +1448,7 @@ class BaoCaoService {
 
   async bieuDoDoanhThu(filters = {}) {
     const { nam = new Date().getFullYear() } = filters;
-    return this.doanhThuTheoThang({ nam });
+    return this.doanhThuTheoThang({ ...filters, nam });
   }
 
   async bieuDoTonKho(filters = {}) {

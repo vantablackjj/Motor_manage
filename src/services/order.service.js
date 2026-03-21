@@ -606,7 +606,7 @@ class OrderService {
       const isBanFin =
         order.loai_don_hang === "BAN_HANG" || order.loai_don_hang === "BAN_XE";
 
-      if (isMuaFin) {
+      if (isMuaFin && order.loai_ben_xuat === "DOI_TAC" && order.ma_ben_xuat) {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_xuat, // NCC
           loai_cong_no: "PHAI_TRA",
@@ -614,7 +614,7 @@ class OrderService {
           so_tien: inv_thanh_tien,
           ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
         });
-      } else if (isBanFin) {
+      } else if (isBanFin && order.loai_ben_nhap === "DOI_TAC" && order.ma_ben_nhap) {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_nhap, // Khách hàng
           loai_cong_no: "PHAI_THU",
@@ -822,6 +822,132 @@ class OrderService {
   }
 
   /**
+   * [P0-3] Reverse inventory & financials for all invoices of an order
+   * Gọi khi hủy đơn ở trạng thái DANG_GIAO (tức là đã có hóa đơn được tạo)
+   */
+  static async _reverseInvoice(client, so_don_hang, userId) {
+    // 1. Lấy tất cả hóa đơn chưa hủy của đơn hàng này
+    const hdRes = await client.query(
+      `SELECT * FROM tm_hoa_don WHERE so_don_hang = $1 AND trang_thai != 'DA_HUY'`,
+      [so_don_hang],
+    );
+
+    for (const hd of hdRes.rows) {
+      // 2. Lấy chi tiết hóa đơn
+      const ctRes = await client.query(
+        `SELECT ct.*, hh.loai_quan_ly
+         FROM tm_hoa_don_chi_tiet ct
+         JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
+         WHERE ct.so_hoa_don = $1`,
+        [hd.so_hoa_don],
+      );
+
+      // 3. Xác định kho cần hoàn hàng (kho xuất ban đầu)
+      const maKhoHoan = hd.ma_ben_xuat;
+
+      for (const item of ctRes.rows) {
+        if (item.loai_quan_ly === "SERIAL" && item.ma_serial) {
+          // Hoàn xe về kho: đặt lại trạng thái TON_KHO, xóa ngày bán
+          await client.query(
+            `UPDATE tm_hang_hoa_serial
+             SET trang_thai = 'TON_KHO',
+                 ma_kho_hien_tai = $1,
+                 ngay_ban = NULL,
+                 so_hoa_don_ban = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE ma_serial = $2`,
+            [maKhoHoan, item.ma_serial],
+          );
+          // Ghi lịch sử hoàn hàng
+          await client.query(
+            `INSERT INTO tm_hang_hoa_lich_su
+               (ma_hang_hoa, ma_serial, loai_giao_dich, so_chung_tu, ma_kho_nhap, so_luong, don_gia, nguoi_thuc_hien, dien_giai)
+             VALUES ($1, $2, 'HOAN_HANG', $3, $4, 1, $5, $6, $7)`,
+            [
+              item.ma_hang_hoa,
+              item.ma_serial,
+              hd.so_hoa_don,
+              maKhoHoan,
+              item.don_gia,
+              userId,
+              `Hoàn kho khi hủy đơn hàng ${so_don_hang}`,
+            ],
+          );
+        } else if (item.loai_quan_ly !== "SERIAL" && item.so_luong > 0) {
+          // Hoàn phụ tùng: cộng lại số lượng tồn kho
+          await client.query(
+            `UPDATE tm_hang_hoa_ton_kho
+             SET so_luong_ton = so_luong_ton + $1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE ma_hang_hoa = $2 AND ma_kho = $3`,
+            [item.so_luong, item.ma_hang_hoa, maKhoHoan],
+          );
+          // Ghi lịch sử hoàn hàng
+          await client.query(
+            `INSERT INTO tm_hang_hoa_lich_su
+               (ma_hang_hoa, loai_giao_dich, so_chung_tu, ma_kho_nhap, so_luong, don_gia, nguoi_thuc_hien, dien_giai)
+             VALUES ($1, 'HOAN_HANG', $2, $3, $4, $5, $6, $7)`,
+            [
+              item.ma_hang_hoa,
+              hd.so_hoa_don,
+              maKhoHoan,
+              item.so_luong,
+              item.don_gia,
+              userId,
+              `Hoàn kho khi hủy đơn hàng ${so_don_hang}`,
+            ],
+          );
+        }
+      }
+
+      // 4. Hủy hóa đơn
+      await client.query(
+        `UPDATE tm_hoa_don SET trang_thai = 'DA_HUY' WHERE so_hoa_don = $1`,
+        [hd.so_hoa_don],
+      );
+
+      // 5. Hoàn công nợ: trừ lại số nợ đã ghi
+      const isBan =
+        hd.loai_hoa_don === "BAN_HANG" || hd.loai_hoa_don === "BAN_XE";
+      const isMua =
+        hd.loai_hoa_don === "MUA_HANG" || hd.loai_hoa_don === "MUA_XE";
+
+      if (isBan && hd.ma_ben_nhap) {
+        // Hoàn công nợ phải thu (khách không còn nợ nữa)
+        await client.query(
+          `UPDATE tm_cong_no_doi_tac
+           SET tong_no = GREATEST(tong_no - $1, 0),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE ma_doi_tac = $2 AND loai_cong_no = 'PHAI_THU'`,
+          [Number(hd.thanh_tien), hd.ma_ben_nhap],
+        );
+        // Đánh dấu chi tiết công nợ là đã hủy
+        await client.query(
+          `UPDATE tm_cong_no_doi_tac_ct
+           SET trang_thai = 'DA_HUY'
+           WHERE so_hoa_don = $1 AND ma_doi_tac = $2 AND loai_cong_no = 'PHAI_THU'`,
+          [hd.so_hoa_don, hd.ma_ben_nhap],
+        );
+      } else if (isMua && hd.ma_ben_xuat) {
+        // Hoàn công nợ phải trả (không nợ NCC nữa)
+        await client.query(
+          `UPDATE tm_cong_no_doi_tac
+           SET tong_no = GREATEST(tong_no - $1, 0),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE ma_doi_tac = $2 AND loai_cong_no = 'PHAI_TRA'`,
+          [Number(hd.thanh_tien), hd.ma_ben_xuat],
+        );
+        await client.query(
+          `UPDATE tm_cong_no_doi_tac_ct
+           SET trang_thai = 'DA_HUY'
+           WHERE so_hoa_don = $1 AND ma_doi_tac = $2 AND loai_cong_no = 'PHAI_TRA'`,
+          [hd.so_hoa_don, hd.ma_ben_xuat],
+        );
+      }
+    }
+  }
+
+  /**
    * Update Order Header (VAT, Discount, Notes) - Only allowed in NHAP status
    */
   static async updateOrder(so_don_hang, updateData) {
@@ -902,61 +1028,78 @@ class OrderService {
    * Update Order Status (Approve, Cancel, etc.)
    */
   static async updateStatus(idOrNo, status, userId) {
-    // 1. Check current status
-    const checkRes = await pool.query(
-      `SELECT trang_thai FROM tm_don_hang 
-       WHERE so_don_hang = $1 
-       OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
-      [idOrNo],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (checkRes.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
-    const currentStatus = checkRes.rows[0].trang_thai;
-
-    // Business Rule: Once approved (DA_DUYET, DANG_GIAO, HOAN_THANH), cannot cancel or revert
-    const lockedStatuses = ["DA_DUYET", "DANG_GIAO", "HOAN_THANH"];
-    const revertStatuses = ["NHAP", "GUI_DUYET", "HUY", "TU_CHOI"];
-
-    if (
-      lockedStatuses.includes(currentStatus) &&
-      revertStatuses.includes(status)
-    ) {
-      throw new Error(
-        `Đơn hàng đã được xác nhận (${currentStatus}), không thể hủy hoặc thay đổi trạng thái về ${status}.`,
+      // 1. Check current status
+      const checkRes = await client.query(
+        `SELECT * FROM tm_don_hang 
+         WHERE so_don_hang = $1 
+         OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+        [idOrNo],
       );
+
+      if (checkRes.rowCount === 0) throw new Error("Đơn hàng không tồn tại");
+      const order = checkRes.rows[0];
+      const currentStatus = order.trang_thai;
+
+      // Business Rule: Chỉ cho phép hủy đơn ở NHAP, DA_DUYET, DANG_GIAO
+      const cancelableStatuses = ["NHAP", "DA_DUYET", "DANG_GIAO"];
+      if (status === "DA_HUY" && !cancelableStatuses.includes(currentStatus)) {
+        throw new Error(
+          `Không thể hủy đơn hàng ở trạng thái ${currentStatus}. Chỉ có thể hủy khi đơn ở Nháp, Đã duyệt hoặc Đang giao.`,
+        );
+      }
+
+      // [P0-3] Hoàn kho nếu hủy đơn đang giao dở
+      if (status === "DA_HUY" && currentStatus === "DANG_GIAO") {
+        await this._reverseInvoice(client, order.so_don_hang, userId);
+      }
+
+      const updatedOrderResult = await client.query(
+        `UPDATE tm_don_hang 
+         SET 
+          trang_thai = $1::enum_trang_thai_don_hang, 
+          nguoi_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN $2::text ELSE nguoi_duyet END,
+          ngay_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN NOW() ELSE ngay_duyet END
+         WHERE so_don_hang = $3 
+         OR (CASE WHEN $3::text ~ '^\\d+$' THEN id = $3::text::int ELSE FALSE END)
+         RETURNING *`,
+        [status, userId, idOrNo],
+      );
+
+      const updatedOrder = updatedOrderResult.rows[0];
+
+      await client.query("COMMIT");
+
+      // Fetch updater name for notification
+      const userRes = await pool.query(
+        "SELECT ho_ten FROM sys_user WHERE id = $1",
+        [userId],
+      );
+      const ten_nguoi_sua = userRes.rows[0]?.ho_ten || userId;
+
+      // Notify about status change
+      NotificationService.notifyUser(
+        updatedOrder.nguoi_tao,
+        "Trạng thái đơn hàng thay đổi",
+        `Đơn hàng ${updatedOrder.so_don_hang} đã được ${ten_nguoi_sua} chuyển sang trạng thái: ${status}${
+          status === "DA_HUY" && currentStatus === "DANG_GIAO"
+            ? " (Kho đã được hoàn tự động)"
+            : ""
+        }`,
+        `/orders/view/${updatedOrder.so_don_hang}`,
+        "SYSTEM",
+      ).catch((err) => console.error("Notification Error:", err));
+
+      return updatedOrder;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    const updatedOrderResult = await pool.query(
-      `UPDATE tm_don_hang 
-       SET 
-        trang_thai = $1::enum_trang_thai_don_hang, 
-        nguoi_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN $2::text ELSE nguoi_duyet END,
-        ngay_duyet = CASE WHEN $1::text = 'DA_DUYET' THEN NOW() ELSE ngay_duyet END
-       WHERE so_don_hang = $3 
-       OR (CASE WHEN $3::text ~ '^\\d+$' THEN id = $3::text::int ELSE FALSE END)
-       RETURNING *`,
-      [status, userId, idOrNo],
-    );
-
-    const updatedOrder = updatedOrderResult.rows[0];
-
-    // Fetch updater name for notification
-    const userRes = await pool.query(
-      "SELECT ho_ten FROM sys_user WHERE id = $1",
-      [userId],
-    );
-    const ten_nguoi_sua = userRes.rows[0]?.ho_ten || userId;
-
-    // Notify about status change
-    NotificationService.notifyUser(
-      updatedOrder.nguoi_tao,
-      "Trạng thái đơn hàng thay đổi",
-      `Đơn hàng ${updatedOrder.so_don_hang} đã được ${ten_nguoi_sua} chuyển sang trạng thái: ${status}`,
-      `/orders/view/${updatedOrder.so_don_hang}`,
-      "SYSTEM",
-    ).catch((err) => console.error("Notification Error:", err));
-
-    return updatedOrder;
   }
 
   // Manual Payment for Orders/Invoices (Thanh toán công nợ Mua Hàng)

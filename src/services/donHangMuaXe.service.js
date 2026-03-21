@@ -613,8 +613,6 @@ class DonHangMuaXeService {
 
     const detailsWithSerials = details.rows.map((d) => {
       // Filter serials matching this product type
-      // Note: Ideally we match by detail ID, but ls doesn't store detail ID clearly.
-      // Matching by Product Code is generally sufficient for PO display.
       const relatedSerials = serials.filter(
         (s) => s.ma_loai_xe === d.ma_loai_xe,
       );
@@ -625,9 +623,25 @@ class DonHangMuaXeService {
       };
     });
 
+    // 4. Get associated invoices (receipt slips)
+    const receiptsResult = await pool.query(
+      `SELECT 
+        so_hoa_don as so_phieu, 
+        ngay_hoa_don as ngay_nhap, 
+        tong_tien as tong_tien_raw,
+        thanh_tien,
+        trang_thai,
+        nguoi_lap as nguoi_nhap
+       FROM tm_hoa_don 
+       WHERE so_don_hang = $1 AND loai_hoa_don = 'MUA_HANG'
+       ORDER BY created_at DESC`,
+      [soPhieuDB],
+    );
+
     return {
       ...header.rows[0],
       chi_tiet: detailsWithSerials,
+      phieu_nhap: receiptsResult.rows,
     };
   }
   /* =========================

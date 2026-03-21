@@ -13,11 +13,61 @@ const cookieParser = require("cookie-parser");
 const app = express();
 app.set("trust proxy", 1);
 
+// ─── 0. Shared config (dùng ở cả Helmet CSP và CORS) ─────────────────────────
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ||
+  "http://localhost:5173,https://manage-motor-fe-12un.vercel.app,https://jaclyn-uncaged-ecliptically.ngrok-free.dev"
+)
+  .split(",")
+  .map((o) => o.trim());
+
 // ─── 1. Security middleware (đặt đầu tiên) ───────────────────────────────────
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: false, // Tắt CSP nếu đang dev/test bị chặn, hoặc cấu hình chi tiết sau
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Cho phép inline scripts/styles của Swagger UI
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'", // Swagger UI cần inline script
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'", // Swagger UI dùng inline style
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+          "https://fonts.googleapis.com",
+        ],
+        fontSrc: [
+          "'self'",
+          "https://fonts.gstatic.com",
+          "https://unpkg.com",
+        ],
+        imgSrc: [
+          "'self'",
+          "data:", // Base64 images thường gặp trong Swagger
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+        ],
+        // Cho phép Socket.IO (WebSocket)
+        connectSrc: [
+          "'self'",
+          "ws:", // WebSocket không mã hóa (dev)
+          "wss:", // WebSocket mã hóa (production)
+          ...allowedOrigins.filter((o) => o !== "*"),
+        ],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"], // Chống Clickjacking
+        upgradeInsecureRequests:
+          process.env.NODE_ENV === "production" ? [] : null,
+      },
+      // Chỉ bật CSP ở production, dev thì report-only để debug dễ hơn
+      reportOnly: process.env.NODE_ENV !== "production",
+    },
   }),
 );
 
@@ -36,14 +86,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // ─── 4. CORS ─────────────────────────────────────────────────────────────────
-// Hỗ trợ nhiều origin (phân cách bởi dấu phẩy trong CORS_ORIGIN)
-const allowedOrigins = (
-  process.env.CORS_ORIGIN ||
-  "http://localhost:5173,https://manage-motor-fe-12un.vercel.app,https://jaclyn-uncaged-ecliptically.ngrok-free.dev"
-)
-  .split(",")
-  .map((o) => o.trim());
-
+// Hỗ trợ nhiều origin (phân cách bởi dấu phẩy trong CORS_ORIGIN) - đã khai báo ở trên
 app.use(
   cors({
     origin: (origin, callback) => {

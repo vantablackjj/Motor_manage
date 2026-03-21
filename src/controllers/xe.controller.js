@@ -24,6 +24,23 @@ class XeController {
         return sendError(res, "Không tìm thấy xe", 404);
       }
 
+      // Warehouse isolation check
+      const { ROLES } = require("../config/constants");
+      const hasFullAccess = [
+        ROLES.ADMIN,
+        ROLES.QUAN_LY,
+        ROLES.QUAN_LY_CTY,
+        ROLES.KE_TOAN,
+      ].includes(req.user.vai_tro);
+
+      if (!hasFullAccess && xe.ma_kho_hien_tai !== req.user.ma_kho) {
+        return sendError(
+          res,
+          "Bạn không có quyền xem thông tin xe tại kho khác",
+          403,
+        );
+      }
+
       sendSuccess(res, xe, "Lấy thông tin xe thành công");
     } catch (err) {
       next(err);
@@ -46,6 +63,29 @@ class XeController {
   async getHistory(req, res, next) {
     try {
       const { xe_key } = req.params;
+      const xe = await Xe.getByXeKey(xe_key);
+
+      if (!xe) {
+        return sendError(res, "Không tìm thấy xe", 404);
+      }
+
+      // Warehouse isolation check
+      const { ROLES } = require("../config/constants");
+      const hasFullAccess = [
+        ROLES.ADMIN,
+        ROLES.QUAN_LY,
+        ROLES.QUAN_LY_CTY,
+        ROLES.KE_TOAN,
+      ].includes(req.user.vai_tro);
+
+      if (!hasFullAccess && xe.ma_kho_hien_tai !== req.user.ma_kho) {
+        return sendError(
+          res,
+          "Bạn không có quyền xem lịch sử xe tại kho khác",
+          403,
+        );
+      }
+
       const data = await Xe.getLichSu(xe_key);
       sendSuccess(res, data, "Lấy lịch sử xe thành công");
     } catch (err) {

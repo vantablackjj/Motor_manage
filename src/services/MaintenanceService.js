@@ -564,7 +564,8 @@ class MaintenanceService {
 
   // Lấy danh sách nhắc nhở bảo trì
   static async getReminders(filters = {}) {
-    const { search, tu_ngay, den_ngay, trang_thai, limit, page } = filters;
+    const { search, tu_ngay, den_ngay, trang_thai, limit, page, ma_kho } =
+      filters;
     let sql = `
       SELECT n.*, 
              n.trang_thai as trang_thai_db,
@@ -610,6 +611,11 @@ class MaintenanceService {
     if (den_ngay) {
       params.push(den_ngay);
       sql += ` AND n.ngay_du_kien <= $${params.length}`;
+    }
+
+    if (ma_kho) {
+      params.push(ma_kho);
+      sql += ` AND x.ma_kho_hien_tai = $${params.length}`;
     }
 
     sql += " ORDER BY n.ngay_du_kien ASC, n.id DESC";

@@ -82,7 +82,11 @@ class CongNoService {
       // Xác định loại phiếu (THU cho PHAI_THU - Khách hàng nợ mình, CHI cho PHAI_TRA - Mình nợ NCC)
       const loai_phieu = loai_cong_no === "PHAI_THU" ? "THU" : "CHI";
       const prefix = loai_phieu === "THU" ? "PT" : "PC";
-      const so_phieu = `${prefix}DT-${Date.now()}`;
+      // Dùng PostgreSQL sequence để đảm bảo tính duy nhất trong môi trường Cluster
+      const soPhieuRes = await client.query(
+        `SELECT '${prefix}DT' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_cong_no_payment')::text, 6, '0') AS so_phieu`
+      );
+      const so_phieu = soPhieuRes.rows[0].so_phieu;
 
       // Tạo phiếu thu/chi
       await client.query(
@@ -134,7 +138,11 @@ class CongNoService {
           "Thiếu thông tin thanh toán: Kho trả, Kho nhận hoặc Số tiền",
         );
       }
-      const so_phieu = `TTNB-${Date.now()}`;
+      // Dùng PostgreSQL sequence để đảm bảo tính duy nhất trong môi trường Cluster
+      const soPhieuRes = await client.query(
+        `SELECT 'TTNB' || TO_CHAR(NOW(),'YYYYMMDD') || LPAD(nextval('seq_cong_no_payment')::text, 6, '0') AS so_phieu`
+      );
+      const so_phieu = soPhieuRes.rows[0].so_phieu;
 
       // Metadata to identify this as Debt Payment
       const metadata = JSON.stringify({

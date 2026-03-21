@@ -21,12 +21,50 @@ const warehouseIsolation = (req, res, next) => {
     ROLES.KE_TOAN,
   ].includes(user.vai_tro);
 
-  if (hasFullAccess) {
-    return next();
-  }
+  const warehouseFields = [
+    "ma_kho",
+    "kho_id",
+    "ma_kho_hien_tai",
+    "ma_kho_nhap",
+    "ma_kho_xuat",
+    "tu_ma_kho",
+    "den_ma_kho",
+    "ma_ben_nhap",
+    "ma_ben_xuat",
+    "fromKho",
+    "toKho",
+    "ma_kho_no",
+    "ma_kho_co",
+  ];
 
-  // Đối với Nhân viên (BAN_HANG, KHO, NHAN_VIEN), buộc phải lọc theo kho của họ
-  if ([ROLES.BAN_HANG, ROLES.KHO, ROLES.NHAN_VIEN].includes(user.vai_tro)) {
+  const normalizeAndIsolate = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+
+    // 1. Normalize: ensure ma_kho is present if any other warehouse field is present
+    warehouseFields.forEach((field) => {
+      if (obj[field] !== undefined && obj[field] !== null) {
+        if (!obj.ma_kho) obj.ma_kho = obj[field]; // Normalize to ma_kho for services
+      }
+    });
+
+    // 2. Isolate: only for restricted roles
+    if (!hasFullAccess && [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT, ROLES.NHAN_VIEN].includes(user.vai_tro)) {
+        if (!user.ma_kho) return; // Should have been handled by the check below
+
+        warehouseFields.forEach((field) => {
+          if (obj[field] !== undefined && obj[field] !== null) {
+            if (obj[field] !== user.ma_kho) {
+              obj[field] = user.ma_kho;
+            }
+          } else if (field === "ma_kho") {
+            obj[field] = user.ma_kho;
+          }
+        });
+    }
+  };
+
+  // Check for restricted access without ma_kho early
+  if (!hasFullAccess && [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT, ROLES.NHAN_VIEN].includes(user.vai_tro)) {
     if (!user.ma_kho) {
       return sendError(
         res,
@@ -34,60 +72,19 @@ const warehouseIsolation = (req, res, next) => {
         403,
       );
     }
+  }
 
-    const forceWarehouse = (obj) => {
-      if (!obj || typeof obj !== "object") return;
+  // Handle all relevant parts of the request
+  if (req.query) normalizeAndIsolate(req.query);
+  if (req.body) normalizeAndIsolate(req.body);
+  if (req.params) normalizeAndIsolate(req.params);
 
-      // 1. Force top-level warehouse fields if they exist
-      const warehouseFields = [
-        "ma_kho",
-        "kho_id",
-        "ma_kho_hien_tai",
-        "ma_kho_nhap",
-        "ma_kho_xuat",
-        "tu_ma_kho",
-        "den_ma_kho",
-        "ma_ben_nhap",
-        "ma_ben_xuat",
-        "fromKho",
-        "toKho",
-      ];
-
-      warehouseFields.forEach((field) => {
-        if (obj[field] !== undefined && obj[field] !== null) {
-          // If the field targets a different warehouse, override it
-          if (obj[field] !== user.ma_kho) {
-            obj[field] = user.ma_kho;
-          }
-        }
-      });
-
-      // Special case for transfers: at least one side must be theirs
-      // The logic above forces BOTH to be theirs, which is safer for a warehouse staff (they can only move within their kho?)
-      // Actually, for transfers between warehouses, we might want to allow moving OUT of their kho to another.
-      // But if they are just warehouse staff, they shouldn't even be initiating inter-warehouse transfers without supervision.
-      // Let's stick to a strict rule: if they are restricted, they work ONLY with their warehouse.
-
-      // Handle nested params object
-      if (obj.params && typeof obj.params === "object") {
-        forceWarehouse(obj.params);
-      }
-    };
-
-    // 1. Xử lý Query String
-    if (req.query) forceWarehouse(req.query);
-
-    // 2. Xử lý Request Body
-    if (req.body) forceWarehouse(req.body);
-
-    // 3. Xử lý URL Params
-    if (req.params) forceWarehouse(req.params);
-
-    // 4. Double check for POST/PUT specific body fields based on common patterns
-    if (req.method === "POST" || req.method === "PUT") {
-      if (req.body.ma_kho_nhap) req.body.ma_kho_nhap = user.ma_kho;
-      if (req.body.ma_kho_xuat) req.body.ma_kho_xuat = user.ma_kho;
-      if (req.body.ma_kho) req.body.ma_kho = user.ma_kho;
+  // POST/PUT specific body fields
+  if (req.method === "POST" || req.method === "PUT") {
+    if (!hasFullAccess && [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT, ROLES.NHAN_VIEN].includes(user.vai_tro)) {
+        if (req.body.ma_kho_nhap) req.body.ma_kho_nhap = user.ma_kho;
+        if (req.body.ma_kho_xuat) req.body.ma_kho_xuat = user.ma_kho;
+        if (req.body.ma_kho) req.body.ma_kho = user.ma_kho;
     }
   }
 

@@ -12,24 +12,39 @@ router.get('/', async (req, res) => {
     sendError(res, err.message);
   }
 });
-router.get("/:ma_kho",async(req,res)=>{
-  try{
-    const {ma_kho} = req.params;
-    const data = await InventoryService.getByID(ma_kho)
-    sendSuccess (res,data)
-  }catch(err){
-    sendError (res,err.message)
+// Lấy tồn kho theo kho
+router.get("/kho/:ma_kho", async (req, res) => {
+  try {
+    const { ma_kho } = req.params;
+    const data = await InventoryService.getByID(ma_kho);
+    sendSuccess(res, data);
+  } catch (err) {
+    sendError(res, err.message);
   }
-})
-router.get("/:ma_pt",async(req,res)=>{
-  try{
-    const {ma_pt} = req.params;
-    const data = await InventoryService.getByPT(ma_pt)
-    sendSuccess (res,data)
-  }catch(err){
-    sendError (res,err.message)
+});
+
+// Lấy tồn kho của 1 mã phụ tùng trên toàn hệ thống (hoặc theo kho bị giới hạn)
+router.get("/phu-tung/:ma_pt", async (req, res) => {
+  try {
+    const { ma_pt } = req.params;
+    let data = await InventoryService.getByPT(ma_pt);
+
+    // Isolation check
+    const { ROLES } = require("../config/constants");
+    if (
+      req.user &&
+      [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT, ROLES.NHAN_VIEN].includes(
+        req.user.vai_tro,
+      )
+    ) {
+      data = data.filter((item) => item.ma_kho === req.user.ma_kho);
+    }
+
+    sendSuccess(res, data);
+  } catch (err) {
+    sendError(res, err.message);
   }
-})
+});
 // Tạo tồn kho ban đầu
 router.post('/init', async (req, res) => {
   try {
