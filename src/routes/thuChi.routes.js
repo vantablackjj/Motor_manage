@@ -73,7 +73,8 @@ router.post(
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.id,
+        nguoi_tao: req.user.username || req.user.ho_ten || String(req.user.id),
+        created_by: req.user.id,
       };
       const result = await thuChiService.taoPhieu(data);
       sendSuccess(res, result, "Success", 201);

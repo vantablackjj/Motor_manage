@@ -112,8 +112,17 @@ router.post(
   "/doi-tac/thanh-toan",
   authenticate,
   checkPermission("payments", "create"),
-  async (req, res, next) => {
+    async (req, res, next) => {
     try {
+      const { ma_doi_tac, loai_cong_no, so_tien, ma_kho } = req.body;
+      if (!ma_doi_tac || !loai_cong_no || !so_tien || !ma_kho) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Thiếu thông tin thanh toán: Đối tác, Loại công nợ, Số tiền hoặc Kho",
+        });
+      }
+
       const result = await congNoService.thanhToanDoiTac(req.body, req.user.id);
       sendSuccess(res, result, "Tạo lệnh thanh toán đối tác thành công");
     } catch (error) {

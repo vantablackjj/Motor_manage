@@ -6,6 +6,7 @@ class KhoController {
   async getAll(req, res, next) {
     try {
       const filters = {
+        ma_kho: req.query.ma_kho, // For isolation filtering
         chinh:
           req.query.chinh === "true"
             ? true

@@ -15,6 +15,7 @@ class ChuyenKhoService {
       ma_kho_xuat,
       ma_kho_nhap,
       nguoi_tao,
+      created_by,
       dien_giai,
     } = data;
 
@@ -33,10 +34,11 @@ class ChuyenKhoService {
         loai_ben_nhap,
         loai_don_hang,
         trang_thai,
+        nguoi_tao,
         created_by,
         ghi_chu
       )
-      VALUES ($1,$2,$3,'KHO',$4,'KHO','CHUYEN_KHO',$5,$6,$7)
+      VALUES ($1,$2,$3,'KHO',$4,'KHO','CHUYEN_KHO',$5,$6,$7,$8)
       RETURNING *, so_don_hang as so_phieu
       `,
       [
@@ -46,6 +48,7 @@ class ChuyenKhoService {
         ma_kho_nhap,
         "NHAP",
         nguoi_tao,
+        created_by,
         dien_giai,
       ],
     );
@@ -153,6 +156,8 @@ class ChuyenKhoService {
         UPDATE tm_hang_hoa_serial
         SET trang_thai = 'DANG_CHUYEN',
             locked = TRUE,
+            locked_reason = 'Đang chuyển theo phiếu: ' || $1,
+            locked_at = NOW(),
             ghi_chu = COALESCE(ghi_chu, '') || E'\nĐang chuyển theo phiếu: ' || $1
         WHERE ma_serial = $2
         `,
@@ -365,7 +370,7 @@ class ChuyenKhoService {
 
       const phieuRes = await client.query(
         `
-        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai
+        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai, created_by
         FROM tm_don_hang
         WHERE so_don_hang = $1
         FOR UPDATE
@@ -433,7 +438,7 @@ class ChuyenKhoService {
       /* 1. Kiểm tra phiếu */
       const phieuRes = await client.query(
         `
-        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai
+        SELECT so_don_hang, ma_ben_xuat as ma_kho_xuat, ma_ben_nhap as ma_kho_nhap, trang_thai, created_by
         FROM tm_don_hang
         WHERE so_don_hang = $1
         FOR UPDATE
@@ -668,10 +673,17 @@ class ChuyenKhoService {
   }
 
   async getDanhSach(filters = {}) {
-    const { trang_thai, ma_kho_xuat, ma_kho_nhap, tu_ngay, den_ngay } = filters;
+    const { ma_kho, trang_thai, ma_kho_xuat, ma_kho_nhap, tu_ngay, den_ngay } = filters;
     const conditions = ["h.loai_don_hang::text = 'CHUYEN_KHO'"];
     const values = [];
     let idx = 1;
+
+    // ma_kho is used for automatic isolation (either side of the transfer)
+    if (ma_kho) {
+      conditions.push(`(h.ma_ben_xuat = $${idx} OR h.ma_ben_nhap = $${idx})`);
+      values.push(ma_kho);
+      idx++;
+    }
 
     if (trang_thai) {
       conditions.push(`h.trang_thai::text = $${idx++}`);

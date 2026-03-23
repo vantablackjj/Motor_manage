@@ -154,7 +154,8 @@ router.post(
       const data = {
         ...req.body,
         so_phieu: req.body.ma_phieu,
-        nguoi_tao: req.user.id,
+        nguoi_tao: req.user.username || req.user.ho_ten || String(req.user.id),
+        created_by: req.user.id,
       };
 
       const result = await chuyenKhoService.taoPhieu(data);

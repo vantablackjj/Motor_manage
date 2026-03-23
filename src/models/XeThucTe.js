@@ -6,7 +6,7 @@ class Xe {
     const result = await query(
       `SELECT 
         x.ma_serial as xe_key, x.serial_identifier as so_khung, x.ma_hang_hoa as ma_loai_xe,
-        x.ma_kho_hien_tai, x.trang_thai, x.locked, x.locked_reason,
+        x.ma_kho_hien_tai, x.trang_thai, x.locked, x.locked_reason, x.locked_at,
         x.ngay_nhap_kho as ngay_nhap, x.ghi_chu,
         hh.ten_hang_hoa as ten_loai, (x.thuoc_tinh_rieng->>'ten_mau') as ten_mau,
         k.ten_kho
@@ -76,7 +76,10 @@ class Xe {
   static async lock(xe_key, ma_phieu, ly_do) {
     const result = await query(
       `UPDATE tm_hang_hoa_serial
-       SET locked = TRUE, ghi_chu = COALESCE(ghi_chu, '') || E'\nLocked by ' || $1 || ': ' || $2,
+       SET locked = TRUE, 
+           locked_reason = $2, 
+           locked_at = CURRENT_TIMESTAMP,
+           ghi_chu = COALESCE(ghi_chu, '') || E'\nLocked by ' || $1 || ': ' || $2,
            updated_at = CURRENT_TIMESTAMP
        WHERE ma_serial = $3 AND locked = FALSE AND trang_thai = 'TON_KHO'
        RETURNING *`,

@@ -180,7 +180,10 @@ class HoaDonBanService {
       // Khóa xe
       await client.query(
         `UPDATE tm_hang_hoa_serial
-         SET locked = TRUE, ghi_chu = COALESCE(ghi_chu, '') || E'\nKhóa theo HD: ' || $1
+         SET locked = TRUE, 
+             locked_reason = 'Khóa theo HD: ' || $1,
+             locked_at = NOW(),
+             ghi_chu = COALESCE(ghi_chu, '') || E'\nKhóa theo HD: ' || $1
          WHERE ma_serial = $2`,
         [so_hd, xe_key],
       );
@@ -475,6 +478,11 @@ class HoaDonBanService {
 
     if (filters.ma_kho_xuat) {
       params.push(filters.ma_kho_xuat);
+      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+    }
+
+    if (filters.ma_kho) {
+      params.push(filters.ma_kho);
       sql += ` AND h.ma_ben_xuat = $${params.length}`;
     }
 

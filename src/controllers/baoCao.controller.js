@@ -203,7 +203,13 @@ class BaoCaoController {
   // Dashboard & Charts
   async dashboard(req, res) {
     try {
-      const data = await baoCaoService.dashboard(req.query);
+      const userPermissions = {
+        hasMaintenance: req.user.authorities?.includes("maintenance.view"),
+        hasFinancial: req.user.authorities?.includes("reports.view_financial"),
+        isAdmin: req.user.vai_tro === "ADMIN"
+      };
+
+      const data = await baoCaoService.dashboard(req.query, userPermissions);
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });

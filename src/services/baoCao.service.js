@@ -213,10 +213,12 @@ class BaoCaoService {
       `;
     }
 
+    // 3. Thực thu (Tiền mặt/Chuyển khoản thực tế thu về)
+    // Chỉ tính phiếu THU đã DUYỆT (Dòng tiền thực)
     let sqlThucThu = `
       SELECT EXTRACT(MONTH FROM tc.ngay_giao_dich) as thang, SUM(tc.so_tien) as thuc_thu
       FROM tm_phieu_thu_chi tc
-      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai != 'DA_HUY'
+      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai = 'DA_DUYET'
       ${condPTC}
       GROUP BY thang
     `;
@@ -297,8 +299,7 @@ class BaoCaoService {
     const sqlThucThu = `
       SELECT tc.ma_kho, SUM(tc.so_tien) as thuc_thu
       FROM tm_phieu_thu_chi tc
-      LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai != 'DA_HUY'
+      WHERE tc.loai_phieu = 'THU' AND tc.trang_thai = 'DA_DUYET'
       ${condPTC}
       GROUP BY tc.ma_kho
     `;
@@ -1032,7 +1033,7 @@ class BaoCaoService {
         so_phieu_tc as so_phieu
       FROM tm_phieu_thu_chi tc
       LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE trang_thai != 'DA_HUY'
+      WHERE trang_thai = 'DA_DUYET'
     `;
     const params = [];
     if (tu_ngay) {
@@ -1066,7 +1067,7 @@ class BaoCaoService {
         SUM(CASE WHEN loai_phieu = 'CHI' THEN so_tien ELSE 0 END) as tong_chi
       FROM tm_phieu_thu_chi tc
       LEFT JOIN sys_kho k ON tc.ma_kho = k.ma_kho
-      WHERE 1=1
+      WHERE tc.trang_thai = 'DA_DUYET'
     `;
     const params = [];
     if (tu_ngay) {
@@ -1187,8 +1188,9 @@ class BaoCaoService {
   // DASHBOARD
   // ============================================================
 
-  async dashboard(filters = {}) {
+  async dashboard(filters = {}, permissions = {}) {
     const { ma_kho, tu_ngay } = filters;
+    const { hasMaintenance = true, hasFinancial = true, isAdmin = false } = permissions;
     const client = await pool.connect();
 
     try {
@@ -1268,12 +1270,11 @@ class BaoCaoService {
       };
 
       const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
-      const sqlStockXeFixing = `
-        SELECT COUNT(DISTINCT ma_serial) as total 
-        FROM tm_bao_tri 
-        WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')
-        ${ma_kho ? " AND ma_kho = $1" : ""}
-      `;
+      
+      // Hide maintenance operational details if no maintenance permission
+      const sqlStockXeFixing = (hasMaintenance || isAdmin)
+        ? `SELECT COUNT(DISTINCT ma_serial) as total FROM tm_bao_tri WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')${ma_kho ? " AND ma_kho = $1" : ""}`
+        : `SELECT 0 as total`;
       const sqlLowStockPT = `
         SELECT COUNT(*) as total 
         FROM tm_hang_hoa_ton_kho tk 
@@ -1398,8 +1399,8 @@ class BaoCaoService {
         WHERE h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
         ${ma_kho ? "AND (h.ma_ben_nhap = $1 OR h.ma_ben_xuat = $1)" : ""}
 
+        ${(hasMaintenance || isAdmin) ? `
         UNION ALL
-
         SELECT 
           b.ma_phieu as so_phieu,
           'DICH_VU_BAO_TRI'::varchar as loai_giao_dich,
@@ -1411,6 +1412,21 @@ class BaoCaoService {
         LEFT JOIN dm_doi_tac dt ON b.ma_doi_tac = dt.ma_doi_tac
         WHERE b.trang_thai = 'HOAN_THANH'
         ${ma_kho ? "AND b.ma_kho = $1" : ""}
+        ` : ""}
+
+        UNION ALL
+
+        SELECT 
+          tc.so_phieu_tc as so_phieu,
+          (CASE WHEN tc.loai_phieu = 'THU' THEN 'PHIEU_THU' ELSE 'PHIEU_CHI' END)::varchar as loai_giao_dich,
+          tc.so_tien as tong_tien,
+          tc.ngay_giao_dich as ngay_lap,
+          tc.noi_dung as dien_giai,
+          dt.ten_doi_tac
+        FROM tm_phieu_thu_chi tc
+        LEFT JOIN dm_doi_tac dt ON tc.ma_doi_tac = dt.ma_doi_tac
+        WHERE tc.trang_thai = 'DA_DUYET'
+        ${ma_kho ? "AND tc.ma_kho = $1" : ""}
       ) as combined
       ORDER BY ngay_lap DESC
       LIMIT 10

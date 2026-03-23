@@ -6,7 +6,7 @@ class Xe {
     let sql = `
       SELECT 
         x.ma_serial as xe_key, x.ma_hang_hoa as ma_loai_xe, x.serial_identifier as so_khung,
-        x.trang_thai, x.locked, x.locked_reason, x.ngay_nhap_kho as ngay_nhap,
+        x.trang_thai, x.locked, x.locked_reason, x.locked_at, x.ngay_nhap_kho as ngay_nhap,
         hh.ten_hang_hoa as ten_loai, m.ten_mau,
         k.ten_kho, (x.thuoc_tinh_rieng->>'so_may') as so_may,
         x.gia_von as gia_nhap
@@ -70,10 +70,12 @@ class Xe {
 
   // Lấy xe theo xe_key
   static async getByXeKey(xe_key) {
+    if (!xe_key || xe_key === "null") return null;
+
     const result = await query(
       `SELECT 
         x.ma_serial as xe_key, x.serial_identifier as so_khung, x.ma_hang_hoa as ma_loai_xe,
-        x.ma_kho_hien_tai, x.trang_thai, x.locked, x.locked_reason,
+        x.ma_kho_hien_tai, x.trang_thai, x.locked, x.locked_reason, x.locked_at,
         x.ngay_nhap_kho as ngay_nhap, x.ghi_chu,
         hh.ten_hang_hoa as ten_loai, m.ten_mau,
         k.ten_kho, (x.thuoc_tinh_rieng->>'so_may') as so_may
@@ -81,7 +83,9 @@ class Xe {
       INNER JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN sys_kho k ON x.ma_kho_hien_tai = k.ma_kho
       LEFT JOIN dm_mau m ON (x.thuoc_tinh_rieng->>'ma_mau') = m.ma_mau
-      WHERE x.ma_serial = $1`,
+      WHERE x.ma_serial = $1 
+         OR x.serial_identifier = $1 
+         OR (x.thuoc_tinh_rieng->>'so_may') = $1`,
       [xe_key],
     );
     return result.rows[0];
@@ -225,7 +229,7 @@ class Xe {
   static async lock(xe_key, ma_phieu, ly_do) {
     const result = await query(
       `UPDATE tm_hang_hoa_serial
-       SET locked = TRUE, locked_reason = $1, updated_at = CURRENT_TIMESTAMP
+       SET locked = TRUE, locked_reason = $1, locked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE ma_serial = $2 AND locked = FALSE AND trang_thai = 'TON_KHO'
        RETURNING *`,
       [ly_do, xe_key],

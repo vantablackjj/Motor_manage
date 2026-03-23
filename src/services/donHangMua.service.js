@@ -22,6 +22,7 @@ class DonHangMuaService {
       ma_kho_nhap,
       ma_ncc,
       nguoi_tao,
+      created_by,
       dien_giai,
       chiet_khau,
       vat_percentage,
@@ -40,8 +41,8 @@ class DonHangMuaService {
           so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
           ma_ben_xuat, loai_ben_xuat, loai_don_hang,
           tong_gia_tri, chiet_khau, vat_percentage, thanh_tien,
-          trang_thai, ghi_chu
-        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'MUA_HANG', 0, $5, $6, 0, $7, $8)
+          trang_thai, ghi_chu, nguoi_tao, created_by
+        ) VALUES ($1, $2, $3, 'KHO', $4, 'DOI_TAC', 'MUA_HANG', 0, $5, $6, 0, $7, $8, $9, $10)
         RETURNING *`,
         [
           so_phieu,
@@ -52,6 +53,8 @@ class DonHangMuaService {
           vat,
           TRANG_THAI.NHAP,
           dien_giai,
+          nguoi_tao,
+          created_by,
         ],
       );
 
@@ -141,10 +144,12 @@ class DonHangMuaService {
   async guiDuyet(ma_phieu, nguoi_gui) {
     const result = await pool.query(
       `UPDATE tm_don_hang
-       SET trang_thai = $2
+       SET trang_thai = $2,
+           nguoi_gui = $4,
+           ngay_gui = CURRENT_TIMESTAMP
        WHERE (so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)) 
          AND trang_thai = $3`,
-      [ma_phieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP],
+      [ma_phieu, TRANG_THAI.GUI_DUYET, TRANG_THAI.NHAP, nguoi_gui],
     );
 
     if (result.rowCount === 0) {
@@ -180,6 +185,10 @@ class DonHangMuaService {
       [ma_phieu, nguoi_duyet, TRANG_THAI.DA_DUYET, TRANG_THAI.GUI_DUYET],
     );
 
+    if (result.rowCount === 0) {
+      throw new Error("Phiếu không ở trạng thái chờ duyệt hoặc không tồn tại");
+    }
+
     const don = result.rows[0];
 
     // Notify the person who submitted
@@ -197,7 +206,53 @@ class DonHangMuaService {
       ).catch((err) => console.error("Notification Error:", err));
     }
 
-    return { success: true, message: "Đã duyệt đơn hàng thành công" };
+    return { 
+      success: true, 
+      message: "Đã duyệt đơn hàng thành công",
+      data: don
+    };
+  }
+
+  // Từ chối duyệt
+  async tuChoiDonHang(maPhieu, nguoiDuyet, lyDo) {
+    const result = await pool.query(
+      `UPDATE tm_don_hang
+       SET trang_thai = $3, 
+           nguoi_duyet = $2,
+           ngay_duyet = CURRENT_TIMESTAMP,
+           ghi_chu = COALESCE(ghi_chu, '') || ' | Lý do từ chối: ' || $4
+       WHERE (so_don_hang = $1 OR (CASE WHEN $1 ~ '^\\d+$' THEN id = $1::int ELSE FALSE END)) 
+         AND trang_thai = $5
+       RETURNING *`,
+      [maPhieu, nguoiDuyet, TRANG_THAI.DA_HUY, lyDo, TRANG_THAI.GUI_DUYET],
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error("Phiếu không ở trạng thái chờ duyệt hoặc không tồn tại");
+    }
+
+    const don = result.rows[0];
+
+    // Notify the person who submitted
+    if (don.nguoi_gui) {
+      const ten_quan_ly = await pool
+        .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoiDuyet])
+        .then((r) => r.rows[0]?.ho_ten || "Quản lý");
+
+      NotificationService.notifyUser(
+        don.nguoi_gui,
+        "Đơn mua hàng bị từ chối",
+        `Đơn hàng ${don.so_don_hang} của bạn đã bị từ chối bởi ${ten_quan_ly}. Lý do: ${lyDo}`,
+        `/purchase/parts/${don.so_don_hang}`,
+        "APPROVAL",
+      ).catch((err) => console.error("Notification Error:", err));
+    }
+
+    return { 
+      success: true, 
+      message: "Đã từ chối đơn hàng thành công",
+      data: don 
+    };
   }
 
   // Nhập kho (Partial Receiving)
@@ -458,6 +513,11 @@ class DonHangMuaService {
       sql += ` AND d.ma_ben_nhap = $${params.length}`;
     }
 
+    if (filters.ma_kho) {
+      params.push(filters.ma_kho);
+      sql += ` AND d.ma_ben_nhap = $${params.length}`;
+    }
+
     sql += " ORDER BY d.ngay_dat_hang DESC, d.so_don_hang DESC";
 
     const result = await pool.query(sql, params);
@@ -519,7 +579,7 @@ class DonHangMuaService {
         nguoi_lap as nguoi_nhap
        FROM tm_hoa_don 
        WHERE so_don_hang = $1 AND loai_hoa_don = 'MUA_HANG'
-       ORDER BY created_at DESC`,
+       ORDER BY ngay_lap DESC`,
       [soPhieu],
     );
 

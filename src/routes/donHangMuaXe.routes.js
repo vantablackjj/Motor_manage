@@ -210,7 +210,9 @@ router.get(
           ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
           tong_tien: Number(order.tong_tien || 0),
           chiet_khau: Number(order.chiet_khau || 0),
-          vat: (Number(order.tong_tien || 0) - Number(order.chiet_khau || 0)) * (Number(order.vat_percentage || 0) / 100),
+          vat:
+            (Number(order.tong_tien || 0) - Number(order.chiet_khau || 0)) *
+            (Number(order.vat_percentage || 0) / 100),
           thanh_toan: Number(order.thanh_tien || 0),
           ghi_chu: order.ghi_chu,
           trang_thai: order.trang_thai,

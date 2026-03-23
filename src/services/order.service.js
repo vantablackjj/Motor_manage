@@ -104,8 +104,8 @@ class OrderService {
           so_don_hang, loai_don_hang, ngay_dat_hang,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
           tong_gia_tri, chiet_khau, vat_percentage, thanh_tien,
-          trang_thai, nguoi_tao, ghi_chu
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'NHAP', $12, $13)
+          trang_thai, nguoi_tao, created_by, ghi_chu
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'NHAP', $12, $13, $14)
         RETURNING *
       `,
         [
@@ -122,7 +122,8 @@ class OrderService {
           tong_gia_tri -
             (data.chiet_khau || 0) +
             (tong_gia_tri * (data.vat_percentage || 0)) / 100,
-          nguoi_tao,
+          data.nguoi_tao,
+          data.created_by,
           ghi_chu,
         ],
       );
@@ -173,7 +174,7 @@ class OrderService {
       // Fetch creator name for notification
       const userRes = await client.query(
         "SELECT ho_ten FROM sys_user WHERE id = $1",
-        [nguoi_tao],
+        [data.created_by],
       );
       const ten_nguoi_tao = userRes.rows[0]?.ho_ten || nguoi_tao;
 
@@ -409,7 +410,8 @@ class OrderService {
         INSERT INTO tm_hoa_don (
           so_hoa_don, loai_hoa_don, so_don_hang, ngay_hoa_don,
           ma_ben_xuat, loai_ben_xuat, ma_ben_nhap, loai_ben_nhap,
-          tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, trang_thai, nguoi_lap, ghi_chu
+          tong_tien, chiet_khau, tien_thue_gtgt, thanh_tien, trang_thai, 
+          nguoi_lap, ghi_chu
         ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, $9, $10, $11, 'DA_GIAO', $12, $13)
       `,
         [
@@ -758,7 +760,7 @@ class OrderService {
       LEFT JOIN dm_doi_tac dx ON d.ma_ben_xuat = dx.ma_doi_tac AND d.loai_ben_xuat = 'DOI_TAC'
       LEFT JOIN sys_kho kn ON d.ma_ben_nhap = kn.ma_kho AND d.loai_ben_nhap = 'KHO'
       LEFT JOIN dm_doi_tac dn ON d.ma_ben_nhap = dn.ma_doi_tac AND d.loai_ben_nhap = 'DOI_TAC'
-      LEFT JOIN sys_user u ON d.nguoi_tao::text = u.id::text
+      LEFT JOIN sys_user u ON d.created_by = u.id
       ${whereClause} 
       ORDER BY d.created_at DESC 
       LIMIT $${idx++} OFFSET $${idx++}
@@ -796,7 +798,7 @@ class OrderService {
        LEFT JOIN dm_doi_tac dx ON d.ma_ben_xuat = dx.ma_doi_tac AND d.loai_ben_xuat = 'DOI_TAC'
        LEFT JOIN sys_kho kn ON d.ma_ben_nhap = kn.ma_kho AND d.loai_ben_nhap = 'KHO'
        LEFT JOIN dm_doi_tac dn ON d.ma_ben_nhap = dn.ma_doi_tac AND d.loai_ben_nhap = 'DOI_TAC'
-       LEFT JOIN sys_user u ON d.nguoi_tao::text = u.id::text
+       LEFT JOIN sys_user u ON d.created_by = u.id
        WHERE d.so_don_hang = $1 
        OR (CASE WHEN $1::text ~ '^\\d+$' THEN d.id = $1::text::int ELSE FALSE END)`,
       [idOrNo],

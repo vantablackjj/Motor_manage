@@ -116,7 +116,7 @@ class DonHangMuaXeService {
    * 1. Tạo đơn mua (HEADER)
    * ========================= */
 
-  async createDonHang(data, userId) {
+  async createDonHang(data, userId, userName) {
     this._validateCreateHeader(data);
 
     return withTransaction(pool, async (client) => {
@@ -136,11 +136,11 @@ class DonHangMuaXeService {
         INSERT INTO tm_don_hang (
           so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
           ma_ben_xuat, loai_ben_xuat, tong_gia_tri, chiet_khau,
-          vat_percentage, thanh_tien, trang_thai, nguoi_tao, loai_don_hang, ghi_chu, created_at
+          vat_percentage, thanh_tien, trang_thai, nguoi_tao, created_by, loai_don_hang, ghi_chu, created_at
         ) VALUES (
           $1, COALESCE($9::date, CURRENT_DATE), $2, 'KHO',
           $3, 'DOI_TAC', $4, $5,
-          $6, $7, $8, $10, 'MUA_XE', $11, NOW()
+          $6, $7, $8, $10, $12, 'MUA_XE', $11, NOW()
         )
         RETURNING *
         `,
@@ -154,8 +154,9 @@ class DonHangMuaXeService {
           thanhTien, // $7
           TRANG_THAI.NHAP, // $8
           data.ngay_dat_hang || null, // $9
-          String(userId), // $10
+          userName, // $10 - nguoi_tao (Name)
           data.ghi_chu || null, // $11
+          userId, // $12 - created_by (ID)
         ],
       );
 
@@ -167,7 +168,7 @@ class DonHangMuaXeService {
    * 1.1 Tạo đơn mua KÈM CHI TIẾT (ATOMIC)
    * ========================= */
 
-  async createDonHangWithDetails(data, userId) {
+  async createDonHangWithDetails(data, userId, userName) {
     this._validateCreateHeader(data);
 
     if (
@@ -208,12 +209,12 @@ class DonHangMuaXeService {
         `INSERT INTO tm_don_hang (
           so_don_hang, ngay_dat_hang, ma_ben_nhap, loai_ben_nhap,
           ma_ben_xuat, loai_ben_xuat, tong_gia_tri, chiet_khau,
-          vat_percentage, thanh_tien, trang_thai, nguoi_tao,
+          vat_percentage, thanh_tien, trang_thai, nguoi_tao, created_by,
           loai_don_hang, ghi_chu, created_at
         ) VALUES (
           $1, COALESCE($9::date, CURRENT_DATE), $2, 'KHO',
           $3, 'DOI_TAC', $4, $5,
-          $6, $7, $8, $10,
+          $6, $7, $8, $10, $12,
           'MUA_XE', $11, NOW()
         )
         RETURNING *`,
@@ -227,8 +228,9 @@ class DonHangMuaXeService {
           thanhTien, // $7  thanh_tien
           TRANG_THAI.NHAP, // $8  trang_thai
           data.ngay_dat_hang || null, // $9  ngay_dat_hang (optional)
-          String(userId), // $10 nguoi_tao
+          userName, // $10 - nguoi_tao (Name)
           data.ghi_chu || null, // $11 ghi_chu
+          userId, // $12 - created_by (ID)
         ],
       );
 
@@ -442,9 +444,9 @@ class DonHangMuaXeService {
     }
 
     const order = result.rows[0];
-    if (order.nguoi_tao && !isNaN(order.nguoi_tao)) {
+    if (order.created_by) {
       NotificationService.notifyUser(
-        parseInt(order.nguoi_tao),
+        parseInt(order.created_by),
         "Đơn mua xe đã được duyệt",
         `Đơn ${soPhieu} đã được duyệt. Bạn có thể thực hiện nhập kho.`,
         `/purchase/vehicles/${soPhieu}`,
@@ -479,9 +481,9 @@ class DonHangMuaXeService {
     }
 
     const order = result.rows[0];
-    if (order.nguoi_tao && !isNaN(order.nguoi_tao)) {
+    if (order.created_by) {
       NotificationService.notifyUser(
-        parseInt(order.nguoi_tao),
+        parseInt(order.created_by),
         "Đơn mua xe bị từ chối",
         `Đơn ${soPhieu} đã bị từ chối. Lý do: ${lyDo}`,
         `/purchase/vehicles/${soPhieu}`,
@@ -546,9 +548,9 @@ class DonHangMuaXeService {
       FROM tm_don_hang h
       LEFT JOIN sys_kho k ON h.ma_ben_nhap = k.ma_kho
       LEFT JOIN dm_doi_tac dt ON h.ma_ben_xuat = dt.ma_doi_tac
-      LEFT JOIN sys_user u_tao ON (CASE WHEN h.nguoi_tao ~ '^[0-9]+$' THEN h.nguoi_tao::integer ELSE NULL END) = u_tao.id
-      LEFT JOIN sys_user u_gui ON (CASE WHEN h.nguoi_gui ~ '^[0-9]+$' THEN h.nguoi_gui::integer ELSE NULL END) = u_gui.id
-      LEFT JOIN sys_user u_duyet ON (CASE WHEN h.nguoi_duyet ~ '^[0-9]+$' THEN h.nguoi_duyet::integer ELSE NULL END) = u_duyet.id
+      LEFT JOIN sys_user u_tao ON h.created_by = u_tao.id
+      LEFT JOIN sys_user u_gui ON h.nguoi_gui = u_gui.id
+      LEFT JOIN sys_user u_duyet ON h.nguoi_duyet = u_duyet.id
       WHERE h.so_don_hang = $1 
          OR (CASE WHEN $1 ~ '^\\d+$' THEN h.id = $1::int ELSE FALSE END)
       `,
@@ -634,7 +636,7 @@ class DonHangMuaXeService {
         nguoi_lap as nguoi_nhap
        FROM tm_hoa_don 
        WHERE so_don_hang = $1 AND loai_hoa_don = 'MUA_HANG'
-       ORDER BY created_at DESC`,
+       ORDER BY ngay_lap DESC`,
       [soPhieuDB],
     );
 
@@ -671,6 +673,11 @@ class DonHangMuaXeService {
     if (ma_kho_nhap) {
       conditions.push(`ma_ben_nhap = $${idx++}`);
       values.push(ma_kho_nhap);
+    }
+
+    if (filters.ma_kho) {
+      conditions.push(`ma_ben_nhap = $${idx++}`);
+      values.push(filters.ma_kho);
     }
 
     if (tu_ngay) {

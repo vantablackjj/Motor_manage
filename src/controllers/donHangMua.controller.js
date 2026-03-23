@@ -41,7 +41,8 @@ class DonHangMuaController {
     try {
       const data = {
         ...req.body,
-        nguoi_tao: req.user.id,
+        nguoi_tao: req.user.username || req.user.ho_ten || String(req.user.id),
+        created_by: req.user.id,
       };
 
       const result = await donHangMuaService.taoDonHang(data);
@@ -216,7 +217,9 @@ class DonHangMuaController {
           ten_nguoi_tao: order.ten_nguoi_tao || order.nguoi_tao,
           tong_tien: Number(order.tong_gia_tri || 0),
           chiet_khau: Number(order.chiet_khau || 0),
-          vat: (Number(order.tong_gia_tri || 0) - Number(order.chiet_khau || 0)) * (Number(order.vat_percentage || 0) / 100),
+          vat:
+            (Number(order.tong_gia_tri || 0) - Number(order.chiet_khau || 0)) *
+            (Number(order.vat_percentage || 0) / 100),
           thanh_toan: Number(order.thanh_tien || 0),
           ghi_chu: order.ghi_chu || order.dien_giai,
           trang_thai: order.trang_thai,

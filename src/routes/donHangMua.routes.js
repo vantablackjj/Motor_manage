@@ -51,7 +51,21 @@ router.post(
 );
 
 router.post(
+  "/:ma_phieu/submit",
+  authenticate,
+  checkPermission("purchase_orders", "create"),
+  donHangMuaController.guiDuyet,
+);
+
+router.post(
   "/:ma_phieu/phe-duyet",
+  authenticate,
+  checkPermission("purchase_orders", "approve"),
+  donHangMuaController.pheDuyet,
+);
+
+router.post(
+  "/:ma_phieu/approve",
   authenticate,
   checkPermission("purchase_orders", "approve"),
   donHangMuaController.pheDuyet,
@@ -66,6 +80,13 @@ router.post(
 
 router.post(
   "/:ma_phieu/huy-duyet",
+  authenticate,
+  checkPermission("purchase_orders", "approve"),
+  donHangMuaController.huyDuyet,
+);
+
+router.post(
+  "/:ma_phieu/reject",
   authenticate,
   checkPermission("purchase_orders", "approve"),
   donHangMuaController.huyDuyet,

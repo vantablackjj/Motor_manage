@@ -40,16 +40,17 @@ class ThuChiService {
       const result = await client.query(
         `
         INSERT INTO tm_phieu_thu_chi (
-          so_phieu_tc, created_by, ngay_giao_dich,
+          so_phieu_tc, created_by, nguoi_lap, ngay_giao_dich,
           ma_kho, ma_doi_tac, so_tien, loai_phieu,
           hinh_thuc, noi_dung, trang_thai, ma_hoa_don
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12)
         RETURNING *
       `,
         [
           so_phieu,
-          nguoi_tao,
+          data.created_by,
+          data.nguoi_tao, // This is Name from routes
           ngay_giao_dich,
           ma_kho,
           ma_kh,

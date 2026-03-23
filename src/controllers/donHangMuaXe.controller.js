@@ -31,8 +31,12 @@ class DonHangMuaXeController {
    */
   async create(req, res, next) {
     try {
-      const userId = req.user.id;
-      const data = await DonHangMuaXeService.createDonHang(req.body, userId);
+      const { id, username, ho_ten } = req.user;
+      const data = await DonHangMuaXeService.createDonHang(
+        req.body,
+        id,
+        username || ho_ten,
+      );
 
       sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);
     } catch (err) {
@@ -45,10 +49,11 @@ class DonHangMuaXeController {
    */
   async createWithDetails(req, res, next) {
     try {
-      const userId = req.user.id;
+      const { id, username, ho_ten } = req.user;
       const data = await DonHangMuaXeService.createDonHangWithDetails(
         req.body,
-        userId,
+        id,
+        username || ho_ten,
       );
 
       sendSuccess(res, data, "Tạo đơn mua xe thành công", 201);

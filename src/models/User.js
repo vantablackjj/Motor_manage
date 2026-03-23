@@ -446,21 +446,73 @@ class User {
       // Lọc bỏ các giá trị null/undefined/empty
       authArray = authArray.filter(a => a && typeof a === 'string');
 
-      if (authArray.length > 0) {
-        // Tìm IDs dựa trên ma_authority
+      // 3. Normalized Sync Logic: Treat paired groups (legacy/modern) as one conceptual group.
+      const groupPairs = [
+        { modern: 'sales_orders', legacy: 'don_hang_ban_xe' },
+        { modern: 'purchase_orders', legacy: 'don_hang_mua_xe' }
+      ];
+
+      // Map actions per group
+      const inputGroups = {}; // group -> Set(actions)
+      authArray.forEach(a => {
+        const [group, action] = a.split('.');
+        if (!inputGroups[group]) inputGroups[group] = new Set();
+        inputGroups[group].add(action);
+      });
+
+      const finalAuthList = new Set();
+
+      // Track which pairs we handled
+      const handledPairs = new Set();
+
+      // Process pairs with sync/parity logic
+      groupPairs.forEach(({ modern, legacy }) => {
+        const modernSet = inputGroups[modern];
+        const legacySet = inputGroups[legacy];
+
+        if (modernSet || legacySet) {
+          handledPairs.add(modern);
+          handledPairs.add(legacy);
+
+          let actions = null;
+          if (modernSet && legacySet) {
+            // INTERSECTION: If both are present in input, action must be in BOTH to survive.
+            // This is crucial for removal: if user unchecks ONE of the paired UI items, 
+            // the state is removed from both DB counterparts.
+            actions = new Set([...modernSet].filter(a => legacySet.has(a)));
+          } else if (modernSet) {
+            // If only modern sent, it's the source of truth
+            actions = modernSet;
+          } else {
+            // Fallback to legacy
+            actions = legacySet;
+          }
+
+          if (actions && actions.size > 0) {
+            actions.forEach(action => {
+              finalAuthList.add(`${modern}.${action}`);
+              finalAuthList.add(`${legacy}.${action}`);
+            });
+          }
+        }
+      });
+
+      // Process all other (non-paired) groups
+      Object.keys(inputGroups).forEach(group => {
+        if (!handledPairs.has(group)) {
+          inputGroups[group].forEach(action => {
+            finalAuthList.add(`${group}.${action}`);
+          });
+        }
+      });
+
+      const authList = Array.from(finalAuthList);
+
+      if (authList.length > 0) {
+        // Find valid authority IDs in DB
         const authIdsRes = await client.query(
-          `SELECT id FROM sys_authority 
-           WHERE ma_authority = ANY($1)
-              OR ma_authority IN (
-                SELECT 'don_hang_ban_xe.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'sales_orders.%'
-                UNION ALL
-                SELECT 'sales_orders.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'don_hang_ban_xe.%'
-                UNION ALL
-                SELECT 'don_hang_mua_xe.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'purchase_orders.%'
-                UNION ALL
-                SELECT 'purchase_orders.' || split_part(u, '.', 2) FROM unnest($1::text[]) u WHERE u LIKE 'don_hang_mua_xe.%'
-              )`,
-          [authArray]
+          "SELECT id FROM sys_authority WHERE ma_authority = ANY($1)",
+          [authList]
         );
         
         if (authIdsRes.rows.length > 0) {
@@ -512,31 +564,31 @@ class User {
         permissions[group][action] = hasAuth.has(auth.ma_authority);
       });
 
-      // 4. Xử lý đồng bộ các group trùng lặp (ví dụ don_hang_ban_xe <-> sales_orders)
-      const groupMappings = {
-        don_hang_ban_xe: "sales_orders",
-        sales_orders: "don_hang_ban_xe",
-        don_hang_mua_xe: "purchase_orders",
-        purchase_orders: "don_hang_mua_xe",
-        inventory: "inventory", // just in case
-      };
+      // 4. Force strict parity between legacy and modern counterparts
+      const groupPairs = [
+        { modern: 'sales_orders', legacy: 'don_hang_ban_xe' },
+        { modern: 'purchase_orders', legacy: 'don_hang_mua_xe' }
+      ];
 
-      for (const src in groupMappings) {
-        const dest = groupMappings[src];
-        if (permissions[src] && !permissions[dest]) {
-          permissions[dest] = { ...permissions[src] };
-        } else if (permissions[src] && permissions[dest]) {
-          // Merge both, if any is true, both are true
-          for (const action in permissions[src]) {
-            if (permissions[src][action]) permissions[dest][action] = true;
-          }
-          for (const action in permissions[dest]) {
-            if (permissions[dest][action]) permissions[src][action] = true;
-          }
+      groupPairs.forEach(({ modern, legacy }) => {
+        if (permissions[modern] || permissions[legacy]) {
+          const mod = permissions[modern] || {};
+          const leg = permissions[legacy] || {};
+          
+          // Use modern as master if any modern key was found, else legacy
+          const master = permissions[modern] ? mod : leg;
+          
+          // Re-populate both to be identical based on master
+          permissions[modern] = { ...master };
+          permissions[legacy] = { ...master };
+
+          // Also merge keys if they differ (in case of missing aliases in sys_authority)
+          Object.keys(mod).forEach(k => { if (master[k] !== undefined) leg[k] = master[k]; });
+          Object.keys(leg).forEach(k => { if (master[k] !== undefined) mod[k] = master[k]; });
         }
-      }
+      });
 
-      // 5. Cập nhật vào DB
+      // 5. Update DB
       await db.query("UPDATE sys_role SET permissions = $1 WHERE id = $2", [
         JSON.stringify(permissions),
         role_id,

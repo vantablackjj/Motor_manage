@@ -24,6 +24,11 @@ class Kho {
       sql += ` AND daily = $${params.length}`;
     }
 
+    if (filters.ma_kho) {
+      params.push(filters.ma_kho);
+      sql += ` AND ma_kho = $${params.length}`;
+    }
+
     sql += " ORDER BY chinh DESC, daily DESC, ten_kho ASC";
 
     const result = await query(sql, params);
