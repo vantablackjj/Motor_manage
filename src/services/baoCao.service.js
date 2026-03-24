@@ -20,8 +20,8 @@ class BaoCaoService {
     `;
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND x.ma_kho_hien_tai = $${params.length}`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND x.ma_kho_hien_tai = ANY($${params.length}::text[])`;
     }
     if (ma_loai_xe) {
       params.push(ma_loai_xe);
@@ -53,8 +53,8 @@ class BaoCaoService {
     `;
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND tk.ma_kho = $${params.length}`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND tk.ma_kho = ANY($${params.length}::text[])`;
     }
     if (nhom_pt) {
       params.push(nhom_pt);
@@ -97,9 +97,10 @@ class BaoCaoService {
 
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sqlXe += ` AND x.ma_kho_hien_tai = $1`;
-      sqlPT += ` AND tk.ma_kho = $1`;
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sqlXe += ` AND x.ma_kho_hien_tai = ANY($${params.length}::text[])`;
+      sqlPT += ` AND tk.ma_kho = ANY($${params.length}::text[])`;
     }
 
     sqlXe += ` GROUP BY k.ten_kho`;
@@ -109,9 +110,23 @@ class BaoCaoService {
       pool.query(sqlXe, params),
       pool.query(sqlPT, params),
     ]);
+
+    // Calculate aggregated summary for convenience
+    const summary = {
+      xe: {
+        so_luong: xeRes.rows.reduce((a, b) => a + Number(b.so_luong || 0), 0),
+        gia_tri: xeRes.rows.reduce((a, b) => a + Number(b.gia_tri || 0), 0),
+      },
+      phu_tung: {
+        so_luong: ptRes.rows.reduce((a, b) => a + Number(b.so_luong || 0), 0),
+        gia_tri: ptRes.rows.reduce((a, b) => a + Number(b.gia_tri || 0), 0),
+      }
+    };
+
     return {
       xe: xeRes.rows,
       phu_tung: ptRes.rows,
+      summary
     };
   }
 
@@ -152,10 +167,11 @@ class BaoCaoService {
       paramIndex++;
     }
     if (ma_kho) {
-      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
-      condBT += ` AND b.ma_kho = $${paramIndex}`;
-      condPTC += ` AND tc.ma_kho = $${paramIndex}`;
-      params.push(ma_kho);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      condHD += ` AND h.ma_ben_xuat = ANY($${paramIndex}::text[])`;
+      condBT += ` AND b.ma_kho = ANY($${paramIndex}::text[])`;
+      condPTC += ` AND tc.ma_kho = ANY($${paramIndex}::text[])`;
+      params.push(ma_kho_arr);
       paramIndex++;
     }
 
@@ -270,10 +286,11 @@ class BaoCaoService {
       paramIndex++;
     }
     if (ma_kho) {
-      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
-      condBT += ` AND b.ma_kho = $${paramIndex}`;
-      condPTC += ` AND tc.ma_kho = $${paramIndex}`;
-      params.push(ma_kho);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      condHD += ` AND h.ma_ben_xuat = ANY($${paramIndex}::text[])`;
+      condBT += ` AND b.ma_kho = ANY($${paramIndex}::text[])`;
+      condPTC += ` AND tc.ma_kho = ANY($${paramIndex}::text[])`;
+      params.push(ma_kho_arr);
       paramIndex++;
     }
 
@@ -323,7 +340,7 @@ class BaoCaoService {
     resThucThu.rows.forEach((tRec) => {
       if (!resDoanhThu.rows.find((r) => r.ma_kho === tRec.ma_kho)) {
         result.push({
-          ten_kho: tRec.ten_kho || "Không xác định", // Would need another query or join directly, but it's optional
+          ten_kho: tRec.ten_kho || "Không xác định",
           so_luong_hd: 0,
           doanh_thu: 0,
           thuc_thu: Number(tRec.thuc_thu),
@@ -331,7 +348,16 @@ class BaoCaoService {
       }
     });
 
-    return result;
+    const summary = {
+      total_revenue: result.reduce((a, b) => a + b.doanh_thu, 0),
+      total_actual: result.reduce((a, b) => a + b.thuc_thu, 0),
+      total_orders: result.reduce((a, b) => a + b.so_luong_hd, 0)
+    };
+
+    return {
+      data: result,
+      summary
+    };
   }
 
   async doanhThuTheoSanPham(filters = {}) {
@@ -372,8 +398,8 @@ class BaoCaoService {
       sql += ` AND h.ngay_hoa_don < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length}::text[])`;
     }
 
     sql += ` GROUP BY san_pham ORDER BY doanh_thu DESC`;
@@ -407,10 +433,11 @@ class BaoCaoService {
     }
 
     if (ma_kho) {
-      condHD += ` AND ma_ben_xuat = $${paramIndex}`;
-      condBT += ` AND ma_kho = $${paramIndex}`;
-      condPTC += ` AND ma_kho = $${paramIndex}`;
-      params.push(ma_kho);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      condHD += ` AND ma_ben_xuat = ANY($${paramIndex}::text[])`;
+      condBT += ` AND ma_kho = ANY($${paramIndex}::text[])`;
+      condPTC += ` AND ma_kho = ANY($${paramIndex}::text[])`;
+      params.push(ma_kho_arr);
       paramIndex++;
     }
 
@@ -468,9 +495,10 @@ class BaoCaoService {
       paramIndex++;
     }
     if (ma_kho) {
-      condHD += ` AND h.ma_ben_xuat = $${paramIndex}`;
-      condBT += ` AND b.ma_kho = $${paramIndex}`;
-      params.push(ma_kho);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      condHD += ` AND h.ma_ben_xuat = ANY($${paramIndex}::text[])`;
+      condBT += ` AND b.ma_kho = ANY($${paramIndex}::text[])`;
+      params.push(ma_kho_arr);
       paramIndex++;
     }
 
@@ -551,8 +579,8 @@ class BaoCaoService {
       paramIndex++;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      cond += ` AND h.ma_ben_xuat = $${paramIndex}`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      cond += ` AND h.ma_ben_xuat = ANY($${paramIndex}::text[])`;
       paramIndex++;
     }
 
@@ -789,12 +817,12 @@ class BaoCaoService {
       sql += ` AND ck.ngay_dat_hang < ($${params.length}::date + 1)`;
     }
     if (ma_kho_xuat) {
-      params.push(ma_kho_xuat);
-      sql += ` AND ck.ma_ben_xuat = $${params.length}`;
+      params.push(Array.isArray(ma_kho_xuat) ? ma_kho_xuat : [ma_kho_xuat]);
+      sql += ` AND ck.ma_ben_xuat = ANY($${params.length}::text[])`;
     }
     if (ma_kho_nhap) {
-      params.push(ma_kho_nhap);
-      sql += ` AND ck.ma_ben_nhap = $${params.length}`;
+      params.push(Array.isArray(ma_kho_nhap) ? ma_kho_nhap : [ma_kho_nhap]);
+      sql += ` AND ck.ma_ben_nhap = ANY($${params.length}::text[])`;
     }
     sql += ` ORDER BY ck.ngay_dat_hang DESC`;
     const { rows } = await pool.query(sql, params);
@@ -828,8 +856,8 @@ class BaoCaoService {
       sql += ` AND ck.ngay_dat_hang < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND (ck.ma_ben_xuat = $${params.length} OR ck.ma_ben_nhap = $${params.length})`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND (ck.ma_ben_xuat = ANY($${params.length}::text[]) OR ck.ma_ben_nhap = ANY($${params.length}::text[]))`;
     }
     sql += ` ORDER BY ck.ngay_dat_hang DESC, ck.so_don_hang`;
     const { rows } = await pool.query(sql, params);
@@ -854,8 +882,8 @@ class BaoCaoService {
     `;
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND (cn.ma_kho_no = $${params.length} OR cn.ma_kho_co = $${params.length})`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND (cn.ma_kho_no = ANY($${params.length}::text[]) OR cn.ma_kho_co = ANY($${params.length}::text[]))`;
     }
     if (tu_ngay) {
       params.push(tu_ngay);
@@ -1045,8 +1073,8 @@ class BaoCaoService {
       sql += ` AND ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND tc.ma_kho = $${params.length}`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND tc.ma_kho = ANY($${params.length}::text[])`;
     }
     // Chỉ filter loai_phieu nếu loai là THU hoặc CHI (không phải XE/PHU_TUNG/DICH_VU)
     if (loai && (loai === "THU" || loai === "CHI")) {
@@ -1194,87 +1222,74 @@ class BaoCaoService {
     const client = await pool.connect();
 
     try {
-      // Set session timezone to ICT to ensure date casts work correctly for local time
-      // Using shared client ensures this applies to ALL subsequent queries in this method
       await client.query("SET TIME ZONE 'Asia/Ho_Chi_Minh'");
 
-      // Get range in ICT
       const nowICT = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
       const realToday = nowICT.toISOString().split("T")[0];
 
       const tuNgay = tu_ngay || realToday.substring(0, 8) + "01";
       const denNgay = filters.den_ngay || realToday;
-      const todayRef = denNgay; // Compare daily stats against the end of the range
+      const todayRef = denNgay;
 
-      console.log(
-        `DASHBOARD RANGE: ${tuNgay} to ${denNgay} (Ref: ${todayRef})`,
-      );
+      console.log(`DASHBOARD RANGE: ${tuNgay} to ${denNgay} (Ref: ${todayRef})`);
 
-      const whereKho = ma_kho ? ` AND ma_ben_xuat = $2` : "";
-      const whereKhoHienTai = ma_kho ? ` AND ma_kho_hien_tai = $1` : "";
-      const whereKhoPT = ma_kho ? ` AND tk.ma_kho = $1` : "";
-      const whereKhoBT = ma_kho ? ` AND ma_kho = $2` : "";
-      const whereKhoTC = ma_kho ? ` AND ma_kho = $2` : "";
+      const ma_kho_arr = ma_kho ? (Array.isArray(ma_kho) ? ma_kho : [ma_kho]) : null;
+      const warehouseVal = ma_kho_arr;
 
-      // 1. Detailed Revenue Query (Range & Specific Day)
+      const whereKhoSales = warehouseVal ? ` AND ma_ben_xuat = ANY($2::text[])` : "";
+      const whereKhoTC = warehouseVal ? ` AND ma_kho = ANY($2::text[])` : "";
+      const whereKhoSerial = warehouseVal ? ` AND ma_kho_hien_tai = ANY($1::text[])` : "";
+      const whereKhoTonKho = warehouseVal ? ` AND tk.ma_kho = ANY($1::text[])` : "";
+
       const sqlRevenueQuery = (isRange, warehouseCond) => {
-        const denNgayIdx = ma_kho ? "$3" : "$2";
-        const dateCond = isRange
-          ? `BETWEEN $1::date AND ${denNgayIdx}::date`
-          : "= $1::date";
-        const mainDateCond = isRange
-          ? `COALESCE(thoi_gian_ket_thuc, updated_at)::date BETWEEN $1::date AND ${denNgayIdx}::date`
+        const dateCond = isRange ? `BETWEEN $1::date AND $${warehouseVal ? 3 : 2}::date` : "= $1::date";
+        const mainDateCond = isRange 
+          ? `COALESCE(thoi_gian_ket_thuc, updated_at)::date BETWEEN $1::date AND $${warehouseVal ? 3 : 2}::date` 
           : "COALESCE(thoi_gian_ket_thuc, updated_at)::date = $1::date";
 
         return `
-        SELECT source, SUM(total) as total FROM (
-          SELECT 'SALES' as source, SUM(thanh_tien) as total 
-          FROM tm_hoa_don 
-          WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
-            AND loai_hoa_don = 'BAN_HANG' 
-            AND ngay_hoa_don::date ${dateCond}
-            ${warehouseCond}
-          UNION ALL
-          SELECT 'MAINTENANCE' as source, SUM(tong_tien) as total 
-          FROM tm_bao_tri 
-          WHERE trang_thai = 'HOAN_THANH' 
-            AND ${mainDateCond}
-            ${ma_kho ? " AND ma_kho = $2" : ""}
-        ) t GROUP BY source
-      `;
+          SELECT source, SUM(total) as total FROM (
+            SELECT 'SALES' as source, SUM(thanh_tien) as total 
+            FROM tm_hoa_don 
+            WHERE trang_thai IN ('DA_THANH_TOAN', 'DA_GIAO', 'DA_XUAT') 
+              AND loai_hoa_don = 'BAN_HANG' 
+              AND ngay_hoa_don::date ${dateCond}
+              ${warehouseCond}
+            UNION ALL
+            SELECT 'MAINTENANCE' as source, SUM(tong_tien) as total 
+            FROM tm_bao_tri 
+            WHERE trang_thai = 'HOAN_THANH' 
+              AND ${mainDateCond}
+              ${warehouseVal ? " AND ma_kho = ANY($2::text[])" : ""}
+          ) t GROUP BY source
+        `;
       };
 
-      // 2. Detailed Cash Collection Query (Range & Specific Day)
       const sqlCashDetailsQuery = (isRange, warehouseCond) => {
-        const denNgayIdx = ma_kho ? "$3" : "$2";
-        const dateCond = isRange
-          ? `ngay_giao_dich::date BETWEEN $1::date AND ${denNgayIdx}::date`
-          : "ngay_giao_dich::date = $1::date";
-
+        const dateCond = isRange ? `ngay_giao_dich::date BETWEEN $1::date AND $${warehouseVal ? 3 : 2}::date` : "ngay_giao_dich::date = $1::date";
         return `
-        SELECT type, SUM(so_tien) as total FROM (
-          SELECT 
-            CASE 
-              WHEN ma_hoa_don IS NOT NULL THEN 'SALES'
-              WHEN noi_dung ILIKE '%bảo trì%' OR noi_dung ILIKE '%sửa chữa%' OR noi_dung ILIKE '%BT000%' THEN 'MAINTENANCE'
-              ELSE 'OTHER'
-            END as type,
-            so_tien
-          FROM tm_phieu_thu_chi
-          WHERE loai_phieu = 'THU' 
-            AND trang_thai = 'DA_DUYET' 
-            AND ${dateCond}
-            ${warehouseCond}
-        ) t GROUP BY type
-      `;
+          SELECT type, SUM(so_tien) as total FROM (
+            SELECT 
+              CASE 
+                WHEN ma_hoa_don IS NOT NULL THEN 'SALES'
+                WHEN noi_dung ILIKE '%bảo trì%' OR noi_dung ILIKE '%sửa chữa%' OR noi_dung ILIKE '%BT000%' THEN 'MAINTENANCE'
+                ELSE 'OTHER'
+              END as type,
+              so_tien
+            FROM tm_phieu_thu_chi
+            WHERE loai_phieu = 'THU' 
+              AND trang_thai = 'DA_DUYET' 
+              AND ${dateCond}
+              ${warehouseCond}
+          ) t GROUP BY type
+        `;
       };
 
-      const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO'${whereKhoHienTai}`;
-      
-      // Hide maintenance operational details if no maintenance permission
+      const sqlStockXe = `SELECT COUNT(*) as total FROM tm_hang_hoa_serial WHERE trang_thai = 'TON_KHO' ${whereKhoSerial}`;
       const sqlStockXeFixing = (hasMaintenance || isAdmin)
-        ? `SELECT COUNT(DISTINCT ma_serial) as total FROM tm_bao_tri WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN')${ma_kho ? " AND ma_kho = $1" : ""}`
+        ? `SELECT COUNT(DISTINCT ma_serial) as total FROM tm_bao_tri WHERE trang_thai IN ('TIEP_NHAN', 'DANG_SUA', 'CHO_THANH_TOAN') ${warehouseVal ? " AND ma_kho = ANY($1::text[])" : ""}`
         : `SELECT 0 as total`;
+
       const sqlLowStockPT = `
         SELECT COUNT(*) as total 
         FROM tm_hang_hoa_ton_kho tk 
@@ -1287,158 +1302,71 @@ class BaoCaoService {
           ) SELECT ma_nhom FROM nhom_tree
         ) OR pt.ma_nhom_hang IS NULL) 
         AND (tk.so_luong_ton <= COALESCE(tk.so_luong_toi_thieu, 0) OR tk.so_luong_ton = 0)
-        ${whereKhoPT}
+        ${whereKhoTonKho}
       `;
 
-      const [
-        revTodayRes,
-        revRangeRes,
-        cashTodayRes,
-        cashRangeRes,
-        stockXeRes,
-        stockXeFixingRes,
-        lowStockRes,
-      ] = await Promise.all([
-        client.query(
-          sqlRevenueQuery(false, whereKho),
-          ma_kho ? [todayRef, ma_kho] : [todayRef],
-        ),
-        client.query(
-          sqlRevenueQuery(true, whereKho),
-          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, denNgay],
-        ),
-        client.query(
-          sqlCashDetailsQuery(false, whereKhoTC),
-          ma_kho ? [todayRef, ma_kho] : [todayRef],
-        ),
-        client.query(
-          sqlCashDetailsQuery(true, whereKhoTC),
-          ma_kho ? [tuNgay, ma_kho, denNgay] : [tuNgay, denNgay],
-        ),
-        client.query(sqlStockXe, ma_kho ? [ma_kho] : []),
-        client.query(sqlStockXeFixing, ma_kho ? [ma_kho] : []),
-        client.query(sqlLowStockPT, ma_kho ? [ma_kho] : []),
+      const [revTodayRes, revRangeRes, cashTodayRes, cashRangeRes, stockXeRes, stockXeFixingRes, lowStockRes] = await Promise.all([
+        client.query(sqlRevenueQuery(false, whereKhoSales), warehouseVal ? [todayRef, warehouseVal] : [todayRef]),
+        client.query(sqlRevenueQuery(true, whereKhoSales), warehouseVal ? [tuNgay, warehouseVal, denNgay] : [tuNgay, denNgay]),
+        client.query(sqlCashDetailsQuery(false, whereKhoTC), warehouseVal ? [todayRef, warehouseVal] : [todayRef]),
+        client.query(sqlCashDetailsQuery(true, whereKhoTC), warehouseVal ? [tuNgay, warehouseVal, denNgay] : [tuNgay, denNgay]),
+        client.query(sqlStockXe, warehouseVal ? [warehouseVal] : []),
+        client.query(sqlStockXeFixing, (hasMaintenance || isAdmin) && warehouseVal ? [warehouseVal] : []),
+        client.query(sqlLowStockPT, warehouseVal ? [warehouseVal] : []),
       ]);
 
       const formatBreakdown = (rows, keys) => {
         const result = {};
         keys.forEach((k) => (result[k] = 0));
         rows.forEach((r) => {
-          if (keys.includes(r.source || r.type)) {
-            result[r.source || r.type] = Number(r.total || 0);
-          }
+          const key = r.source || r.type;
+          if (keys.includes(key)) result[key] = Number(r.total || 0);
         });
         return result;
       };
 
-      const revToday = formatBreakdown(revTodayRes.rows, [
-        "SALES",
-        "MAINTENANCE",
-      ]);
-      const revMonth = formatBreakdown(revRangeRes.rows, [
-        "SALES",
-        "MAINTENANCE",
-      ]);
-      const cashToday = formatBreakdown(cashTodayRes.rows, [
-        "SALES",
-        "MAINTENANCE",
-        "OTHER",
-      ]);
-      const cashMonth = formatBreakdown(cashRangeRes.rows, [
-        "SALES",
-        "MAINTENANCE",
-        "OTHER",
-      ]);
+      const revToday = formatBreakdown(revTodayRes.rows, ["SALES", "MAINTENANCE"]);
+      const revMonth = formatBreakdown(revRangeRes.rows, ["SALES", "MAINTENANCE"]);
+      const cashToday = formatBreakdown(cashTodayRes.rows, ["SALES", "MAINTENANCE", "OTHER"]);
+      const cashMonth = formatBreakdown(cashRangeRes.rows, ["SALES", "MAINTENANCE", "OTHER"]);
 
-      const totalRevenueToday = Object.values(revToday).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const totalRevenueMonth = Object.values(revMonth).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const totalCashToday = Object.values(cashToday).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      const totalCashMonth = Object.values(cashMonth).reduce(
-        (a, b) => a + b,
-        0,
-      );
+      const totalRevenueToday = Object.values(revToday).reduce((a, b) => a + b, 0);
+      const totalRevenueMonth = Object.values(revMonth).reduce((a, b) => a + b, 0);
+      const totalCashToday = Object.values(cashToday).reduce((a, b) => a + b, 0);
+      const totalCashMonth = Object.values(cashMonth).reduce((a, b) => a + b, 0);
 
-      const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${ma_kho ? "WHERE ma_kho_no = $1 OR ma_kho_co = $1" : ""}`;
-      const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_hoa_don WHERE ma_ben_xuat = $1)" : ""}`;
-      const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' ${ma_kho ? "AND ma_doi_tac IN (SELECT ma_doi_tac FROM tm_don_hang WHERE ma_ben_nhap = $1)" : ""}`;
+      const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${warehouseVal ? "WHERE (ma_kho_no = ANY($1::text[]) OR ma_kho_co = ANY($1::text[]))" : "WHERE con_lai > 0"}`;
+      const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' AND con_lai > 0 ${warehouseVal ? "AND ma_doi_tac IN (SELECT ma_ben_nhap FROM tm_hoa_don WHERE ma_ben_xuat = ANY($1::text[]))" : ""}`;
+      const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' AND con_lai > 0 ${warehouseVal ? "AND ma_doi_tac IN (SELECT ma_ben_xuat FROM tm_don_hang WHERE ma_ben_nhap = ANY($1::text[]))" : ""}`;
 
       const sqlRecentActivities = `
-      SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap, dien_giai, ten_doi_tac FROM (
-        SELECT 
-          h.so_hoa_don as so_phieu, 
-          h.loai_hoa_don::varchar as loai_giao_dich, 
-          h.thanh_tien as tong_tien, 
-          h.ngay_hoa_don::timestamp as ngay_lap,
-          COALESCE(h.ghi_chu, 'Hóa đơn bán hàng') as dien_giai,
-          dt.ten_doi_tac
-        FROM tm_hoa_don h
-        LEFT JOIN dm_doi_tac dt ON h.ma_ben_nhap = dt.ma_doi_tac
-        WHERE h.loai_hoa_don::text IN ('BAN_HANG')
-        ${ma_kho ? "AND h.ma_ben_xuat = $1" : ""}
-        
-        UNION ALL
-        
-        SELECT 
-          h.so_don_hang as so_phieu, 
-          CASE WHEN h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE h.loai_don_hang::text END as loai_giao_dich, 
-          h.thanh_tien as tong_tien, 
-          h.ngay_dat_hang::timestamp as ngay_lap,
-          COALESCE(h.ghi_chu, 'Đơn mua hàng/chuyển kho') as dien_giai,
-          dt.ten_doi_tac
-        FROM tm_don_hang h
-        LEFT JOIN dm_doi_tac dt ON (h.ma_ben_xuat = dt.ma_doi_tac OR h.ma_ben_nhap = dt.ma_doi_tac)
-        WHERE h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO')
-        ${ma_kho ? "AND (h.ma_ben_nhap = $1 OR h.ma_ben_xuat = $1)" : ""}
+        SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap, dien_giai, ten_doi_tac FROM (
+          SELECT h.so_hoa_don as so_phieu, h.loai_hoa_don::varchar as loai_giao_dich, h.thanh_tien as tong_tien, h.ngay_hoa_don::timestamp as ngay_lap, COALESCE(h.ghi_chu, 'Hóa đơn bán hàng') as dien_giai, dt.ten_doi_tac
+          FROM tm_hoa_don h LEFT JOIN dm_doi_tac dt ON h.ma_ben_nhap = dt.ma_doi_tac
+          WHERE h.loai_hoa_don::text IN ('BAN_HANG') ${warehouseVal ? "AND h.ma_ben_xuat = ANY($1::text[])" : ""}
+          UNION ALL
+          SELECT h.so_don_hang as so_phieu, CASE WHEN h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE') THEN 'NHAP_KHO' ELSE h.loai_don_hang::text END as loai_giao_dich, h.thanh_tien as tong_tien, h.ngay_dat_hang::timestamp as ngay_lap, COALESCE(h.ghi_chu, 'Đơn mua hàng/chuyển kho') as dien_giai, dt.ten_doi_tac
+          FROM tm_don_hang h LEFT JOIN dm_doi_tac dt ON (h.ma_ben_xuat = dt.ma_doi_tac OR h.ma_ben_nhap = dt.ma_doi_tac)
+          WHERE h.loai_don_hang::text IN ('MUA_HANG', 'MUA_XE', 'CHUYEN_KHO') ${warehouseVal ? "AND (h.ma_ben_nhap = ANY($1::text[]) OR h.ma_ben_xuat = ANY($1::text[]))" : ""}
+          ${(hasMaintenance || isAdmin) ? `
+          UNION ALL
+          SELECT b.ma_phieu as so_phieu, 'DICH_VU_BAO_TRI'::varchar as loai_giao_dich, b.tong_tien, COALESCE(b.thoi_gian_ket_thuc, b.created_at)::timestamp as ngay_lap, 'Dịch vụ sửa chữa xe ' || b.ma_serial as dien_giai, dt.ten_doi_tac
+          FROM tm_bao_tri b LEFT JOIN dm_doi_tac dt ON b.ma_doi_tac = dt.ma_doi_tac
+          WHERE b.trang_thai = 'HOAN_THANH' ${warehouseVal ? "AND b.ma_kho = ANY($1::text[])" : ""}
+          ` : ""}
+          UNION ALL
+          SELECT tc.so_phieu_tc as so_phieu, (CASE WHEN tc.loai_phieu = 'THU' THEN 'PHIEU_THU' ELSE 'PHIEU_CHI' END)::varchar as loai_giao_dich, tc.so_tien as tong_tien, tc.ngay_giao_dich as ngay_lap, tc.noi_dung as dien_giai, dt.ten_doi_tac
+          FROM tm_phieu_thu_chi tc LEFT JOIN dm_doi_tac dt ON tc.ma_doi_tac = dt.ma_doi_tac
+          WHERE tc.trang_thai = 'DA_DUYET' ${warehouseVal ? "AND tc.ma_kho = ANY($1::text[])" : ""}
+        ) as combined ORDER BY ngay_lap DESC LIMIT 10
+      `;
 
-        ${(hasMaintenance || isAdmin) ? `
-        UNION ALL
-        SELECT 
-          b.ma_phieu as so_phieu,
-          'DICH_VU_BAO_TRI'::varchar as loai_giao_dich,
-          b.tong_tien,
-          COALESCE(b.thoi_gian_ket_thuc, b.created_at)::timestamp as ngay_lap,
-          'Dịch vụ sửa chữa xe ' || b.ma_serial as dien_giai,
-          dt.ten_doi_tac
-        FROM tm_bao_tri b
-        LEFT JOIN dm_doi_tac dt ON b.ma_doi_tac = dt.ma_doi_tac
-        WHERE b.trang_thai = 'HOAN_THANH'
-        ${ma_kho ? "AND b.ma_kho = $1" : ""}
-        ` : ""}
-
-        UNION ALL
-
-        SELECT 
-          tc.so_phieu_tc as so_phieu,
-          (CASE WHEN tc.loai_phieu = 'THU' THEN 'PHIEU_THU' ELSE 'PHIEU_CHI' END)::varchar as loai_giao_dich,
-          tc.so_tien as tong_tien,
-          tc.ngay_giao_dich as ngay_lap,
-          tc.noi_dung as dien_giai,
-          dt.ten_doi_tac
-        FROM tm_phieu_thu_chi tc
-        LEFT JOIN dm_doi_tac dt ON tc.ma_doi_tac = dt.ma_doi_tac
-        WHERE tc.trang_thai = 'DA_DUYET'
-        ${ma_kho ? "AND tc.ma_kho = $1" : ""}
-      ) as combined
-      ORDER BY ngay_lap DESC
-      LIMIT 10
-    `;
-
-      const [intDebtRes, custDebtRes, suppDebtRes, recentActivitiesRes] =
-        await Promise.all([
-          client.query(sqlInternalDebt, ma_kho ? [ma_kho] : []),
-          client.query(sqlCustomerDebt, ma_kho ? [ma_kho] : []),
-          client.query(sqlSupplierDebt, ma_kho ? [ma_kho] : []),
-          client.query(sqlRecentActivities, ma_kho ? [ma_kho] : []),
-        ]);
+      const [intDebtRes, custDebtRes, suppDebtRes, recentActivitiesRes] = await Promise.all([
+        client.query(sqlInternalDebt, warehouseVal ? [warehouseVal] : []),
+        client.query(sqlCustomerDebt, warehouseVal ? [warehouseVal] : []),
+        client.query(sqlSupplierDebt, warehouseVal ? [warehouseVal] : []),
+        client.query(sqlRecentActivities, warehouseVal ? [warehouseVal] : []),
+      ]);
 
       return {
         revenue_today: totalRevenueToday,
@@ -1477,8 +1405,8 @@ class BaoCaoService {
     `;
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND x.ma_kho_hien_tai = $1`;
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND x.ma_kho_hien_tai = ANY($${params.length}::text[])`;
     }
     sql += ` GROUP BY pt.ten_hang_hoa ORDER BY so_luong DESC LIMIT 10`;
     const { rows } = await pool.query(sql, params);

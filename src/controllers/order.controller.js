@@ -77,23 +77,22 @@ class OrderController {
 
       // Warehouse isolation check
       const { ROLES } = require("../config/constants");
-      const hasFullAccess = [
-        ROLES.ADMIN,
-        ROLES.QUAN_LY,
-        ROLES.QUAN_LY_CTY,
-        ROLES.KE_TOAN,
-      ].includes(req.user.vai_tro);
+      const isGlobalAdmin = req.user.vai_tro === ROLES.ADMIN;
+      
+      if (!isGlobalAdmin) {
+        const allowedWarehouses = (req.user.allowed_warehouses || []).map(w => w.ma_kho);
+        if (req.user.ma_kho) allowedWarehouses.push(req.user.ma_kho);
 
-      if (!hasFullAccess) {
-        const userKho = req.user.ma_kho;
-        const isRelated =
-          (order.loai_ben_xuat === "KHO" && order.ma_ben_xuat === userKho) ||
-          (order.loai_ben_nhap === "KHO" && order.ma_ben_nhap === userKho);
+        const ma_kho_xuat = order.ma_ben_xuat;
+        const ma_kho_nhap = order.ma_ben_nhap;
+
+        const isRelated = (order.loai_ben_xuat === "KHO" && allowedWarehouses.includes(ma_kho_xuat)) ||
+                          (order.loai_ben_nhap === "KHO" && allowedWarehouses.includes(ma_kho_nhap));
 
         if (!isRelated) {
           return res.status(403).json({
             success: false,
-            message: "Bạn không có quyền xem đơn hàng của kho khác",
+            message: "Bạn không có quyền xem đơn hàng của kho này",
           });
         }
       }
@@ -124,10 +123,73 @@ class OrderController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      const userId = req.user ? req.user.id : null;
-      const order = await OrderService.updateStatus(id, status, userId);
-      await ActivityLogger.record(req, "UPDATE_STATUS", "orders", id, { status });
-      res.json({ success: true, data: order });
+      const user = req.user;
+      const userId = user ? user.id : null;
+
+      // 1. Get current order state to verify roles against transition
+      const order = await OrderService.getOrderById(id);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Đơn hàng không tồn tại" });
+      }
+
+      const currentStatus = order.trang_thai;
+      const authorities = user.authorities || [];
+      const { ROLES } = require("../config/constants");
+
+      const hasApprovalPower =
+        user.vai_tro === ROLES.ADMIN ||
+        user.vai_tro === ROLES.QUAN_LY ||
+        authorities.includes("sales_orders.approve") ||
+        authorities.includes("purchase_orders.approve") ||
+        authorities.includes("don_hang_ban_xe.approve") ||
+        authorities.includes("don_hang_mua_xe.approve");
+
+      // Permission Rules:
+      // A. Management Actions: Only managers can APPROVE, REJECT, or RETURN from a non-Draft state
+      const restrictedStatuses = ["DA_DUYET", "TU_CHOI"];
+      if (currentStatus !== "NHAP" && status === "NHAP") {
+        restrictedStatuses.push("NHAP");
+      }
+
+      if (restrictedStatuses.includes(status) && !hasApprovalPower) {
+        let message =
+          "Thao tác này chỉ dành cho quản lý. Bạn không có quyền thực hiện.";
+        if (status === "NHAP")
+          message = "Bạn không thể trả về phiếu sau khi đã gửi duyệt.";
+        if (status === "DA_DUYET") message = "Bạn không có quyền phê duyệt phiếu.";
+        if (status === "TU_CHOI") message = "Bạn không có quyền từ chối phiếu.";
+
+        return res.status(403).json({
+          success: false,
+          message,
+        });
+      }
+
+      // B. Cancellation Rule: Sale can only cancel their own DRAFT (NHAP) orders
+      if (
+        status === "DA_HUY" &&
+        currentStatus !== "NHAP" &&
+        !hasApprovalPower
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Không thể hủy đơn hàng đã gửi duyệt hoặc đã được phê duyệt. Vui lòng liên hệ quản lý.",
+        });
+      }
+
+      // C. Safe passage for GUI_DUYET (Submit for approval) - allowed if user can access this route
+
+      const result = await OrderService.updateStatus(id, status, userId);
+
+      await ActivityLogger.record(req, "UPDATE_STATUS", "orders", id, {
+        from: currentStatus,
+        to: status,
+      });
+
+      res.json({ success: true, data: result });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }

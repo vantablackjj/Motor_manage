@@ -56,6 +56,23 @@ router.get(
         return sendError(res, "Số phiếu không tồn tại", 404);
       }
 
+      // Warehouse access check
+      const user = req.user;
+      const ma_kho = data.ma_kho;
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const hasWarehouseAccess =
+        user.ma_kho === ma_kho ||
+        (user.allowed_warehouses &&
+          user.allowed_warehouses.some((w) => w.ma_kho === ma_kho));
+
+      if (!isGlobalAdmin && !hasWarehouseAccess) {
+        return sendError(
+          res,
+          "Bạn không có quyền truy cập dữ liệu của kho này",
+          403,
+        );
+      }
+
       return sendSuccess(res, data, "success");
     } catch (error) {
       next(error);

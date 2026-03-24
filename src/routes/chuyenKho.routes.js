@@ -65,6 +65,23 @@ router.get(
         return sendError(res, "Phiếu chuyển kho không tồn tại", 404);
       }
 
+      // Warehouse access check
+      const user = req.user;
+      const phieu = data.phieu || data;
+      const ma_kho_xuat = phieu.ma_kho_xuat;
+      const ma_kho_nhap = phieu.ma_kho_nhap;
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      
+      const allowedWarehouses = (user.allowed_warehouses || []).map(w => w.ma_kho);
+      const hasAccess = user.ma_kho === ma_kho_xuat || 
+                        user.ma_kho === ma_kho_nhap || 
+                        allowedWarehouses.includes(ma_kho_xuat) || 
+                        allowedWarehouses.includes(ma_kho_nhap);
+
+      if (!isGlobalAdmin && !hasAccess) {
+        return sendError(res, "Bạn không có quyền truy cập dữ liệu của kho xuất hoặc kho nhập này", 403);
+      }
+
       sendSuccess(res, data, "Lấy chi tiết phiếu chuyển kho thành công");
     } catch (error) {
       next(error);

@@ -23,7 +23,11 @@ class User {
               -- Legacy fields for compatibility
               COALESCE((SELECT vai_tro FROM user_roles LIMIT 1), u.vai_tro) as vai_tro,
               COALESCE((SELECT ten_vai_tro FROM user_roles LIMIT 1), u.vai_tro) as ten_vai_tro,
-              COALESCE((SELECT permissions FROM user_roles LIMIT 1), (SELECT permissions FROM sys_role WHERE id = u.role_id)) as permissions
+              COALESCE((SELECT permissions FROM user_roles LIMIT 1), (SELECT permissions FROM sys_role WHERE id = u.role_id)) as permissions,
+              (SELECT json_agg(json_build_object('ma_kho', uk.ma_kho, 'ten_kho', k.ten_kho)) 
+                FROM sys_user_kho uk 
+                JOIN sys_kho k ON uk.ma_kho = k.ma_kho 
+                WHERE uk.user_id = u.id) as allowed_warehouses
        FROM sys_user u
        WHERE u.username = $1`,
       [username],
@@ -53,6 +57,10 @@ class User {
               COALESCE((SELECT vai_tro FROM user_roles LIMIT 1), u.vai_tro) as vai_tro,
               COALESCE((SELECT ten_vai_tro FROM user_roles LIMIT 1), u.vai_tro) as ten_vai_tro,
               COALESCE((SELECT permissions FROM user_roles LIMIT 1), (SELECT permissions FROM sys_role WHERE id = u.role_id)) as permissions,
+              (SELECT json_agg(json_build_object('ma_kho', uk.ma_kho, 'ten_kho', k.ten_kho)) 
+                FROM sys_user_kho uk 
+                JOIN sys_kho k ON uk.ma_kho = k.ma_kho 
+                WHERE uk.user_id = u.id) as allowed_warehouses,
               u.status, u.created_at, u.updated_at
        FROM sys_user u
        WHERE u.id = $1`,

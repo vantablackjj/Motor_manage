@@ -548,9 +548,9 @@ class DonHangMuaXeService {
       FROM tm_don_hang h
       LEFT JOIN sys_kho k ON h.ma_ben_nhap = k.ma_kho
       LEFT JOIN dm_doi_tac dt ON h.ma_ben_xuat = dt.ma_doi_tac
-      LEFT JOIN sys_user u_tao ON h.created_by = u_tao.id
-      LEFT JOIN sys_user u_gui ON h.nguoi_gui = u_gui.id
-      LEFT JOIN sys_user u_duyet ON h.nguoi_duyet = u_duyet.id
+      LEFT JOIN sys_user u_tao ON h.created_by::text = u_tao.id::text
+      LEFT JOIN sys_user u_gui ON h.nguoi_gui::text = u_gui.id::text
+      LEFT JOIN sys_user u_duyet ON h.nguoi_duyet::text = u_duyet.id::text
       WHERE h.so_don_hang = $1 
          OR (CASE WHEN $1 ~ '^\\d+$' THEN h.id = $1::int ELSE FALSE END)
       `,

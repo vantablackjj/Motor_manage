@@ -157,6 +157,12 @@ class DonHangMuaService {
     }
 
     // Notify Managers
+    const orderRes = await pool.query(
+      "SELECT ma_ben_nhap FROM tm_don_hang WHERE so_don_hang = $1 OR id::text = $1",
+      [ma_phieu]
+    );
+    const ma_kho = orderRes.rows[0]?.ma_ben_nhap;
+
     const ten_nguoi_gui = await pool
       .query("SELECT ho_ten FROM sys_user WHERE id = $1", [nguoi_gui])
       .then((r) => r.rows[0]?.ho_ten || nguoi_gui);
@@ -166,6 +172,7 @@ class DonHangMuaService {
       `Đơn hàng ${ma_phieu} đã được ${ten_nguoi_gui} gửi yêu cầu phê duyệt.`,
       `/purchase/parts/${ma_phieu}`,
       "APPROVAL",
+      ma_kho
     ).catch((err) => console.error("Notification Error:", err));
 
     return { success: true, message: "Đã gửi duyệt thành công" };

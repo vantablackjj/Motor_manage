@@ -46,6 +46,7 @@ const authenticate = async (req, res, next) => {
       vai_tro: user.vai_tro,
       role_id: user.role_id,
       ma_kho: user.ma_kho,
+      allowed_warehouses: user.allowed_warehouses || [],
       roles: user.roles || [],
       authorities: user.authorities || [],
     };

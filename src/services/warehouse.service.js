@@ -121,6 +121,9 @@ class WarehouseService {
               ma_kho_hien_tai = CASE WHEN $1::text = 'DA_BAN' THEN NULL ELSE ma_kho_hien_tai END,
               so_hoa_don_ban = CASE WHEN $4 = TRUE THEN $5 ELSE so_hoa_don_ban END,
               ngay_ban = CASE WHEN $4 = TRUE THEN CURRENT_DATE ELSE ngay_ban END,
+              locked = FALSE,
+              locked_at = NULL,
+              locked_reason = NULL,
               updated_at = CURRENT_TIMESTAMP
           WHERE ma_serial = $2 AND ma_kho_hien_tai = $3
           RETURNING *
@@ -196,6 +199,7 @@ class WarehouseService {
           `Sản phẩm ${ten_hang_hoa} (${ma_hang_hoa}) tại kho ${ma_kho} đã chạm ngưỡng tối thiểu (${stockInfo.so_luong_ton}/${stockInfo.so_luong_toi_thieu}).`,
           `/phu-tung/danh-sach?search=${ma_hang_hoa}`,
           "INVENTORY",
+          ma_kho
         ).catch((err) => console.error("Notification Error:", err));
       }
     }

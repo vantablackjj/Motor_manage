@@ -226,8 +226,9 @@ class Xe {
   }
 
   // Khóa xe
-  static async lock(xe_key, ma_phieu, ly_do) {
-    const result = await query(
+  static async lock(xe_key, ma_phieu, ly_do, client = null) {
+    const db = client || pool;
+    const result = await db.query(
       `UPDATE tm_hang_hoa_serial
        SET locked = TRUE, locked_reason = $1, locked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE ma_serial = $2 AND locked = FALSE AND trang_thai = 'TON_KHO'
@@ -243,10 +244,11 @@ class Xe {
   }
 
   // Bỏ khóa xe
-  static async unlock(xe_key) {
-    const result = await query(
+  static async unlock(xe_key, client = null) {
+    const db = client || pool;
+    const result = await db.query(
       `UPDATE tm_hang_hoa_serial
-       SET locked = FALSE, updated_at = CURRENT_TIMESTAMP
+       SET locked = FALSE, locked_at = NULL, locked_reason = NULL, updated_at = CURRENT_TIMESTAMP
        WHERE ma_serial = $1
        RETURNING *`,
       [xe_key],

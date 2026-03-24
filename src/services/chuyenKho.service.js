@@ -350,10 +350,18 @@ class ChuyenKhoService {
     }
 
     // Notify managers
+    const phieuRes = await pool.query(
+      "SELECT ma_ben_xuat, ma_ben_nhap FROM tm_don_hang WHERE so_don_hang = $1",
+      [so_phieu]
+    );
+    const phieu = phieuRes.rows[0];
+
     NotificationService.notifyManagers(
       "Yêu cầu chuyển kho mới",
       `Có phiếu chuyển kho ${so_phieu} đang chờ duyệt.`,
       `/chuyen-kho/${so_phieu}`,
+      "APPROVAL",
+      [phieu.ma_ben_xuat, phieu.ma_ben_nhap]
     ).catch((err) => console.error("Notification Error:", err));
 
     return { success: true };

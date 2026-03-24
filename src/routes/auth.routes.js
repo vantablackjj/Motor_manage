@@ -322,6 +322,7 @@ router.get("/me", authenticate, async (req, res, next) => {
       {
         ...user,
         warehouse_permissions: wh_permissions,
+        is_multi_warehouse: (wh_permissions || []).length > 1 || user.vai_tro === ROLES.ADMIN
       },
       "Lấy thông tin người dùng thành công",
     );

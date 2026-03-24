@@ -61,14 +61,32 @@ class NotificationService {
 
   // --- Specialized notification methods ---
 
-  static async notifyManagers(title, content, link, type = "SYSTEM") {
+  /**
+   * Notify Managers and Accountants who have access to specific warehouse(s)
+   * @param {string} title 
+   * @param {string} content 
+   * @param {string} link 
+   * @param {string} type 
+   * @param {string|string[]} ma_kho - Optional warehouse code(s) to filter recipients
+   */
+  static async notifyManagers(title, content, link, type = "SYSTEM", ma_kho = null) {
     // Get all users with QUAN_LY, ADMIN or KE_TOAN role
-    const managers = await query(
-      `SELECT u.id FROM sys_user u
-       LEFT JOIN sys_role r ON u.role_id = r.id
-       WHERE r.ten_quyen IN ('QUAN_LY', 'ADMIN', 'KE_TOAN')
-          OR u.vai_tro IN ('QUAN_LY', 'ADMIN', 'KE_TOAN')`,
-    );
+    // Filter by warehouse if provided (Admins always get notified)
+    let queryStr = `
+      SELECT DISTINCT u.id FROM sys_user u
+      LEFT JOIN sys_role r ON u.role_id = r.id
+      LEFT JOIN sys_user_kho uk ON u.id = uk.user_id
+      WHERE (r.ten_quyen IN ('QUAN_LY', 'ADMIN', 'KE_TOAN') OR u.vai_tro IN ('QUAN_LY', 'ADMIN', 'KE_TOAN'))
+    `;
+
+    const params = [];
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      queryStr += ` AND (u.vai_tro = 'ADMIN' OR u.ma_kho = ANY($1::text[]) OR uk.ma_kho = ANY($1::text[]))`;
+    }
+
+    const managers = await query(queryStr, params);
 
     const notifications = [];
     for (const manager of managers.rows) {
@@ -85,12 +103,21 @@ class NotificationService {
     return notifications;
   }
 
+  /**
+   * Notify Warehouse Staff (KHO/BAN_HANG) who have access to a specific warehouse
+   * @param {string} ma_kho 
+   * @param {string} title 
+   * @param {string} content 
+   * @param {string} link 
+   * @param {string} type 
+   */
   static async notifyWarehouseStaff(ma_kho, title, content, link, type = "SYSTEM") {
-    // Get users in this warehouse with KHO or BAN_HANG role
+    // Get users with access to this warehouse and role KHO or BAN_HANG
     const staff = await query(
-      `SELECT u.id FROM sys_user u
+      `SELECT DISTINCT u.id FROM sys_user u
        LEFT JOIN sys_role r ON u.role_id = r.id
-       WHERE u.ma_kho = $1 
+       LEFT JOIN sys_user_kho uk ON u.id = uk.user_id
+       WHERE (u.ma_kho = $1 OR uk.ma_kho = $1)
          AND (r.ten_quyen IN ('KHO', 'BAN_HANG') OR u.vai_tro IN ('KHO', 'BAN_HANG'))`,
       [ma_kho],
     );

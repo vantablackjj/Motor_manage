@@ -30,6 +30,17 @@ class DonHangMuaController {
         return sendError(res, "Đơn hàng không tồn tại", 404);
       }
 
+      // Warehouse access check
+      const user = req.user;
+      const ma_kho = data.ma_ben_nhap; // Kho nhập của đơn mua
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const hasWarehouseAccess = user.ma_kho === ma_kho || 
+        (user.allowed_warehouses && user.allowed_warehouses.some(w => w.ma_kho === ma_kho));
+
+      if (!isGlobalAdmin && !hasWarehouseAccess) {
+        return sendError(res, "Bạn không có quyền truy cập dữ liệu của kho này", 403);
+      }
+
       sendSuccess(res, data, "Lấy chi tiết đơn hàng thành công");
     } catch (error) {
       next(error);

@@ -6,7 +6,9 @@ const { validate } = require("../middleware/validation");
 const {
   createMaintenanceSchema,
 } = require("../validations/maintenance.validation");
-const { checkPermission } = require("../middleware/roleCheck");
+const { checkPermission, checkAnyPermission } = require("../middleware/roleCheck");
+
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 
 /**
  * @swagger
@@ -15,7 +17,7 @@ const { checkPermission } = require("../middleware/roleCheck");
  *   description: Quản lý bảo trì xe
  */
 
-router.use(authenticate);
+router.use(authenticate, warehouseIsolation);
 
 router.post(
   "/",

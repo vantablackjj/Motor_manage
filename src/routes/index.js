@@ -61,10 +61,24 @@ const warehouseParams = [
 warehouseParams.forEach((paramName) => {
   router.param(paramName, (req, res, next, val) => {
     const { ROLES } = require("../config/constants");
-    if (req.user && [ROLES.BAN_HANG, ROLES.KHO].includes(req.user.vai_tro)) {
-      if (val !== req.user.ma_kho) {
-        // Override the parameter with the user's assigned warehouse
-        req.params[paramName] = req.user.ma_kho;
+    if (!req.user) return next();
+
+    // Determine assigned warehouses (primary + list)
+    const assigned = (req.user.allowed_warehouses || [])
+      .map((k) => (typeof k === "string" ? k : k?.ma_kho))
+      .filter(Boolean);
+    if (req.user.ma_kho && !assigned.includes(req.user.ma_kho)) {
+      assigned.push(req.user.ma_kho);
+    }
+
+    // Only apply restriction for staff roles (or managers with a specific list)
+    const isFullAccess = req.user.vai_tro === ROLES.ADMIN || 
+      ((req.user.vai_tro === ROLES.QUAN_LY || req.user.vai_tro === ROLES.KE_TOAN) && assigned.length === 0);
+
+    if (!isFullAccess && assigned.length > 0) {
+      if (!assigned.includes(val)) {
+        // Force to the first assigned warehouse if the requested one is not allowed
+        req.params[paramName] = assigned[0];
       }
     }
     next();

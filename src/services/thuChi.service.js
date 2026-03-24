@@ -105,6 +105,7 @@ class ThuChiService {
       `${loai_ten} ${so_phieu} trị giá ${Number(phieu.so_tien).toLocaleString()}đ đã được ${ten_nguoi_gui} gửi yêu cầu phê duyệt.`,
       `/financial/details/${so_phieu}`,
       "APPROVAL",
+      phieu.ma_kho,
     ).catch((err) => console.error("Notification Error:", err));
 
     return phieu;
@@ -247,40 +248,41 @@ class ThuChiService {
 
     if (loai) {
       values.push(loai);
-      conditions.push(`loai_phieu = $${values.length}`);
+      conditions.push(`tc.loai_phieu = $${values.length}`);
     }
 
     if (trang_thai) {
       values.push(trang_thai);
-      conditions.push(`trang_thai = $${values.length}`);
+      conditions.push(`tc.trang_thai = $${values.length}`);
     }
 
     if (ma_kho) {
-      values.push(ma_kho);
-      conditions.push(`ma_kho = $${values.length}`);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      values.push(ma_kho_arr);
+      conditions.push(`TRIM(tc.ma_kho) = ANY($${values.length}::text[])`);
     }
 
     if (ma_kh) {
       values.push(ma_kh);
-      conditions.push(`ma_doi_tac = $${values.length}`); // Fixed: ma_kh -> ma_doi_tac
+      conditions.push(`tc.ma_doi_tac = $${values.length}`);
     }
 
     if (tu_ngay) {
       values.push(tu_ngay);
-      conditions.push(`ngay_giao_dich >= $${values.length}`);
+      conditions.push(`tc.ngay_giao_dich >= $${values.length}`);
     }
 
     if (den_ngay) {
       values.push(den_ngay);
-      conditions.push(`ngay_giao_dich <= $${values.length}`);
+      conditions.push(`tc.ngay_giao_dich <= $${values.length}`);
     }
 
     if (keyword) {
       values.push(`%${keyword}%`);
       conditions.push(`(
-        so_phieu_tc ILIKE $${values.length} 
-        OR noi_dung ILIKE $${values.length}
-      )`); // Fixed: so_phieu -> so_phieu_tc, dien_giai -> noi_dung
+        tc.so_phieu_tc ILIKE $${values.length} 
+        OR tc.noi_dung ILIKE $${values.length}
+      )`);
     }
 
     const whereClause = conditions.length
@@ -293,7 +295,7 @@ class ThuChiService {
     // Get total count
     const countQuery = `
       SELECT COUNT(*)::int AS total
-      FROM tm_phieu_thu_chi
+      FROM tm_phieu_thu_chi tc
       ${whereClause}
     `;
 
@@ -384,8 +386,9 @@ class ThuChiService {
     }
 
     if (ma_kho) {
-      values.push(ma_kho);
-      conditions.push(`tc.ma_kho = $${values.length}`);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      values.push(ma_kho_arr);
+      conditions.push(`TRIM(tc.ma_kho) = ANY($${values.length}::text[])`);
     }
 
     if (ma_kh) {

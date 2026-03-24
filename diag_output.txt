@@ -1,0 +1,5 @@
+ERROR: SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string
+Error: SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string
+    at C:\Users\admin\Documents\Motor_Manage\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async diagnose (C:\Users\admin\Documents\Motor_Manage\diag_thuchi_file.js:7:17)

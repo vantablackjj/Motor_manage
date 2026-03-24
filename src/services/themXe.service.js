@@ -268,6 +268,7 @@ class VehicleService {
         `Nhân viên ${ten_nhan_vien} đã nhập xe mới: ${fullData.ten_loai} (SK: ${fullData.so_khung}). Vui lòng phê duyệt.`,
         `/xe/danh-sach?search=${xeKey}`,
         "APPROVAL",
+        data.ma_kho_hien_tai,
       ).catch((err) => console.error("Notification Error:", err));
 
       return {
@@ -632,6 +633,7 @@ class VehicleService {
       `Xe ${xeKey} đã được ${ten_nhan_vien} gửi yêu cầu phê duyệt.`,
       `/xe/danh-sach?search=${xeKey}`,
       "APPROVAL",
+      updatedXe.ma_kho_hien_tai,
     ).catch((err) => console.error("Notification Error:", err));
 
     return updatedXe;

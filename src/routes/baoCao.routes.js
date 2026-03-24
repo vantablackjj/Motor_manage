@@ -321,36 +321,35 @@ router.post(
 /**
  * @route   GET /api/bao-cao/dashboard
  * @desc    Dashboard tổng quan
- * @access  Tất cả role đã đăng nhập
+ * @access  Tất cả role đã đăng nhập có quyền quan trọng
  */
 router.get(
   "/dashboard",
   authenticate,
-  checkPermission("reports", "view"),
   baoCaoController.dashboard,
 );
 
 /**
  * @route   GET /api/bao-cao/bieu-do/doanh-thu
  * @desc    Dữ liệu biểu đồ doanh thu
- * @access  BAN_HANG, KE_TOAN, QUAN_LY, ADMIN
+ * @access  Tất cả có quyền xem reports hoặc đơn hàng
  */
 router.get(
   "/bieu-do/doanh-thu",
   authenticate,
-  checkPermission("reports", "view"),
+  checkAnyPermission(["reports", "view"], ["sales_orders", "view"]),
   baoCaoController.bieuDoDoanhThu,
 );
 
 /**
  * @route   GET /api/bao-cao/bieu-do/ton-kho
  * @desc    Dữ liệu biểu đồ tồn kho
- * @access  KHO, KE_TOAN, QUAN_LY, ADMIN
+ * @access  Tất cả có quyền xem reports hoặc kho
  */
 router.get(
   "/bieu-do/ton-kho",
   authenticate,
-  checkPermission("reports", "view"),
+  checkAnyPermission(["reports", "view"], ["inventory", "view"]),
   baoCaoController.bieuDoTonKho,
 );
 

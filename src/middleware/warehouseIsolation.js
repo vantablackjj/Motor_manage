@@ -13,32 +13,52 @@ const warehouseIsolation = (req, res, next) => {
   }
 
   // Allow seeing all warehouses in the list (needed for transfers, etc.)
-  // Use originalUrl to be absolutely sure we're on the master data list
   if (req.method === "GET" && (req.originalUrl.includes("/api/kho") || req.path.startsWith("/kho"))) {
     return next();
   }
 
-  // Chế độ "Toàn quyền": Chỉ dành cho ADMIN hoặc những tài khoản Quản lý/Kế toán KHÔNG bị gán vào kho cụ thể
-  // Nếu đã bị gán vào 1 kho (ma_kho != null), kể cả Quản lý cũng sẽ bị cách ly vào kho đó
+  // Determine the list of effective warehouses this user is restricted to
+  // Determine the list of effective warehouses this user is restricted to
+  const assignedWarehouses = (user.allowed_warehouses || [])
+    .map(k => (typeof k === "string" ? k.trim() : k?.ma_kho?.trim()))
+    .filter(Boolean);
+  
+  if (user.ma_kho) {
+    const trimmedHome = user.ma_kho.trim();
+    if (!assignedWarehouses.includes(trimmedHome)) {
+      assignedWarehouses.push(trimmedHome);
+    }
+  }
+  
+  const hasAssignedWarehouses = assignedWarehouses.length > 0;
+
+  // Chế độ "Toàn quyền": Dành cho ADMIN, hoặc QUAN_LY/KE_TOAN mà KHÔNG bị giới hạn bởi danh sách kho gán cụ thể
   const hasFullAccess =
     user.vai_tro === ROLES.ADMIN ||
-    ((user.vai_tro === ROLES.QUAN_LY || user.vai_tro === ROLES.KE_TOAN) &&
-      !user.ma_kho);
+    ((user.vai_tro === ROLES.QUAN_LY || user.vai_tro === ROLES.KE_TOAN) && !hasAssignedWarehouses);
 
+  if (hasFullAccess) {
+    return next();
+  }
+
+  // If not full access, the user MUST have at least one assigned warehouse
+  if (!hasAssignedWarehouses) {
+    const restrictedRoles = [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT, ROLES.QUAN_LY, ROLES.KE_TOAN];
+    if (restrictedRoles.includes(user.vai_tro)) {
+      return sendError(
+        res,
+        "Bạn chưa được gán vào kho nào. Vui lòng liên hệ Admin.",
+        403,
+      );
+    }
+    return next(); // Other roles might not need warehouse isolation
+  }
+
+  const defaultWarehouse = assignedWarehouses[0];
   const warehouseFields = [
-    "ma_kho",
-    "kho_id",
-    "ma_kho_hien_tai",
-    "ma_kho_nhap",
-    "ma_kho_xuat",
-    "tu_ma_kho",
-    "den_ma_kho",
-    "ma_ben_nhap",
-    "ma_ben_xuat",
-    "fromKho",
-    "toKho",
-    "ma_kho_no",
-    "ma_kho_co",
+    "ma_kho", "kho_id", "ma_kho_hien_tai", "ma_kho_nhap", "ma_kho_xuat",
+    "tu_ma_kho", "den_ma_kho", "ma_ben_nhap", "ma_ben_xuat",
+    "fromKho", "toKho", "ma_kho_no", "ma_kho_co",
   ];
 
   const normalizeAndIsolate = (obj) => {
@@ -46,76 +66,56 @@ const warehouseIsolation = (req, res, next) => {
 
     // 1. Normalize: ensure ma_kho is present if any other warehouse field is present
     warehouseFields.forEach((field) => {
-      if (obj[field] !== undefined && obj[field] !== null) {
-        if (!obj.ma_kho) obj.ma_kho = obj[field];
+      const val = obj[field];
+      if (val !== undefined && val !== null && val !== "") {
+        if (!obj.ma_kho) obj.ma_kho = val;
       }
     });
 
-    // 2. Isolate: For restricted users (non-full access AND has a specific warehouse)
-    if (!hasFullAccess && user.ma_kho) {
-      // Special check for transfer pairs (source and destination)
-      const hasTransferFields = 
-        (obj.ma_kho_xuat && obj.ma_kho_nhap) || 
-        (obj.ma_ben_xuat && obj.ma_ben_nhap) ||
-        (obj.ma_kho_no && obj.ma_kho_co);
+    // 2. Isolate
+    const hasTransferFields = 
+      (obj.ma_kho_xuat && obj.ma_kho_nhap) || 
+      (obj.ma_ben_xuat && obj.ma_ben_nhap) ||
+      (obj.ma_kho_no && obj.ma_kho_co);
 
-      if (hasTransferFields) {
-        // For transfers, we MUST ensure the user's warehouse is either the sender or receiver
-        const isSender = (obj.ma_kho_xuat === user.ma_kho || obj.ma_ben_xuat === user.ma_kho || obj.ma_kho_co === user.ma_kho);
-        const isReceiver = (obj.ma_kho_nhap === user.ma_kho || obj.ma_ben_nhap === user.ma_kho || obj.ma_kho_no === user.ma_kho);
+    if (hasTransferFields) {
+      const isSender = assignedWarehouses.includes(obj.ma_kho_xuat?.toString().trim()) || assignedWarehouses.includes(obj.ma_ben_xuat?.toString().trim()) || assignedWarehouses.includes(obj.ma_kho_co?.toString().trim());
+      const isReceiver = assignedWarehouses.includes(obj.ma_kho_nhap?.toString().trim()) || assignedWarehouses.includes(obj.ma_ben_nhap?.toString().trim()) || assignedWarehouses.includes(obj.ma_kho_no?.toString().trim());
 
-        if (!isSender && !isReceiver) {
-          // If neither matches, force the source (or current location) to be the user's warehouse
-          if (obj.ma_kho_xuat) obj.ma_kho_xuat = user.ma_kho;
-          if (obj.ma_ben_xuat) obj.ma_ben_xuat = user.ma_kho;
-          if (obj.ma_kho_co) obj.ma_kho_co = user.ma_kho;
-          if (obj.ma_kho) obj.ma_kho = user.ma_kho;
-        }
-        // Do NOT overwrite the "other" side of the transfer!
-        return;
+      if (!isSender && !isReceiver) {
+        if (obj.ma_kho_xuat) obj.ma_kho_xuat = defaultWarehouse;
+        if (obj.ma_ben_xuat) obj.ma_ben_xuat = defaultWarehouse;
+        if (obj.ma_kho_co) obj.ma_kho_co = defaultWarehouse;
+        if (obj.ma_kho) obj.ma_kho = defaultWarehouse;
       }
+      return;
+    }
 
-      // Single warehouse field case: standard isolation
       warehouseFields.forEach((field) => {
-        if (obj[field] !== undefined && obj[field] !== null) {
-          if (obj[field] !== user.ma_kho) {
-            obj[field] = user.ma_kho;
+        const val = obj[field];
+        if (val !== undefined && val !== null && val !== "") {
+          // Verify if requested warehouse is in the allowed list
+          const requested = Array.isArray(val) ? val.map(v => v.toString().trim()) : [val.toString().trim()];
+          const allAllowed = requested.every(v => assignedWarehouses.includes(v));
+          
+          if (!allAllowed) {
+            // If any requested is NOT allowed, fallback to default or restrict
+            obj[field] = defaultWarehouse;
           }
         } else if (
-          ["ma_kho", "ma_kho_hien_tai", "ma_kho_nhap", "ma_kho_xuat", "ma_ben_nhap", "ma_ben_xuat"].includes(field)
+          ["ma_kho", "ma_ben_nhap", "ma_ben_xuat", "ma_kho_hien_tai", "ma_kho_nhap", "ma_kho_xuat"].includes(field)
         ) {
-          // For GET requests, we only want to inject a generic 'ma_kho' filter
-          // Injected specific filters like 'ma_kho_nhap' combined with 'ma_kho_xuat' 
-          // often create impossible logic (e.g. source == destination).
           if (req.method === "GET") {
-             if (field === "ma_kho") {
-               obj[field] = user.ma_kho;
-             }
-             // Don't inject other fields for GET unless they were already there
+             // For GET, if no warehouse is specified (or empty string), show data for ALL assigned warehouses
+             obj[field] = assignedWarehouses;
           } else {
-            // For POST/PUT, we enforce isolation on all fields
-            obj[field] = user.ma_kho;
+            // For POST/PUT, always force to the default warehouse if not specified
+            obj[field] = defaultWarehouse;
           }
         }
       });
-    }
   };
 
-  // Check for restricted access without ma_kho early (for staff roles)
-  if (
-    !hasFullAccess &&
-    [ROLES.BAN_HANG, ROLES.KHO, ROLES.KY_THUAT].includes(user.vai_tro)
-  ) {
-    if (!user.ma_kho) {
-      return sendError(
-        res,
-        "Bạn chưa được gán vào kho nào. Vui lòng liên hệ Admin.",
-        403,
-      );
-    }
-  }
-
-  // Handle all relevant parts of the request
   if (req.query) normalizeAndIsolate(req.query);
   if (req.body) normalizeAndIsolate(req.body);
   if (req.params) normalizeAndIsolate(req.params);

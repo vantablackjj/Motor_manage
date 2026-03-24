@@ -7,6 +7,7 @@ const WarehouseService = require("./warehouse.service");
 const CongNoService = require("./congNo.service");
 const ThuChiService = require("./thuChi.service");
 const NotificationService = require("./notification.service");
+const Xe = require("./xe.service");
 
 class OrderService {
   /**
@@ -148,6 +149,16 @@ class OrderService {
             if (!final_yeu_cau_dac_biet.ma_serial) {
               final_yeu_cau_dac_biet.ma_serial = item.ma_hang_hoa;
             }
+            
+            // Lock if it's a sales or transfer order
+            if (["BAN_HANG", "BAN_XE", "CHUYEN_KHO"].includes(loai_don_hang)) {
+              await Xe.lock(
+                final_yeu_cau_dac_biet.ma_serial,
+                so_don_hang,
+                `Đã gán vào đơn hàng ${so_don_hang}`,
+                client
+              );
+            }
           }
         }
 
@@ -183,11 +194,14 @@ class OrderService {
       if (order.loai_don_hang === "MUA_HANG") title = "Đơn mua hàng mới";
       if (order.loai_don_hang === "BAN_HANG") title = "Đơn bán hàng mới";
 
+      const targetWarehouse = order.loai_don_hang === "MUA_HANG" ? order.ma_ben_nhap : order.ma_ben_xuat;
+
       NotificationService.notifyManagers(
         title,
         `Đơn hàng ${so_don_hang} đã được tạo bởi ${ten_nguoi_tao}.`,
         `/orders/view/${so_don_hang}`,
         "SYSTEM",
+        targetWarehouse
       ).catch((err) => console.error("Notification Error:", err));
 
       return order;
@@ -217,7 +231,7 @@ class OrderService {
 
       // 1. Get order and verify
       const orderResult = await client.query(
-        `SELECT * FROM tm_don_hang WHERE so_don_hang = $1::text OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END)`,
+        `SELECT * FROM tm_don_hang WHERE so_don_hang = $1::text OR (CASE WHEN $1::text ~ '^\\d+$' THEN id = $1::text::int ELSE FALSE END) FOR UPDATE`,
         [so_don_hang],
       );
       const order = orderResult.rows[0];
@@ -259,6 +273,18 @@ class OrderService {
           final_ma_hang_hoa = serialCheck.rows[0].ma_hang_hoa;
           if (!final_yeu_cau_dac_biet.ma_serial) {
             final_yeu_cau_dac_biet.ma_serial = ma_hang_hoa;
+          }
+
+          // Lock if it's a sales/transfer order
+          if (
+            ["BAN_HANG", "BAN_XE", "CHUYEN_KHO"].includes(order.loai_don_hang)
+          ) {
+            await Xe.lock(
+              final_yeu_cau_dac_biet.ma_serial,
+              order.so_don_hang,
+              `Thêm vào đơn hàng ${order.so_don_hang}`,
+              client,
+            );
           }
         }
       }
@@ -325,7 +351,21 @@ class OrderService {
         );
       }
 
-      // 2. Delete the item
+      // 2. Fetch the item to see if it has a serial to unlock
+      const itemToUnlock = await client.query(
+        "SELECT yeu_cau_dac_biet FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1 AND stt = $2",
+        [order.so_don_hang, stt],
+      );
+
+      if (
+        itemToUnlock.rowCount > 0 &&
+        itemToUnlock.rows[0].yeu_cau_dac_biet &&
+        itemToUnlock.rows[0].yeu_cau_dac_biet.ma_serial
+      ) {
+        await Xe.unlock(itemToUnlock.rows[0].yeu_cau_dac_biet.ma_serial, client);
+      }
+
+      // 3. Delete the item
       const deleteRes = await client.query(
         "DELETE FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1 AND stt = $2",
         [order.so_don_hang, stt],
@@ -850,12 +890,16 @@ class OrderService {
       for (const item of ctRes.rows) {
         if (item.loai_quan_ly === "SERIAL" && item.ma_serial) {
           // Hoàn xe về kho: đặt lại trạng thái TON_KHO, xóa ngày bán
+          // Hoàn xe về kho: đặt lại trạng thái TON_KHO, xóa ngày bán, mở khóa
           await client.query(
             `UPDATE tm_hang_hoa_serial
              SET trang_thai = 'TON_KHO',
                  ma_kho_hien_tai = $1,
                  ngay_ban = NULL,
                  so_hoa_don_ban = NULL,
+                 locked = FALSE,
+                 locked_at = NULL,
+                 locked_reason = NULL,
                  updated_at = CURRENT_TIMESTAMP
              WHERE ma_serial = $2`,
             [maKhoHoan, item.ma_serial],
@@ -1027,6 +1071,22 @@ class OrderService {
   }
 
   /**
+   * Helper: Unlock all vehicles associated with an order
+   */
+  static async _unlockVehiclesInOrder(client, so_don_hang) {
+    const itemsRes = await client.query(
+      `SELECT yeu_cau_dac_biet FROM tm_don_hang_chi_tiet WHERE so_don_hang = $1`,
+      [so_don_hang],
+    );
+
+    for (const row of itemsRes.rows) {
+      if (row.yeu_cau_dac_biet && row.yeu_cau_dac_biet.ma_serial) {
+        await Xe.unlock(row.yeu_cau_dac_biet.ma_serial, client);
+      }
+    }
+  }
+
+  /**
    * Update Order Status (Approve, Cancel, etc.)
    */
   static async updateStatus(idOrNo, status, userId) {
@@ -1055,8 +1115,13 @@ class OrderService {
       }
 
       // [P0-3] Hoàn kho nếu hủy đơn đang giao dở
-      if (status === "DA_HUY" && currentStatus === "DANG_GIAO") {
-        await this._reverseInvoice(client, order.so_don_hang, userId);
+      if (status === "DA_HUY") {
+        if (currentStatus === "DANG_GIAO") {
+          await this._reverseInvoice(client, order.so_don_hang, userId);
+        } else {
+          // Chỉ cần mở khóa xe nếu chưa tạo hóa đơn (NHAP, DA_DUYET)
+          await this._unlockVehiclesInOrder(client, order.so_don_hang);
+        }
       }
 
       const updatedOrderResult = await client.query(
@@ -1084,7 +1149,7 @@ class OrderService {
 
       // Notify about status change
       NotificationService.notifyUser(
-        updatedOrder.nguoi_tao,
+        updatedOrder.created_by,
         "Trạng thái đơn hàng thay đổi",
         `Đơn hàng ${updatedOrder.so_don_hang} đã được ${ten_nguoi_sua} chuyển sang trạng thái: ${status}${
           status === "DA_HUY" && currentStatus === "DANG_GIAO"

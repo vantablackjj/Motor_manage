@@ -51,12 +51,43 @@ const checkPermission = (moduleOrFull, action = null) => {
     }
 
     const authorities = req.user.authorities || [];
-    if (!authorities.includes(requiredPermission)) {
-      return sendError(res, `Permission denied: ${requiredPermission}`, 403, {
-        required_permission: requiredPermission,
-        your_authorities: authorities
-      });
+    
+    // Check main permission
+    if (authorities.includes(requiredPermission)) {
+      return next();
     }
+
+    // Legacy fallback check - Expanded to handle all known pairs
+    const legacyMap = {
+      'sales_orders': 'don_hang_ban_xe',
+      'purchase_orders': 'don_hang_mua_xe',
+      'reports': 'bao_cao',
+      'inventory': 'ton_kho',
+      'maintenance': 'sua_chua'
+    };
+
+    const parts = requiredPermission.split('.');
+    if (parts.length === 2) {
+      const [mod, act] = parts;
+      
+      // Try mapping modern -> legacy
+      const legacyMod = legacyMap[mod];
+      if (legacyMod && authorities.includes(`${legacyMod}.${act}`)) {
+        return next();
+      }
+
+      // Try mapping legacy -> modern (reverse)
+      const modernMod = Object.keys(legacyMap).find(key => legacyMap[key] === mod);
+      if (modernMod && authorities.includes(`${modernMod}.${act}`)) {
+        return next();
+      }
+    }
+
+    return sendError(res, `Permission denied: ${requiredPermission}`, 403, {
+      required_permission: requiredPermission,
+      your_role: req.user.vai_tro,
+      your_authorities: authorities
+    });
 
     next();
   };
@@ -205,14 +236,51 @@ const checkAnyPermission = (...permissions) => {
 
     const userAuthorities = req.user.authorities || [];
     
+    // Mapping of modern prefixes to their legacy counterparts
+    const legacyMap = {
+      'sales_orders': 'don_hang_ban_xe',
+      'purchase_orders': 'don_hang_mua_xe',
+      'reports': 'bao_cao',
+      'inventory': 'ton_kho',
+      'maintenance': 'sua_chua'
+    };
+
     const hasAny = permissions.some(p => {
-      const requiredPermission = Array.isArray(p) ? `${p[0]}.${p[1]}` : p;
-      return userAuthorities.includes(requiredPermission);
+      const [mod, act] = Array.isArray(p) ? [p[0], p[1]] : p.split('.');
+      
+      // Check modern version
+      if (userAuthorities.includes(`${mod}.${act}`)) return true;
+      
+      // Check legacy version if applicable
+      const legacyMod = legacyMap[mod];
+      if (legacyMod && userAuthorities.includes(`${legacyMod}.${act}`)) return true;
+
+      // Check reverse
+      const modernMod = Object.keys(legacyMap).find(key => legacyMap[key] === mod);
+      if (modernMod && userAuthorities.includes(`${modernMod}.${act}`)) return true;
+
+      return false;
     });
+
+    // Special Fallback for Dashboard/Reports if authority check fails
+    // If the check is for reports.view or similar overview permissions, allow recognized roles
+    const isReportCheck = permissions.some(p => {
+      const mod = Array.isArray(p) ? p[0] : p.split('.')[0];
+      return ['reports', 'bao_cao', 'sales_orders', 'don_hang_ban_xe', 'inventory', 'ton_kho'].includes(mod);
+    });
+
+    const allowedRoles = [
+      ROLES.ADMIN, ROLES.QUAN_LY, ROLES.KE_TOAN, ROLES.BAN_HANG, 
+      ROLES.KHO, 'NHAN_VIEN', 'SALE', 'WAREHOUSE'
+    ];
+    if (!hasAny && isReportCheck && allowedRoles.includes(req.user.vai_tro)) {
+        return next();
+    }
 
     if (!hasAny) {
       return sendError(res, 'Insufficient permissions', 403, {
         required_any_of: permissions.map(p => Array.isArray(p) ? `${p[0]}.${p[1]}` : p),
+        your_role: req.user.vai_tro,
         your_authorities: userAuthorities
       });
     }
