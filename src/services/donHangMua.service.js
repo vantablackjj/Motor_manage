@@ -615,6 +615,13 @@ class DonHangMuaService {
       WHERE h.loai_don_hang::text = 'MUA_HANG'
     `;
     const params = [];
+    const ma_kho = filters.ma_kho_nhap || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(khoArray);
+      sql += ` AND h.ma_ben_nhap = ANY($${params.length})`;
+    }
+
     const result = await pool.query(sql, params);
     return result.rows;
   }

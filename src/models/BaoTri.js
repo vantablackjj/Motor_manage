@@ -119,8 +119,13 @@ class BaoTri {
     }
 
     if (filters.ma_kho) {
-      params.push(filters.ma_kho);
-      sql += ` AND b.ma_kho = $${params.length}`;
+      if (Array.isArray(filters.ma_kho)) {
+        params.push(filters.ma_kho);
+        sql += ` AND b.ma_kho = ANY($${params.length})`;
+      } else {
+        params.push(filters.ma_kho);
+        sql += ` AND b.ma_kho = $${params.length}`;
+      }
     }
 
     // Filter: chỉ xe cửa hàng hoặc chỉ xe ngoài

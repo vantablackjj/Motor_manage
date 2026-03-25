@@ -573,7 +573,13 @@ class HoaDonBanService {
       WHERE h.loai_hoa_don = 'BAN_HANG' AND ct.ma_serial IS NOT NULL
     `;
     const params = [];
-    // Add filters if needed (tu_ngay, den_ngay, ma_kho)
+    const ma_kho = filters.ma_kho_xuat || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(khoArray);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length})`;
+    }
+
     const result = await pool.query(sql, params);
     return result.rows;
   }
@@ -595,6 +601,13 @@ class HoaDonBanService {
       WHERE h.loai_hoa_don = 'BAN_HANG' AND ct.ma_serial IS NULL
     `;
     const params = [];
+    const ma_kho = filters.ma_kho_xuat || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(khoArray);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length})`;
+    }
+
     const result = await pool.query(sql, params);
     return result.rows;
   }

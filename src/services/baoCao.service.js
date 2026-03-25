@@ -707,8 +707,13 @@ class BaoCaoService {
       sql += ` AND ls.ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND (ls.ma_kho_xuat = $${params.length} OR ls.ma_kho_nhap = $${params.length})`;
+      if (Array.isArray(ma_kho)) {
+        params.push(ma_kho);
+        sql += ` AND (ls.ma_kho_xuat = ANY($${params.length}::text[]) OR ls.ma_kho_nhap = ANY($${params.length}::text[]))`;
+      } else {
+        params.push(ma_kho);
+        sql += ` AND (ls.ma_kho_xuat = $${params.length} OR ls.ma_kho_nhap = $${params.length})`;
+      }
     }
     if (loai_giao_dich) {
       params.push(loai_giao_dich);
@@ -772,8 +777,13 @@ class BaoCaoService {
       sql += ` AND ls.ngay_giao_dich < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND (ls.ma_kho_xuat = $${params.length} OR ls.ma_kho_nhap = $${params.length})`;
+      if (Array.isArray(ma_kho)) {
+        params.push(ma_kho);
+        sql += ` AND (ls.ma_kho_xuat = ANY($${params.length}::text[]) OR ls.ma_kho_nhap = ANY($${params.length}::text[]))`;
+      } else {
+        params.push(ma_kho);
+        sql += ` AND (ls.ma_kho_xuat = $${params.length} OR ls.ma_kho_nhap = $${params.length})`;
+      }
     }
     if (ma_pt) {
       params.push(ma_pt);

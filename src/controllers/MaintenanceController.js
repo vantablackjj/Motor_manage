@@ -54,10 +54,13 @@ class MaintenanceController {
         ROLES.KE_TOAN,
       ].includes(req.user.vai_tro);
 
-      if (!hasFullAccess && result.ma_kho !== req.user.ma_kho) {
+      const authorized = req.user.authorized_warehouses || [req.user.ma_kho];
+
+      if (!hasFullAccess && !authorized.includes(result.ma_kho)) {
         return res.status(403).json({
           success: false,
-          message: "Bạn không có quyền xem phiếu bảo trì của kho khác",
+          message:
+            "Bạn không có quyền xem phiếu bảo trì của kho này (Chưa được gán vào danh mục kho cho phép)",
         });
       }
 

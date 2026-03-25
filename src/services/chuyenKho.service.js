@@ -789,6 +789,18 @@ class ChuyenKhoService {
    * LẤY DỮ LIỆU EXPORT XE
    * ===================================================== */
   async getAllTransferXe(filters = {}) {
+    const { ma_kho } = filters;
+    const values = [];
+    let idx = 1;
+    let whereClause = "WHERE h.loai_don_hang::text = 'CHUYEN_KHO' AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NOT NULL";
+
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      whereClause += ` AND (h.ma_ben_xuat = ANY($${idx}) OR h.ma_ben_nhap = ANY($${idx}))`;
+      values.push(khoArray);
+      idx++;
+    }
+
     const queryStr = `
       SELECT 
         h.so_don_hang as ma_phieu,
@@ -804,11 +816,10 @@ class ChuyenKhoService {
       LEFT JOIN sys_user u ON h.created_by::text = u.id::text
       LEFT JOIN sys_kho kx ON h.ma_ben_xuat = kx.ma_kho
       LEFT JOIN sys_kho kn ON h.ma_ben_nhap = kn.ma_kho
-      WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
-        AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NOT NULL
+      ${whereClause}
       ORDER BY h.created_at DESC
     `;
-    const result = await pool.query(queryStr);
+    const result = await pool.query(queryStr, values);
     return result.rows;
   }
 
@@ -816,6 +827,18 @@ class ChuyenKhoService {
    * LẤY DỮ LIỆU EXPORT PHỤ TÙNG
    * ===================================================== */
   async getAllTransferPT(filters = {}) {
+    const { ma_kho } = filters;
+    const values = [];
+    let idx = 1;
+    let whereClause = "WHERE h.loai_don_hang::text = 'CHUYEN_KHO' AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NULL";
+
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      whereClause += ` AND (h.ma_ben_xuat = ANY($${idx}) OR h.ma_ben_nhap = ANY($${idx}))`;
+      values.push(khoArray);
+      idx++;
+    }
+
     const queryStr = `
       SELECT 
         h.so_don_hang as ma_phieu,
@@ -832,11 +855,10 @@ class ChuyenKhoService {
       LEFT JOIN tm_hang_hoa hh ON ct.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN sys_kho kx ON h.ma_ben_xuat = kx.ma_kho
       LEFT JOIN sys_kho kn ON h.ma_ben_nhap = kn.ma_kho
-      WHERE h.loai_don_hang::text = 'CHUYEN_KHO'
-        AND (ct.yeu_cau_dac_biet->>'ma_serial') IS NULL
+      ${whereClause}
       ORDER BY h.created_at DESC
     `;
-    const result = await pool.query(queryStr);
+    const result = await pool.query(queryStr, values);
     return result.rows;
   }
 }

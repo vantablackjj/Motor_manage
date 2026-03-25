@@ -39,6 +39,7 @@ router.get(
   async (req, res, next) => {
     try {
       const filters = {
+        ma_kho: req.query.ma_kho,
         trang_thai: req.query.trang_thai,
         ma_kho_xuat: req.query.ma_kho_xuat,
         ma_kho_nhap: req.query.ma_kho_nhap,
@@ -68,18 +69,15 @@ router.get(
         return sendError(res, "Phiếu chuyển kho không tồn tại", 404);
       }
 
-      // Warehouse access check
+      // Warehouse access check using standardized list from isolation middleware
       const user = req.user;
       const phieu = data.phieu || data;
       const ma_kho_xuat = phieu.ma_kho_xuat;
       const ma_kho_nhap = phieu.ma_kho_nhap;
-      const isGlobalAdmin = user.vai_tro === "ADMIN";
       
-      const allowedWarehouses = (user.allowed_warehouses || []).map(w => w.ma_kho);
-      const hasAccess = user.ma_kho === ma_kho_xuat || 
-                        user.ma_kho === ma_kho_nhap || 
-                        allowedWarehouses.includes(ma_kho_xuat) || 
-                        allowedWarehouses.includes(ma_kho_nhap);
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const authorized = user.authorized_warehouses || [];
+      const hasAccess = authorized.includes(ma_kho_xuat) || authorized.includes(ma_kho_nhap);
 
       if (!isGlobalAdmin && !hasAccess) {
         return sendError(res, "Bạn không có quyền truy cập dữ liệu của kho xuất hoặc kho nhập này", 403);
@@ -107,6 +105,20 @@ router.get(
       const data = await chuyenKhoService.getChiTiet(ma_phieu);
       if (!data)
         return res.status(404).json({ message: "Phiếu không tồn tại" });
+
+      // Warehouse access check for PDF printing
+      const user = req.user;
+      const phieu = data.phieu || data;
+      const ma_kho_xuat = phieu.ma_kho_xuat;
+      const ma_kho_nhap = phieu.ma_kho_nhap;
+      
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const authorized = user.authorized_warehouses || [];
+      const hasAccess = isGlobalAdmin || authorized.includes(ma_kho_xuat) || authorized.includes(ma_kho_nhap);
+
+      if (!hasAccess) {
+        return sendError(res, "Bạn không có quyền xem thông tin in phiếu của các kho này", 403);
+      }
 
       // Map data
       const currentData = data.phieu || data;

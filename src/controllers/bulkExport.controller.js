@@ -58,7 +58,7 @@ class BulkExportController {
 
   static async exportWarehouses(req, res, next) {
     try {
-      const data = await KhoService.getAll();
+      const data = await KhoService.getAll(req.query);
       const columns = [
         { header: "Mã Kho", key: "ma_kho", width: 15 },
         { header: "Tên Kho", key: "ten_kho", width: 30 },

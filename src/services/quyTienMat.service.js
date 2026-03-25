@@ -17,8 +17,13 @@ class QuyTienMatService {
 
     const params = [];
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND q.ma_kho = $${params.length}`;
+      if (Array.isArray(ma_kho)) {
+        params.push(ma_kho);
+        sql += ` AND q.ma_kho = ANY($${params.length})`;
+      } else {
+        params.push(ma_kho);
+        sql += ` AND q.ma_kho = $${params.length}`;
+      }
     }
 
     sql += ` ORDER BY q.ma_kho, q.loai_quy`;

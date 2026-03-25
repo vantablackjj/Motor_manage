@@ -347,8 +347,13 @@ class MaintenanceService {
     const params = [];
 
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND bn.ma_kho = $${params.length}`;
+      if (Array.isArray(ma_kho)) {
+        params.push(ma_kho);
+        sql += ` AND bn.ma_kho = ANY($${params.length})`;
+      } else {
+        params.push(ma_kho);
+        sql += ` AND bn.ma_kho = $${params.length}`;
+      }
     }
 
     sql += " ORDER BY bn.ma_ban_nang ASC";
@@ -617,8 +622,13 @@ class MaintenanceService {
     }
 
     if (ma_kho) {
-      params.push(ma_kho);
-      sql += ` AND x.ma_kho_hien_tai = $${params.length}`;
+      if (Array.isArray(ma_kho)) {
+        params.push(ma_kho);
+        sql += ` AND x.ma_kho_hien_tai = ANY($${params.length})`;
+      } else {
+        params.push(ma_kho);
+        sql += ` AND x.ma_kho_hien_tai = $${params.length}`;
+      }
     }
 
     sql += " ORDER BY n.ngay_du_kien ASC, n.id DESC";
@@ -791,7 +801,11 @@ class MaintenanceService {
 
     if (ma_kho) {
       params.push(ma_kho);
-      sql += ` AND (u.ma_kho = $${params.length} OR uk.ma_kho = $${params.length})`;
+      if (Array.isArray(ma_kho)) {
+        sql += ` AND (u.ma_kho = ANY($${params.length}) OR uk.ma_kho = ANY($${params.length}))`;
+      } else {
+        sql += ` AND (u.ma_kho = $${params.length} OR uk.ma_kho = $${params.length})`;
+      }
     }
 
     sql += " ORDER BY u.ho_ten ASC";

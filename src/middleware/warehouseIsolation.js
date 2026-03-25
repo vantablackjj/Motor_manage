@@ -23,6 +23,9 @@ const warehouseIsolation = (req, res, next) => {
       assignedWarehouses.push(trimmedHome);
     }
   }
+
+  // Gắn danh sách kho đã được chuẩn hóa để Controller có thể tái sử dụng
+  req.user.authorized_warehouses = assignedWarehouses;
   
   const hasAssignedWarehouses = assignedWarehouses.length > 0;
 

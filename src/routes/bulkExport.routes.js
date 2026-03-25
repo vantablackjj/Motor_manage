@@ -4,8 +4,10 @@ const BulkExportController = require("../controllers/bulkExport.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
 
-// Tất cả các route export đều yêu cầu đăng nhập
-router.use(authenticate);
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
+
+// Tất cả các route export đều yêu cầu đăng nhập và phân vùng kho
+router.use(authenticate, warehouseIsolation);
 
 // Middleware kiểm tra quyền export chung cho cả module
 const checkExportPermission = checkPermission("reports", "export");
