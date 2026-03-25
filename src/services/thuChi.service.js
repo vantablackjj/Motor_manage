@@ -169,6 +169,7 @@ class ThuChiService {
           phieu.ma_doi_tac,
           loai_cong_no,
           phieu.so_tien,
+          phieu.ma_kho, // Added for isolation
           client,
         );
       }

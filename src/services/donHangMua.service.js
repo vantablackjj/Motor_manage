@@ -451,6 +451,7 @@ class DonHangMuaService {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: don.ma_ncc,
           loai_cong_no: "PHAI_TRA",
+          ma_kho: don.ma_ben_nhap, // Added for isolation
           so_hoa_don: soPhieuNhapKho,
           ngay_phat_sinh: new Date(),
           so_tien: invThanhTien, // công nợ theo thanh_tien sau VAT & CK
@@ -515,14 +516,11 @@ class DonHangMuaService {
       sql += ` AND d.trang_thai::text = $${params.length}`;
     }
 
-    if (filters.ma_kho_nhap) {
-      params.push(filters.ma_kho_nhap);
-      sql += ` AND d.ma_ben_nhap = $${params.length}`;
-    }
-
-    if (filters.ma_kho) {
-      params.push(filters.ma_kho);
-      sql += ` AND d.ma_ben_nhap = $${params.length}`;
+    const ma_kho = filters.ma_kho_nhap || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(khoArray);
+      sql += ` AND d.ma_ben_nhap = ANY($${params.length})`;
     }
 
     sql += " ORDER BY d.ngay_dat_hang DESC, d.so_don_hang DESC";

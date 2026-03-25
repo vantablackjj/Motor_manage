@@ -17,8 +17,9 @@ class InventoryService {
     const params = [];
 
     if (filters.ma_kho) {
-      sql += ` AND ma_kho = $${params.length + 1}`;
-      params.push(filters.ma_kho);
+      const ma_kho_arr = Array.isArray(filters.ma_kho) ? filters.ma_kho : [filters.ma_kho];
+      sql += ` AND ma_kho = ANY($${params.length + 1}::text[])`;
+      params.push(ma_kho_arr);
     }
 
     if (filters.ma_pt) {

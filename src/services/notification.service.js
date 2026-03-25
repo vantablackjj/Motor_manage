@@ -71,7 +71,8 @@ class NotificationService {
    */
   static async notifyManagers(title, content, link, type = "SYSTEM", ma_kho = null) {
     // Get all users with QUAN_LY, ADMIN or KE_TOAN role
-    // Filter by warehouse if provided (Admins always get notified)
+    // If ma_kho is provided, filter by warehouse. 
+    // If ma_kho is NOT provided, ONLY notify ADMINS to avoid "spamming" all warehouse managers.
     let queryStr = `
       SELECT DISTINCT u.id FROM sys_user u
       LEFT JOIN sys_role r ON u.role_id = r.id
@@ -83,7 +84,10 @@ class NotificationService {
     if (ma_kho) {
       const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
       params.push(ma_kho_arr);
-      queryStr += ` AND (u.vai_tro = 'ADMIN' OR u.ma_kho = ANY($1::text[]) OR uk.ma_kho = ANY($1::text[]))`;
+      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ten_quyen = 'ADMIN' OR u.ma_kho = ANY($1::text[]) OR uk.ma_kho = ANY($1::text[]))`;
+    } else {
+      // No warehouse provided -> Only notify global Admins
+      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ten_quyen = 'ADMIN')`;
     }
 
     const managers = await query(queryStr, params);

@@ -411,6 +411,8 @@ class DonHangMuaXeService {
       "Đơn mua xe mới chờ duyệt",
       `Đơn ${soPhieu} đã được gửi duyệt bởi người dùng ${userId}.`,
       `/purchase/vehicles/${soPhieu}`,
+      "APPROVAL",
+      order.ma_ben_nhap,
     ).catch((err) => console.error("Notification Error:", err));
 
     return order;
@@ -670,14 +672,11 @@ class DonHangMuaXeService {
       values.push(trang_thai);
     }
 
-    if (ma_kho_nhap) {
-      conditions.push(`ma_ben_nhap = $${idx++}`);
-      values.push(ma_kho_nhap);
-    }
-
-    if (filters.ma_kho) {
-      conditions.push(`ma_ben_nhap = $${idx++}`);
-      values.push(filters.ma_kho);
+    const ma_kho = ma_kho_nhap || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      conditions.push(`ma_ben_nhap = ANY($${idx++})`);
+      values.push(khoArray);
     }
 
     if (tu_ngay) {
@@ -880,6 +879,7 @@ class DonHangMuaXeService {
       await CongNoService.recordDoiTacDebt(client, {
         ma_doi_tac: order.ma_ben_xuat,
         loai_cong_no: "PHAI_TRA",
+        ma_kho: order.ma_ben_nhap, // Added
         so_hoa_don: soPhieuNhapKho,
         ngay_phat_sinh: new Date(),
         so_tien: invThanhTien,

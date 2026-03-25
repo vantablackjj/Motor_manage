@@ -5,6 +5,7 @@ const Joi = require("joi");
 const controller = require("../controllers/donHangMuaXe.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 const { validate } = require("../middleware/validation");
 
 const nhapXeMoiSchema = Joi.object({
@@ -41,7 +42,7 @@ const createWithDetailsSchema = Joi.object({
   chi_tiet: Joi.array().items(chiTietDonHang).min(1).required(),
 });
 
-router.use(authenticate);
+router.use(authenticate, warehouseIsolation);
 
 /**
  * 1. Lấy danh sách đơn mua

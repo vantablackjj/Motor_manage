@@ -3,8 +3,11 @@ const router = express.Router();
 const donHangMuaController = require("../controllers/donHangMua.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 const { validate } = require("../middleware/validation");
 const Joi = require("joi");
+
+router.use(authenticate, warehouseIsolation);
 
 // Validation schemas
 const taoDonHangSchema = Joi.object({

@@ -22,8 +22,9 @@ class Xe {
 
     if (filters.ma_kho || filters.ma_kho_hien_tai) {
       const ma_kho = filters.ma_kho || filters.ma_kho_hien_tai;
-      sql += ` AND x.ma_kho_hien_tai = $${idx++}`;
-      params.push(ma_kho);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      sql += ` AND x.ma_kho_hien_tai = ANY($${idx++}::text[])`;
+      params.push(ma_kho_arr);
     }
 
     if (filters.trang_thai) {
@@ -102,11 +103,12 @@ class Xe {
       FROM tm_hang_hoa_serial x
       INNER JOIN tm_hang_hoa hh ON x.ma_hang_hoa = hh.ma_hang_hoa
       LEFT JOIN dm_mau m ON (x.thuoc_tinh_rieng->>'ma_mau') = m.ma_mau
-      WHERE x.ma_kho_hien_tai = $1 
+      WHERE x.ma_kho_hien_tai = ANY($1::text[]) 
         AND x.trang_thai = 'TON_KHO'
     `;
 
-    const params = [ma_kho];
+    const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+    const params = [ma_kho_arr];
 
     if (filters.ma_loai_xe) {
       params.push(filters.ma_loai_xe);
@@ -425,8 +427,9 @@ class Xe {
     let idx = 1;
 
     if (filters.ma_kho) {
-      sql += ` AND x.ma_kho_hien_tai = $${idx++}`;
-      params.push(filters.ma_kho);
+      const ma_kho_arr = Array.isArray(filters.ma_kho) ? filters.ma_kho : [filters.ma_kho];
+      sql += ` AND x.ma_kho_hien_tai = ANY($${idx++}::text[])`;
+      params.push(ma_kho_arr);
     }
     if (filters.ma_loai_xe) {
       sql += ` AND x.ma_hang_hoa = $${idx++}`;

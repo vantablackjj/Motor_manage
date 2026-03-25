@@ -11,6 +11,7 @@ class DonHangMuaXeController {
       const filters = {
         trang_thai: req.query.trang_thai,
         ma_kho_nhap: req.query.ma_kho_nhap,
+        ma_kho: req.query.ma_kho, // Injected by warehouseIsolation middleware
         tu_ngay: req.query.tu_ngay,
         den_ngay: req.query.den_ngay,
         limit: req.query.limit,
@@ -69,6 +70,18 @@ class DonHangMuaXeController {
     try {
       const { ma_phieu } = req.params;
       const data = await DonHangMuaXeService.getDetail(ma_phieu);
+
+      // Warehouse access check
+      const user = req.user;
+      const ma_kho = data.ma_kho_nhap;
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const hasWarehouseAccess = user.ma_kho === ma_kho || 
+        (user.allowed_warehouses && user.allowed_warehouses.some(w => w.ma_kho === ma_kho));
+
+      if (!isGlobalAdmin && !hasWarehouseAccess) {
+        const { sendError } = require("../utils/response");
+        return sendError(res, "Bạn không có quyền truy cập dữ liệu của kho này", 403);
+      }
 
       sendSuccess(res, data, "Lấy chi tiết đơn mua xe thành công");
     } catch (err) {

@@ -304,6 +304,7 @@ class MaintenanceService {
       `Xe ${data.ma_serial} đã được tiếp nhận tại kho ${data.ma_kho || "Hệ thống"}.`,
       `/maintenance/${data.ma_phieu}`,
       "MAINTENANCE",
+      data.ma_kho,
     ).catch((err) => console.error("Notification Error:", err));
 
     // Notify the Technician (KTV) if assigned
@@ -479,6 +480,7 @@ class MaintenanceService {
           await CongNoService.recordDoiTacDebt(client, {
             ma_doi_tac: phieuData.ma_doi_tac,
             loai_cong_no: "PHAI_THU",
+            ma_kho: khoXuat, // Added
             so_hoa_don: null,
             ngay_phat_sinh: new Date(),
             so_tien: phieuData.tong_tien,
@@ -544,6 +546,7 @@ class MaintenanceService {
           `Xe ${phieuData.ma_serial} đã hoàn thành sửa chữa (Phiếu: ${ma_phieu}). Tổng tiền: ${Number(phieuData.tong_tien).toLocaleString()}đ.`,
           `/maintenance/${ma_phieu}`,
           "MAINTENANCE",
+          phieuData.ma_kho,
         ).catch((err) => console.error("Notification Error:", err));
       } else {
         // For other status changes, notify relevant users (e.g. Creator or assigned KTV)

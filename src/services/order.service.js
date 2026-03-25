@@ -652,6 +652,7 @@ class OrderService {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_xuat, // NCC
           loai_cong_no: "PHAI_TRA",
+          ma_kho: order.ma_ben_nhap, // Kho của mình
           so_hoa_don: so_hoa_don,
           so_tien: inv_thanh_tien,
           ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
@@ -660,6 +661,7 @@ class OrderService {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_nhap, // Khách hàng
           loai_cong_no: "PHAI_THU",
+          ma_kho: order.ma_ben_xuat, // Kho của mình
           so_hoa_don: so_hoa_don,
           so_tien: inv_thanh_tien,
           ghi_chu: `Nợ bán hàng theo hóa đơn ${so_hoa_don}`,
@@ -750,6 +752,7 @@ class OrderService {
       loai_don_hang,
       ma_ben_xuat,
       ma_ben_nhap,
+      ma_kho, // Added for isolation
       trang_thai,
       page = 1,
       limit = 20,
@@ -782,6 +785,16 @@ class OrderService {
     if (trang_thai) {
       conditions.push(`d.trang_thai::text = $${idx++}`);
       values.push(trang_thai);
+    }
+    // Warehouse Isolation: User in Warehouse A should see orders involving Warehouse A (as Source or Destination)
+    const activeMaKho = ma_kho || ma_ben_nhap || ma_ben_xuat;
+    if (activeMaKho) {
+      const ma_kho_arr = Array.isArray(activeMaKho) ? activeMaKho : [activeMaKho];
+      values.push(ma_kho_arr);
+      conditions.push(
+        `( (d.ma_ben_xuat = ANY($${idx}) AND d.loai_ben_xuat = 'KHO') OR (d.ma_ben_nhap = ANY($${idx}) AND d.loai_ben_nhap = 'KHO') )`,
+      );
+      idx++;
     }
 
     const whereClause = conditions.length

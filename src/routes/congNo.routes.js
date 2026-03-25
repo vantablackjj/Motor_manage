@@ -16,6 +16,7 @@ router.get(
       const filters = {
         ma_kho_no: req.query.ma_kho_no,
         ma_kho_co: req.query.ma_kho_co,
+        ma_kho: req.query.ma_kho, // Added
       };
       const data = await congNoService.getTongHop(filters);
       sendSuccess(res, data, "Lấy danh sách công nợ thành công");
@@ -76,6 +77,7 @@ router.get(
       const filters = {
         ma_doi_tac: req.query.ma_doi_tac,
         loai_cong_no: req.query.loai_cong_no,
+        ma_kho: req.query.ma_kho, // Added
       };
       const data = await congNoService.getTongHopDoiTac(filters);
       sendSuccess(res, data, "Lấy danh sách công nợ đối tác thành công");
@@ -99,6 +101,7 @@ router.get(
       const data = await congNoService.getChiTietDoiTac(
         ma_doi_tac,
         loai_cong_no,
+        req.query.ma_kho, // Added
       );
       sendSuccess(res, data, "Lấy chi tiết công nợ đối tác thành công");
     } catch (error) {

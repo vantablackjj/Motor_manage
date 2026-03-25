@@ -48,43 +48,6 @@ router.get(
 
 // 2. PROTECTED ROUTES (Cần đăng nhập & Cách ly kho)
 router.use(authenticate);
-
-// Intercept warehouse parameters to enforce isolation for BAN_HANG/KHO roles
-const warehouseParams = [
-  "ma_kho",
-  "ma_kho_nhap",
-  "ma_kho_xuat",
-  "kho_id",
-  "tu_ma_kho",
-  "den_ma_kho",
-];
-warehouseParams.forEach((paramName) => {
-  router.param(paramName, (req, res, next, val) => {
-    const { ROLES } = require("../config/constants");
-    if (!req.user) return next();
-
-    // Determine assigned warehouses (primary + list)
-    const assigned = (req.user.allowed_warehouses || [])
-      .map((k) => (typeof k === "string" ? k : k?.ma_kho))
-      .filter(Boolean);
-    if (req.user.ma_kho && !assigned.includes(req.user.ma_kho)) {
-      assigned.push(req.user.ma_kho);
-    }
-
-    // Only apply restriction for staff roles (or managers with a specific list)
-    const isFullAccess = req.user.vai_tro === ROLES.ADMIN || 
-      ((req.user.vai_tro === ROLES.QUAN_LY || req.user.vai_tro === ROLES.KE_TOAN) && assigned.length === 0);
-
-    if (!isFullAccess && assigned.length > 0) {
-      if (!assigned.includes(val)) {
-        // Force to the first assigned warehouse if the requested one is not allowed
-        req.params[paramName] = assigned[0];
-      }
-    }
-    next();
-  });
-});
-
 router.use(warehouseIsolation);
 
 router.use("/kho", khoRoutes);

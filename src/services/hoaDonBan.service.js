@@ -397,6 +397,7 @@ class HoaDonBanService {
       await CongNoService.recordDoiTacDebt(client, {
         ma_doi_tac: hd.ma_ben_nhap,
         loai_cong_no: "PHAI_THU",
+        ma_kho: hd.ma_ben_xuat, // Added
         so_hoa_don: so_hd,
         ngay_phat_sinh: hd.ngay_hoa_don,
         so_tien: hd.thanh_tien,
@@ -455,6 +456,7 @@ class HoaDonBanService {
   }
 
   // Lấy danh sách hóa đơn
+  // Lấy danh sách hóa đơn
   async getDanhSach(filters = {}) {
     let sql = `
       SELECT 
@@ -476,14 +478,12 @@ class HoaDonBanService {
       sql += ` AND h.trang_thai = $${params.length}`;
     }
 
-    if (filters.ma_kho_xuat) {
-      params.push(filters.ma_kho_xuat);
-      sql += ` AND h.ma_ben_xuat = $${params.length}`;
-    }
-
-    if (filters.ma_kho) {
-      params.push(filters.ma_kho);
-      sql += ` AND h.ma_ben_xuat = $${params.length}`;
+    // ma_kho_xuat hoặc ma_kho có thể là String hoặc Array (từ warehouseIsolation)
+    const ma_kho = filters.ma_kho_xuat || filters.ma_kho;
+    if (ma_kho) {
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(khoArray);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length})`;
     }
 
     sql += " ORDER BY h.ngay_hoa_don DESC, h.so_hoa_don DESC";

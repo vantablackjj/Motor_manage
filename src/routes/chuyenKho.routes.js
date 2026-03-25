@@ -2,8 +2,11 @@ const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../utils/response");
+
+router.use(authenticate, warehouseIsolation);
 const chuyenKhoService = require("../services/chuyenKho.service");
 const Joi = require("joi");
 

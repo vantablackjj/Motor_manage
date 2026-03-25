@@ -3,8 +3,11 @@ const router = express.Router();
 
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../utils/response");
+
+router.use(authenticate, warehouseIsolation);
 
 const { pool } = require("../config/database");
 const hoaDonBanService = require("../services/hoaDonBan.service");
@@ -158,6 +161,18 @@ router.get(
       if (so_hd === "create" || so_hd === "new-hd") return;
 
       const result = await hoaDonBanService.getById(so_hd);
+      
+      // Warehouse access check
+      const user = req.user;
+      const ma_kho = result.ma_kho_xuat;
+      const isGlobalAdmin = user.vai_tro === "ADMIN";
+      const hasWarehouseAccess = user.ma_kho === ma_kho || 
+        (user.allowed_warehouses && user.allowed_warehouses.some(w => w.ma_kho === ma_kho));
+
+      if (!isGlobalAdmin && !hasWarehouseAccess) {
+        return sendError(res, "Bạn không có quyền truy cập dữ liệu của kho này", 403);
+      }
+
       return sendSuccess(res, result, "Lấy hóa đơn thành công");
     } catch (err) {
       const status = err.message.includes("Không tìm thấy") ? 404 : 500;

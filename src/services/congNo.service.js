@@ -19,14 +19,12 @@ class CongNoService {
     `;
     const params = [];
 
-    if (ma_kho_no) {
-      params.push(ma_kho_no);
-      sql += ` AND cn.ma_kho_no = $${params.length}`;
-    }
-
-    if (ma_kho_co) {
-      params.push(ma_kho_co);
-      sql += ` AND cn.ma_kho_co = $${params.length}`;
+    // Tối ưu hóa lọc kho: Nếu người dùng thuộc kho A, họ sẽ thấy mọi bản ghi mà kho A là bên Nợ HOẶC bên Có
+    if (filters.ma_kho || ma_kho_no || ma_kho_co) {
+      const target_kho = filters.ma_kho || ma_kho_no || ma_kho_co;
+      const ma_kho_arr = Array.isArray(target_kho) ? target_kho : [target_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND (cn.ma_kho_no = ANY($${params.length}::text[]) OR cn.ma_kho_co = ANY($${params.length}::text[]))`;
     }
 
     sql += ` ORDER BY cn.updated_at DESC`;
@@ -254,6 +252,7 @@ class CongNoService {
     ma_doi_tac,
     loai_cong_no,
     so_tien,
+    ma_kho, // Added
     externalClient = null,
   ) {
     const client = externalClient || (await pool.connect());
@@ -269,11 +268,11 @@ class CongNoService {
         `
         SELECT id, con_lai
         FROM tm_cong_no_doi_tac_ct
-        WHERE ma_doi_tac = $1 AND loai_cong_no = $2 AND con_lai > 0
+        WHERE ma_doi_tac = $1 AND loai_cong_no = $2 AND ma_kho = $3 AND con_lai > 0
         ORDER BY ngay_phat_sinh ASC
         FOR UPDATE
         `,
-        [ma_doi_tac, loai_cong_no],
+        [ma_doi_tac, loai_cong_no, ma_kho],
       );
 
       for (const khoan_no of noRes.rows) {
@@ -301,9 +300,9 @@ class CongNoService {
         UPDATE tm_cong_no_doi_tac
         SET tong_da_thanh_toan = tong_da_thanh_toan + $1,
             updated_at = NOW()
-        WHERE ma_doi_tac = $2 AND loai_cong_no = $3
+        WHERE ma_doi_tac = $2 AND loai_cong_no = $3 AND ma_kho = $4
         `,
-        [so_tien, ma_doi_tac, loai_cong_no],
+        [so_tien, ma_doi_tac, loai_cong_no, ma_kho],
       );
 
       if (shouldManageTransaction) await client.query("COMMIT");
@@ -320,7 +319,7 @@ class CongNoService {
    * LẤY TỔNG HỢP CÔNG NỢ ĐỐI TÁC
    * ===================================================== */
   async getTongHopDoiTac(filters = {}) {
-    const { ma_doi_tac, loai_cong_no } = filters;
+    const { ma_doi_tac, loai_cong_no, ma_kho } = filters;
     let sql = `
       SELECT cn.*, dt.ten_doi_tac
       FROM tm_cong_no_doi_tac cn
@@ -336,6 +335,13 @@ class CongNoService {
       params.push(loai_cong_no);
       sql += ` AND cn.loai_cong_no = $${params.length}`;
     }
+    // Warehouse isolation for Partner Debt
+    if (ma_kho || filters.ma_kho_nhap || filters.ma_kho_xuat) {
+      const active_ma_kho = ma_kho || filters.ma_kho_nhap || filters.ma_kho_xuat;
+      const ma_kho_arr = Array.isArray(active_ma_kho) ? active_ma_kho : [active_ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND cn.ma_kho = ANY($${params.length}::text[])`;
+    }
     sql += ` ORDER BY cn.updated_at DESC`;
     const result = await pool.query(sql, params);
     return result.rows;
@@ -344,14 +350,22 @@ class CongNoService {
   /* =====================================================
    * LẤY CHI TIẾT CÔNG NỢ ĐỐI TÁC
    * ===================================================== */
-  async getChiTietDoiTac(ma_doi_tac, loai_cong_no) {
-    const sql = `
+  async getChiTietDoiTac(ma_doi_tac, loai_cong_no, ma_kho = null) {
+    let sql = `
       SELECT *
       FROM tm_cong_no_doi_tac_ct
       WHERE ma_doi_tac = $1 AND loai_cong_no = $2 AND con_lai > 0
-      ORDER BY ngay_phat_sinh ASC
     `;
-    const result = await pool.query(sql, [ma_doi_tac, loai_cong_no]);
+    const params = [ma_doi_tac, loai_cong_no];
+    
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND ma_kho = ANY($${params.length}::text[])`;
+    }
+    
+    sql += ` ORDER BY ngay_phat_sinh ASC`;
+    const result = await pool.query(sql, params);
     return result.rows;
   }
   /* =====================================================
@@ -362,6 +376,7 @@ class CongNoService {
     {
       ma_doi_tac,
       loai_cong_no,
+      ma_kho, // Added
       so_hoa_don,
       ngay_phat_sinh,
       so_tien,
@@ -373,12 +388,13 @@ class CongNoService {
     await client.query(
       `
       INSERT INTO tm_cong_no_doi_tac_ct (
-        ma_doi_tac, loai_cong_no, so_hoa_don, ngay_phat_sinh, so_tien, han_thanh_toan, ghi_chu
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ma_doi_tac, loai_cong_no, ma_kho, so_hoa_don, ngay_phat_sinh, so_tien, han_thanh_toan, ghi_chu
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `,
       [
         ma_doi_tac,
         loai_cong_no,
+        ma_kho,
         so_hoa_don,
         ngay_phat_sinh || new Date(),
         so_tien,
@@ -390,13 +406,13 @@ class CongNoService {
     // 2. Cập nhật tổng hợp
     await client.query(
       `
-      INSERT INTO tm_cong_no_doi_tac (ma_doi_tac, loai_cong_no, tong_no)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (ma_doi_tac, loai_cong_no) DO UPDATE SET
-        tong_no = tm_cong_no_doi_tac.tong_no + $3,
+      INSERT INTO tm_cong_no_doi_tac (ma_doi_tac, loai_cong_no, ma_kho, tong_no)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (ma_doi_tac, loai_cong_no, ma_kho) DO UPDATE SET
+        tong_no = tm_cong_no_doi_tac.tong_no + $4,
         updated_at = CURRENT_TIMESTAMP
     `,
-      [ma_doi_tac, loai_cong_no, so_tien],
+      [ma_doi_tac, loai_cong_no, ma_kho, so_tien],
     );
   }
 

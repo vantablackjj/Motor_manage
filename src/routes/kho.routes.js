@@ -3,11 +3,14 @@ const router = express.Router();
 const khoController = require("../controllers/kho.controller");
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 const { validate } = require("../middleware/validation");
 const {
   createKhoSchema,
   updateKhoSchema,
 } = require("../validations/kho.validation");
+
+router.use(authenticate, warehouseIsolation);
 
 /**
  * @route   GET /api/kho

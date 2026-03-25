@@ -76,6 +76,7 @@ router.get("/", authenticate, async (req, res, next) => {
     const filters = {
       nhom_pt: req.query.nhom_pt,
       search: req.query.search,
+      ma_kho: req.query.ma_kho, // Bổ sung cho isolation
       status: req.query.status, // Thêm dòng này để nhận diện status=all
     };
 

@@ -86,6 +86,7 @@ class PhuTung {
   }
   // ===== Tồn kho =====
   static async getTonKho(ma_kho, filters = {}) {
+    const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
     let sql = `
       SELECT 
         pt.ma_hang_hoa as ma_pt, pt.ten_hang_hoa as ten_pt, pt.don_vi_tinh, pt.ma_nhom_hang as nhom_pt,
@@ -99,11 +100,11 @@ class PhuTung {
         END AS trang_thai_ton
       FROM tm_hang_hoa_ton_kho tk
       INNER JOIN tm_hang_hoa pt ON tk.ma_hang_hoa = pt.ma_hang_hoa
-      WHERE tk.ma_kho = $1 AND pt.status = TRUE
+      WHERE tk.ma_kho = ANY($1::text[]) AND pt.status = TRUE
       ORDER BY pt.ma_nhom_hang, pt.ten_hang_hoa, pt.ma_hang_hoa
     `;
 
-    const queryParams = [ma_kho];
+    const queryParams = [ma_kho_arr];
     if (filters.page || filters.limit) {
       const { page = 1, limit = 100 } = filters;
       const safeLimit = Math.min(Number(limit) || 100, 500);

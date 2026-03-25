@@ -109,8 +109,9 @@ class User {
     }
 
     if (filters.ma_kho) {
-      params.push(filters.ma_kho);
-      sql += ` AND u.ma_kho = $${params.length}`;
+      const ma_kho_arr = Array.isArray(filters.ma_kho) ? filters.ma_kho : [filters.ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND u.ma_kho = ANY($${params.length}::text[])`;
     }
 
     if (filters.status !== undefined) {

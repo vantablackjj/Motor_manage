@@ -686,10 +686,12 @@ class ChuyenKhoService {
     const values = [];
     let idx = 1;
 
-    // ma_kho is used for automatic isolation (either side of the transfer)
+    // ma_kho hoặc ma_kho_xuat/ma_kho_nhap có thể là String hoặc Array (từ warehouseIsolation)
+    // Nếu là array, dùng ANY
     if (ma_kho) {
-      conditions.push(`(h.ma_ben_xuat = $${idx} OR h.ma_ben_nhap = $${idx})`);
-      values.push(ma_kho);
+      const khoArray = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      conditions.push(`(h.ma_ben_xuat = ANY($${idx}) OR h.ma_ben_nhap = ANY($${idx}))`);
+      values.push(khoArray);
       idx++;
     }
 
@@ -698,12 +700,14 @@ class ChuyenKhoService {
       values.push(trang_thai);
     }
     if (ma_kho_xuat) {
-      conditions.push(`h.ma_ben_xuat = $${idx++}`);
-      values.push(ma_kho_xuat);
+      const khoArray = Array.isArray(ma_kho_xuat) ? ma_kho_xuat : [ma_kho_xuat];
+      conditions.push(`h.ma_ben_xuat = ANY($${idx++})`);
+      values.push(khoArray);
     }
     if (ma_kho_nhap) {
-      conditions.push(`h.ma_ben_nhap = $${idx++}`);
-      values.push(ma_kho_nhap);
+      const khoArray = Array.isArray(ma_kho_nhap) ? ma_kho_nhap : [ma_kho_nhap];
+      conditions.push(`h.ma_ben_nhap = ANY($${idx++})`);
+      values.push(khoArray);
     }
 
     const whereClause = `WHERE ${conditions.join(" AND ")}`;

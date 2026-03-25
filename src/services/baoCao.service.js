@@ -21,7 +21,7 @@ class BaoCaoService {
     const params = [];
     if (ma_kho) {
       params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
-      sql += ` AND x.ma_kho_hien_tai = ANY($${params.length}::text[])`;
+      sql += ` AND TRIM(x.ma_kho_hien_tai) = ANY($${params.length}::text[])`;
     }
     if (ma_loai_xe) {
       params.push(ma_loai_xe);
@@ -54,7 +54,7 @@ class BaoCaoService {
     const params = [];
     if (ma_kho) {
       params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
-      sql += ` AND tk.ma_kho = ANY($${params.length}::text[])`;
+      sql += ` AND TRIM(tk.ma_kho) = ANY($${params.length}::text[])`;
     }
     if (nhom_pt) {
       params.push(nhom_pt);
@@ -99,8 +99,8 @@ class BaoCaoService {
     if (ma_kho) {
       const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
       params.push(ma_kho_arr);
-      sqlXe += ` AND x.ma_kho_hien_tai = ANY($${params.length}::text[])`;
-      sqlPT += ` AND tk.ma_kho = ANY($${params.length}::text[])`;
+      sqlXe += ` AND TRIM(x.ma_kho_hien_tai) = ANY($${params.length}::text[])`;
+      sqlPT += ` AND TRIM(tk.ma_kho) = ANY($${params.length}::text[])`;
     }
 
     sqlXe += ` GROUP BY k.ten_kho`;
@@ -899,7 +899,7 @@ class BaoCaoService {
   }
 
   async congNoKhachHang(filters = {}) {
-    const { ma_kh, ma_ncc, tu_ngay, den_ngay, loai_cong_no, search } = filters;
+    const { ma_kh, ma_ncc, tu_ngay, den_ngay, loai_cong_no, search, ma_kho } = filters;
 
     // If specific type is requested, return only that type
     if (loai_cong_no === "PHAI_TRA") {
@@ -911,6 +911,7 @@ class BaoCaoService {
           dt.ten_doi_tac::varchar as ho_ten, 
           cn.ma_doi_tac::varchar as ma_kh,
           cn.loai_cong_no::varchar,
+          cn.ma_kho::varchar as ma_kho,
           cn.tong_no::numeric as tong_no,
           cn.tong_da_thanh_toan::numeric as da_tra,
           cn.con_lai::numeric,
@@ -923,6 +924,11 @@ class BaoCaoService {
       if (ma_kh) {
         params.push(ma_kh);
         sql += ` AND cn.ma_doi_tac = $${params.length}`;
+      }
+      if (ma_kho) {
+        const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+        params.push(ma_kho_arr);
+        sql += ` AND cn.ma_kho = ANY($${params.length}::text[])`;
       }
       if (search) {
         params.push(`%${search}%`);
@@ -1022,11 +1028,12 @@ class BaoCaoService {
   }
 
   async congNoNhaCungCap(filters = {}) {
-    const { ma_ncc, tu_ngay, den_ngay } = filters;
+    const { ma_ncc, tu_ngay, den_ngay, ma_kho } = filters;
     let sql = `
       SELECT 
         dt.ten_doi_tac as ho_ten, 
         cn.ma_doi_tac as ma_ncc,
+        cn.ma_kho,
         cn.tong_no as tong_no,
         cn.tong_da_thanh_toan as da_tra,
         cn.con_lai
@@ -1038,6 +1045,10 @@ class BaoCaoService {
     if (ma_ncc) {
       params.push(ma_ncc);
       sql += ` AND cn.ma_doi_tac = $${params.length}`;
+    }
+    if (ma_kho) {
+      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      sql += ` AND cn.ma_kho = ANY($${params.length}::text[])`;
     }
     sql += ` ORDER BY cn.con_lai DESC`;
     const { rows } = await pool.query(sql, params);
@@ -1336,8 +1347,8 @@ class BaoCaoService {
       const totalCashMonth = Object.values(cashMonth).reduce((a, b) => a + b, 0);
 
       const sqlInternalDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_noi_bo ${warehouseVal ? "WHERE (ma_kho_no = ANY($1::text[]) OR ma_kho_co = ANY($1::text[]))" : "WHERE con_lai > 0"}`;
-      const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' AND con_lai > 0 ${warehouseVal ? "AND ma_doi_tac IN (SELECT ma_ben_nhap FROM tm_hoa_don WHERE ma_ben_xuat = ANY($1::text[]))" : ""}`;
-      const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' AND con_lai > 0 ${warehouseVal ? "AND ma_doi_tac IN (SELECT ma_ben_xuat FROM tm_don_hang WHERE ma_ben_nhap = ANY($1::text[]))" : ""}`;
+      const sqlCustomerDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_THU' AND con_lai > 0 ${warehouseVal ? "AND ma_kho = ANY($1::text[])" : ""}`;
+      const sqlSupplierDebt = `SELECT SUM(con_lai) as total FROM tm_cong_no_doi_tac WHERE loai_cong_no = 'PHAI_TRA' AND con_lai > 0 ${warehouseVal ? "AND ma_kho = ANY($1::text[])" : ""}`;
 
       const sqlRecentActivities = `
         SELECT so_phieu, loai_giao_dich, tong_tien, ngay_lap, dien_giai, ten_doi_tac FROM (

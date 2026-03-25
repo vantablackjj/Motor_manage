@@ -9,6 +9,7 @@ class DonHangMuaController {
       const filters = {
         trang_thai: req.query.trang_thai,
         ma_kho_nhap: req.query.ma_kho_nhap,
+        ma_kho: req.query.ma_kho, // Bổ sung để Middleware isolation hoạt động
         tu_ngay: req.query.tu_ngay,
         den_ngay: req.query.den_ngay,
       };
