@@ -118,7 +118,19 @@ const checkWarehouseAccess = (ma_kho_param = 'ma_kho') => {
         return sendError(res, 'Warehouse code required', 400);
       }
       
-      // Kiểm tra user có quyền truy cập kho này không
+      // Ưu tiên sử dụng danh sách đã được warehouseIsolation chuẩn hóa
+      if (user.authorized_warehouses) {
+        if (user.authorized_warehouses.includes(ma_kho)) {
+          return next();
+        }
+      }
+
+      // Fallback: Kiểm tra trực tiếp kho "nhà"
+      if (user.ma_kho === ma_kho) {
+        return next();
+      }
+
+      // Kiểm tra user có quyền truy cập kho này trong bảng phân quyền chi tiết
       const result = await query(
         `SELECT quyen_xem FROM sys_user_kho 
          WHERE user_id = $1 AND ma_kho = $2`,
@@ -166,7 +178,13 @@ const checkWarehousePermission = (permission) => {
         return sendError(res, 'Warehouse code required', 400);
       }
       
-      // Kiểm tra quyền cụ thể
+      // Nếu là kho "nhà" của user, mặc định có toàn quyền thao tác 
+      // đối với các role Nhân viên/Quản lý chi nhánh
+      if (user.ma_kho === ma_kho) {
+        return next();
+      }
+
+      // Kiểm tra quyền cụ thể trong bảng phân quyền chi tiết
       const result = await query(
         `SELECT ${permission} FROM sys_user_kho 
          WHERE user_id = $1 AND ma_kho = $2`,

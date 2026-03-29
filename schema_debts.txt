@@ -1,0 +1,3 @@
+
+--- FKs for tm_cong_no_doi_tac_ct ---
+tm_cong_no_doi_tac_ct_ma_doi_tac_fkey: FOREIGN KEY (ma_doi_tac) REFERENCES dm_doi_tac(ma_doi_tac)

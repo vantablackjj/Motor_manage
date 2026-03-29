@@ -22,7 +22,6 @@ router.use(authenticate, warehouseIsolation);
  */
 router.get(
   "/ton-kho/xe",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.tonKhoXe,
 );
@@ -34,7 +33,6 @@ router.get(
  */
 router.get(
   "/ton-kho/phu-tung",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.tonKhoPhuTung,
 );
@@ -46,7 +44,6 @@ router.get(
  */
 router.get(
   "/ton-kho/tong-hop",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.tonKhoTongHop,
 );
@@ -62,7 +59,6 @@ router.get(
  */
 router.get(
   "/doanh-thu/theo-thang",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoThang,
 );
@@ -74,7 +70,6 @@ router.get(
  */
 router.get(
   "/doanh-thu/theo-kho",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoKho,
 );
@@ -86,14 +81,12 @@ router.get(
  */
 router.get(
   "/doanh-thu/theo-san-pham",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.doanhThuTheoSanPham,
 );
 
 router.get(
   "/doanh-thu/tong-hop",
-  authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.doanhThuTongHop,
 );
@@ -105,7 +98,6 @@ router.get(
  */
 router.get(
   "/doanh-thu/chi-tiet",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.doanhThuChiTiet,
 );
@@ -117,7 +109,6 @@ router.get(
  */
 router.get(
   "/loi-nhuan",
-  authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.baoCaoLoiNhuan,
 );
@@ -133,7 +124,6 @@ router.get(
  */
 router.get(
   "/nhap-xuat/xe",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.nhapXuatXe,
 );
@@ -145,7 +135,6 @@ router.get(
  */
 router.get(
   "/nhap-xuat/phu-tung",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.nhapXuatPhuTung,
 );
@@ -157,7 +146,6 @@ router.get(
  */
 router.get(
   "/nhap-xuat/the-kho",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.theKhoPhuTung,
 );
@@ -169,7 +157,6 @@ router.get(
  */
 router.get(
   "/mua-hang/chi-tiet",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.chiTietMuaHang,
 );
@@ -185,7 +172,6 @@ router.get(
  */
 router.get(
   "/chuyen-kho/tong-hop",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.chuyenKhoTongHop,
 );
@@ -197,7 +183,6 @@ router.get(
  */
 router.get(
   "/chuyen-kho/chi-tiet",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.chuyenKhoChiTiet,
 );
@@ -213,7 +198,6 @@ router.get(
  */
 router.get(
   "/cong-no/noi-bo",
-  authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.congNoNoiBo,
 );
@@ -225,7 +209,6 @@ router.get(
  */
 router.get(
   "/cong-no/khach-hang",
-  authenticate,
   checkAnyPermission(["reports", "view_financial"], ["debt", "view"]),
   baoCaoController.congNoKhachHang,
 );
@@ -241,7 +224,6 @@ router.get(
  */
 router.get(
   "/thu-chi/theo-ngay",
-  authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.thuChiTheoNgay,
 );
@@ -253,7 +235,6 @@ router.get(
  */
 router.get(
   "/thu-chi/tong-hop",
-  authenticate,
   checkPermission("reports", "view_financial"),
   baoCaoController.thuChiTongHop,
 );
@@ -269,7 +250,6 @@ router.get(
  */
 router.get(
   "/khach-hang/top-mua-hang",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.topKhachHang,
 );
@@ -281,7 +261,6 @@ router.get(
  */
 router.get(
   "/khach-hang/lich-su-mua-hang",
-  authenticate,
   checkPermission("reports", "view"),
   baoCaoController.lichSuMuaHang,
 );
@@ -297,7 +276,6 @@ router.get(
  */
 router.post(
   "/xuat-excel",
-  authenticate,
   checkPermission("reports", "export"),
   baoCaoController.xuatExcel,
 );
@@ -309,7 +287,6 @@ router.post(
  */
 router.post(
   "/xuat-pdf",
-  authenticate,
   checkPermission("reports", "export"),
   baoCaoController.xuatPDF,
 );
@@ -325,7 +302,6 @@ router.post(
  */
 router.get(
   "/dashboard",
-  authenticate,
   baoCaoController.dashboard,
 );
 
@@ -336,7 +312,6 @@ router.get(
  */
 router.get(
   "/bieu-do/doanh-thu",
-  authenticate,
   checkAnyPermission(["reports", "view"], ["sales_orders", "view"]),
   baoCaoController.bieuDoDoanhThu,
 );
@@ -348,7 +323,6 @@ router.get(
  */
 router.get(
   "/bieu-do/ton-kho",
-  authenticate,
   checkAnyPermission(["reports", "view"], ["inventory", "view"]),
   baoCaoController.bieuDoTonKho,
 );

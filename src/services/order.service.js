@@ -433,6 +433,16 @@ class OrderService {
 
       const vat_percentage = order.vat_percentage || 0;
 
+      // 2.1 Check if partner exists (for Sales orders to DOI_TAC)
+      let partnerExists = false;
+      if (order.loai_ben_nhap === "DOI_TAC" && order.ma_ben_nhap) {
+        const checkPartner = await client.query(
+          "SELECT 1 FROM dm_doi_tac WHERE ma_doi_tac = $1",
+          [order.ma_ben_nhap]
+        );
+        partnerExists = checkPartner.rowCount > 0;
+      }
+
       // Proportional discount calculation
       const orderTotal = Number(order.tong_gia_tri) || 1; // Avoid division by zero
       const invDiscount =
@@ -522,17 +532,20 @@ class OrderService {
           });
 
           // Automatically create first maintenance reminder (30 days or 1000km)
+          // Only if delivered to a Customer (DOI_TAC/DOI_TAC exists), not internal transfer (KHO)
           if (
+            partnerExists &&
             loai_quan_ly === "SERIAL" &&
             item.serials &&
-            item.serials.length > 0
+            item.serials.length > 0 &&
+            order.loai_ben_nhap === "DOI_TAC"
           ) {
             for (const s of item.serials) {
               const ma_serial =
                 typeof s === "string" ? s : s.ma_serial || s.serial;
               await client.query(
-                `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien, so_km_du_kien) 
-                 VALUES ($1, $2, 'BAO_DUONG_DINH_KY', CURRENT_DATE + INTERVAL '30 days', 1000)`,
+                `INSERT INTO tm_nhac_nho_bao_duong (ma_serial, ma_khach_hang, loai_nhac_nho, ngay_du_kien, so_km_du_kien, trang_thai) 
+                 VALUES ($1, $2, 'BAO_DUONG_DINH_KY', CURRENT_DATE + INTERVAL '30 days', 1000, 'CHUA_XU_LY')`,
                 [ma_serial, order.ma_ben_nhap],
               );
             }
@@ -649,15 +662,22 @@ class OrderService {
         order.loai_don_hang === "BAN_HANG" || order.loai_don_hang === "BAN_XE";
 
       if (isMuaFin && order.loai_ben_xuat === "DOI_TAC" && order.ma_ben_xuat) {
-        await CongNoService.recordDoiTacDebt(client, {
-          ma_doi_tac: order.ma_ben_xuat, // NCC
-          loai_cong_no: "PHAI_TRA",
-          ma_kho: order.ma_ben_nhap, // Kho của mình
-          so_hoa_don: so_hoa_don,
-          so_tien: inv_thanh_tien,
-          ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
-        });
-      } else if (isBanFin && order.loai_ben_nhap === "DOI_TAC" && order.ma_ben_nhap) {
+        // Need to check source partner for Purchases
+        const checkSrcPartner = await client.query(
+          "SELECT 1 FROM dm_doi_tac WHERE ma_doi_tac = $1",
+          [order.ma_ben_xuat]
+        );
+        if (checkSrcPartner.rowCount > 0) {
+          await CongNoService.recordDoiTacDebt(client, {
+            ma_doi_tac: order.ma_ben_xuat, // NCC
+            loai_cong_no: "PHAI_TRA",
+            ma_kho: order.ma_ben_nhap, // Kho của mình
+            so_hoa_don: so_hoa_don,
+            so_tien: inv_thanh_tien,
+            ghi_chu: `Nợ mua hàng theo hóa đơn ${so_hoa_don}`,
+          });
+        }
+      } else if (isBanFin && order.loai_ben_nhap === "DOI_TAC" && order.ma_ben_nhap && partnerExists) {
         await CongNoService.recordDoiTacDebt(client, {
           ma_doi_tac: order.ma_ben_nhap, // Khách hàng
           loai_cong_no: "PHAI_THU",

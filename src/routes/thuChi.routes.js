@@ -27,7 +27,6 @@ const thuChiSchema = Joi.object({
 // GET danh sách - KE_TOAN, QUAN_LY, ADMIN
 router.get(
   "/",
-  authenticate,
   checkPermission("payments", "view"),
   async (req, res, next) => {
     try {
@@ -42,7 +41,6 @@ router.get(
 // GET chi tiết - KE_TOAN, QUAN_LY, ADMIN
 router.get(
   "/:so_phieu",
-  authenticate,
   checkPermission("payments", "view"),
   async (req, res, next) => {
     try {
@@ -86,7 +84,6 @@ router.get(
 // POST tạo phiếu thu chi - KE_TOAN, QUAN_LY, ADMIN
 router.post(
   "/",
-  authenticate,
   checkPermission("payments", "create"),
   validate(thuChiSchema),
   async (req, res, next) => {
@@ -107,7 +104,6 @@ router.post(
 // Gửi duyệt - KE_TOAN, QUAN_LY, ADMIN
 router.post(
   "/:so_phieu/gui-duyet",
-  authenticate,
   checkPermission("payments", "create"),
   async (req, res, next) => {
     try {
@@ -125,7 +121,6 @@ router.post(
 // Phê duyệt - chỉ QUAN_LY, KE_TOAN, ADMIN
 router.post(
   "/:so_phieu/phe-duyet",
-  authenticate,
   checkPermission("payments", "approve"),
   async (req, res, next) => {
     try {
@@ -140,7 +135,6 @@ router.post(
 // Hủy phiếu - QUAN_LY, KE_TOAN, ADMIN
 router.post(
   "/:so_phieu/huy",
-  authenticate,
   checkPermission("payments", "edit"),
   async (req, res, next) => {
     try {

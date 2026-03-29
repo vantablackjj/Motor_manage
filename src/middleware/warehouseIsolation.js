@@ -29,10 +29,15 @@ const warehouseIsolation = (req, res, next) => {
   
   const hasAssignedWarehouses = assignedWarehouses.length > 0;
 
-  // 2. Chế độ "Toàn quyền": CHỈ DÀNH CHO ADMIN
-  const hasFullAccess = user.vai_tro === ROLES.ADMIN;
+  // 2. Chế độ "Toàn quyền": CHỈ DÀNH CHO ADMIN hoặc các danh mục metadata (chỉ cho GET)
+  // Cho phép mọi User xem danh mục Kho, Thương hiệu... để có thể chọn trong dropdown (vd: chọn kho nhận khi chuyển kho)
+  const metadataPaths = ["/api/kho", "/api/brand", "/api/color", "/api/model-car", "/api/nhom-hang", "/api/loai-hinh"];
+  const isMetadataPath = metadataPaths.some(p => req.originalUrl.startsWith(p));
+  
+  const hasFullAccess = user.vai_tro === ROLES.ADMIN || (req.method === "GET" && isMetadataPath);
 
   if (hasFullAccess) {
+    if (req.query.ignore_isolation) delete req.query.ignore_isolation;
     return next();
   }
 
@@ -52,12 +57,16 @@ const warehouseIsolation = (req, res, next) => {
   const defaultWarehouse = assignedWarehouses[0];
   
   // Danh sách các trường có thể chứa mã kho cần bảo vệ
-  const warehouseFields = [
-    "ma_kho", "kho_id", "ma_kho_hien_tai", "ma_kho_nhap", "ma_kho_xuat",
-    "tu_ma_kho", "den_ma_kho", "ma_ben_nhap", "ma_ben_xuat",
-    "fromKho", "toKho", "ma_kho_no", "ma_kho_co", "kho_xuat", "kho_nhap",
+  // Tách thành 2 nhóm: Nguồn (cần kiểm soát chặt) và Đích (có thể linh hoạt hơn khi viết)
+  const sourceFields = [
+    "ma_kho", "kho_id", "ma_kho_hien_tai", "ma_kho_xuat",
+    "tu_ma_kho", "ma_ben_xuat", "fromKho", "ma_kho_co", "kho_xuat", "kho_no"
+  ];
+  const destinationFields = [
+    "ma_kho_nhap", "den_ma_kho", "ma_ben_nhap", "toKho", "ma_kho_no", "kho_nhap",
     "ma_kho_tra", "ma_kho_nhan", "kho_no", "kho_co"
   ];
+  const warehouseFields = [...sourceFields, ...destinationFields];
 
   /**
    * Hàm chuẩn hóa và cô lập dữ liệu
@@ -90,41 +99,55 @@ const warehouseIsolation = (req, res, next) => {
 
         if (allowedRequested.length > 0) {
           // Trả về danh sách kho hợp lệ. 
-          // Đối với GET (xem danh sách/báo cáo): Trả về mảng để Service dùng ANY()
-          // Đối với POST/PUT/PATCH (tạo/sửa): Chỉ lấy kho đầu tiên hợp lệ để tránh sai sót
           obj[field] = req.method === "GET" ? allowedRequested : allowedRequested[0];
         } else {
-          // Nếu không kho nào yêu cầu là hợp lệ -> Ép về kho mặc định hoặc toàn bộ kho được gán
-          obj[field] = req.method === "GET" ? assignedWarehouses : defaultWarehouse;
+          // Nếu không kho nào yêu cầu là hợp lệ:
+          if (req.method === "GET") {
+             // Đối với GET: Ép về toàn bộ kho được gán để cách ly dữ liệu
+             obj[field] = assignedWarehouses;
+          } else {
+             // Đối với POST/PUT/PATCH: 
+             // Chế độ ghi dữ liệu: TRẢ VỀ LỖI 403 thay vì âm thầm sửa đổi hoặc bỏ qua
+             // Điều này đảm bảo tính nhất quán giữa các nghiệp vụ (Nhập, Xuất, Chuyển kho)
+             // và giúp người dùng nhận ra lỗi ngay lập tức khi chọn sai kho.
+             const error = new Error(`Bạn không có quyền thực hiện thao tác tại kho này (${val}).`);
+             error.status = 403;
+             throw error;
+          }
         }
       } else if (
         ["ma_kho", "ma_kho_hien_tai", "ma_kho_nhap", "ma_kho_xuat", "kho_xuat", "kho_nhap"].includes(field)
       ) {
         // Trường hợp người dùng KHÔNG truyền tham số kho cụ thể
         if (req.method === "GET") {
-          // Đối với xem danh sách: Nếu không có bất kỳ bộ lọc kho nào khác, tự động điền toàn bộ kho được gán
-          // Chỉ điền vào ma_kho để tránh làm sai lệch các bộ lọc đối tác (như ma_ben_nhap trong hóa đơn bán)
-          if (!providedWarehouseField && field === "ma_kho") {
+          // Đối với xem danh sách: Luôn đảm bảo có filter ma_kho theo phân quyền
+          if (field === "ma_kho") {
              obj[field] = assignedWarehouses;
           }
         } else if (["ma_kho", "ma_kho_nhap", "ma_kho_xuat"].includes(field)) {
-          // Đối với hành động ghi dữ liệu: Ép về kho mặc định nếu thiếu trường quan trọng
+          // Đối với hành động ghi dữ liệu: Tự động gán kho mặc định nếu thiếu trường quan trọng
           obj[field] = defaultWarehouse;
         }
       }
     });
   };
 
-  // Áp dụng cho tham số Query (thường dùng cho GET)
-  if (req.query) normalizeAndIsolate(req.query);
-  
-  // Áp dụng cho Body (thường dùng cho POST/PUT/PATCH/EXCEL/PDF)
-  if (req.body) {
-    normalizeAndIsolate(req.body);
-    // Xử lý báo cáo: Bộ lọc thường bọc trong body.params
-    if (req.body.params && typeof req.body.params === "object") {
-      normalizeAndIsolate(req.body.params);
+  try {
+    // Áp dụng cho tham số Query (thường dùng cho GET)
+    if (req.query) normalizeAndIsolate(req.query);
+    
+    // Áp dụng cho Body (thường dùng cho POST/PUT/PATCH)
+    if (req.body) {
+      normalizeAndIsolate(req.body);
+      if (req.body.params && typeof req.body.params === "object") {
+        normalizeAndIsolate(req.body.params);
+      }
     }
+  } catch (err) {
+    if (err.status === 403) {
+      return sendError(res, err.message, 403);
+    }
+    return next(err);
   }
   
   // Áp dụng cho Params (thường dùng cho các route dạng /:ma_kho)

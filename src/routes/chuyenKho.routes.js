@@ -34,7 +34,6 @@ const themPhuTungSchema = Joi.object({
 // KHO, QUAN_LY, KE_TOAN, ADMIN được xem
 router.get(
   "/",
-  authenticate,
   checkPermission("inventory", "view"),
   async (req, res, next) => {
     try {
@@ -58,7 +57,6 @@ router.get(
 // GET /api/chuyen-kho/:ma_phieu - Chi tiết phiếu
 router.get(
   "/:ma_phieu",
-  authenticate,
   checkPermission("inventory", "view"),
   async (req, res, next) => {
     try {
@@ -72,11 +70,11 @@ router.get(
       // Warehouse access check using standardized list from isolation middleware
       const user = req.user;
       const phieu = data.phieu || data;
-      const ma_kho_xuat = phieu.ma_kho_xuat;
-      const ma_kho_nhap = phieu.ma_kho_nhap;
+      const ma_kho_xuat = phieu.ma_kho_xuat?.trim().toUpperCase();
+      const ma_kho_nhap = phieu.ma_kho_nhap?.trim().toUpperCase();
       
       const isGlobalAdmin = user.vai_tro === "ADMIN";
-      const authorized = user.authorized_warehouses || [];
+      const authorized = (user.authorized_warehouses || []).map(k => k.trim().toUpperCase());
       const hasAccess = authorized.includes(ma_kho_xuat) || authorized.includes(ma_kho_nhap);
 
       if (!isGlobalAdmin && !hasAccess) {
@@ -95,7 +93,6 @@ router.get(
  */
 router.get(
   "/:ma_phieu/in-phieu",
-  authenticate,
   checkPermission("inventory", "view"),
   async (req, res, next) => {
     try {
@@ -113,7 +110,7 @@ router.get(
       const ma_kho_nhap = phieu.ma_kho_nhap;
       
       const isGlobalAdmin = user.vai_tro === "ADMIN";
-      const authorized = user.authorized_warehouses || [];
+      const authorized = (user.authorized_warehouses || []).map(k => k.trim().toUpperCase());
       const hasAccess = isGlobalAdmin || authorized.includes(ma_kho_xuat) || authorized.includes(ma_kho_nhap);
 
       if (!hasAccess) {
@@ -178,7 +175,6 @@ router.get(
 // KHO, QUAN_LY, ADMIN được tạo phiếu chuyển kho
 router.post(
   "/",
-  authenticate,
   checkPermission("inventory", "transfer"),
   validate(taoPhieuSchema),
   async (req, res, next) => {
@@ -201,7 +197,6 @@ router.post(
 // Thêm xe vào phiếu chuyển kho
 router.post(
   "/:ma_phieu/xe",
-  authenticate,
   checkPermission("inventory", "transfer"),
   validate(themXeSchema),
   async (req, res, next) => {
@@ -218,7 +213,6 @@ router.post(
 // Hủy phiếu chuyển kho - QUAN_LY và ADMIN
 router.post(
   "/:so_phieu/huy",
-  authenticate,
   checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {
@@ -242,7 +236,6 @@ router.post(
 // POST /api/chuyen-kho/:ma_phieu/phu-tung - Thêm phụ tùng
 router.post(
   "/:ma_phieu/phu-tung",
-  authenticate,
   checkPermission("inventory", "transfer"),
   validate(themPhuTungSchema),
   async (req, res, next) => {
@@ -262,7 +255,6 @@ router.post(
 // KHO, QUAN_LY, ADMIN được gửi duyệt
 router.post(
   "/:ma_phieu/gui-duyet",
-  authenticate,
   checkPermission("inventory", "transfer"),
   async (req, res, next) => {
     try {
@@ -279,7 +271,6 @@ router.post(
 // Chỉ QUAN_LY và ADMIN được phê duyệt
 router.post(
   "/:ma_phieu/phe-duyet",
-  authenticate,
   checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {
@@ -296,7 +287,6 @@ router.post(
 // KHO, QUAN_LY, ADMIN thực hiện nhập kho
 router.post(
   "/:ma_phieu/nhap-kho",
-  authenticate,
   checkPermission("inventory", "transfer"),
   async (req, res, next) => {
     try {

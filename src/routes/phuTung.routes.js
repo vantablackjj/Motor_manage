@@ -6,6 +6,9 @@ const {
   checkPermission,
   checkWarehouseAccess,
 } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
+
+router.use(authenticate, warehouseIsolation);
 const { validate } = require("../middleware/validation");
 const { sendSuccess, sendError } = require("../utils/response");
 const PhuTung = require("../services/phuTung.service");
@@ -71,7 +74,7 @@ const createPhuTungSchema = Joi.object({
 });
 
 // GET /api/v1/phu-tung - Danh sách phụ tùng
-router.get("/", authenticate, async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const filters = {
       nhom_pt: req.query.nhom_pt,
@@ -87,7 +90,7 @@ router.get("/", authenticate, async (req, res, next) => {
   }
 });
 
-router.get("/:ma_pt", authenticate, async (req, res, next) => {
+router.get("/:ma_pt", async (req, res, next) => {
   try {
     const { ma_pt } = req.params;
     const data = await PhuTung.getOne(ma_pt);
@@ -97,7 +100,7 @@ router.get("/:ma_pt", authenticate, async (req, res, next) => {
   }
 });
 
-router.get("/:ma_pt/lich-su", authenticate, async (req, res, next) => {
+router.get("/:ma_pt/lich-su", async (req, res, next) => {
   try {
     const { ma_pt } = req.params;
     const data = await PhuTung.getLichSu(ma_pt);
@@ -109,7 +112,6 @@ router.get("/:ma_pt/lich-su", authenticate, async (req, res, next) => {
 // GET /api/phu-tung/ton-kho/:ma_kho - Tồn kho phụ tùng theo kho
 router.get(
   "/ton-kho/:ma_kho",
-  authenticate,
   checkWarehouseAccess("ma_kho"),
   async (req, res, next) => {
     try {
@@ -128,7 +130,6 @@ router.get(
 
 router.put(
   "/:ma_pt",
-  authenticate,
   checkPermission("products", "edit"),
   validate(createPhuTungSchema),
   async (req, res, next) => {
@@ -148,7 +149,6 @@ router.put(
 
 router.post(
   "/phu-tung/nhap-kho",
-  authenticate,
   checkPermission("inventory", "import"),
   async (req, res, next) => {
     try {
@@ -167,7 +167,6 @@ router.post(
 // POST /api/phu-tung - Tạo phụ tùng mới
 router.post(
   "/",
-  authenticate,
   checkPermission("products", "create"),
   validate(createPhuTungSchema),
   async (req, res, next) => {
@@ -182,7 +181,6 @@ router.post(
 
 router.delete(
   "/:ma_pt",
-  authenticate,
   checkPermission("products", "delete"),
   async (req, res, next) => {
     try {
@@ -202,7 +200,6 @@ router.delete(
 
 router.post(
   "/lock",
-  authenticate,
   checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {
@@ -220,7 +217,6 @@ router.post(
 
 router.post(
   "/unlock/:so_phieu",
-  authenticate,
   checkPermission("inventory", "adjust"),
   async (req, res, next) => {
     try {

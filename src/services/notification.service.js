@@ -77,17 +77,17 @@ class NotificationService {
       SELECT DISTINCT u.id FROM sys_user u
       LEFT JOIN sys_role r ON u.role_id = r.id
       LEFT JOIN sys_user_kho uk ON u.id = uk.user_id
-      WHERE (r.ten_quyen IN ('QUAN_LY', 'ADMIN', 'KE_TOAN') OR u.vai_tro IN ('QUAN_LY', 'ADMIN', 'KE_TOAN'))
+      WHERE (r.ma_quyen IN ('QUAN_LY', 'ADMIN', 'KE_TOAN') OR u.vai_tro IN ('QUAN_LY', 'ADMIN', 'KE_TOAN'))
     `;
 
     const params = [];
     if (ma_kho) {
       const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
       params.push(ma_kho_arr);
-      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ten_quyen = 'ADMIN' OR u.ma_kho = ANY($1::text[]) OR uk.ma_kho = ANY($1::text[]))`;
+      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ma_quyen = 'ADMIN' OR u.ma_kho = ANY($1::text[]) OR uk.ma_kho = ANY($1::text[]))`;
     } else {
       // No warehouse provided -> Only notify global Admins
-      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ten_quyen = 'ADMIN')`;
+      queryStr += ` AND (u.vai_tro = 'ADMIN' OR r.ma_quyen = 'ADMIN')`;
     }
 
     const managers = await query(queryStr, params);
@@ -122,7 +122,7 @@ class NotificationService {
        LEFT JOIN sys_role r ON u.role_id = r.id
        LEFT JOIN sys_user_kho uk ON u.id = uk.user_id
        WHERE (u.ma_kho = $1 OR uk.ma_kho = $1)
-         AND (r.ten_quyen IN ('KHO', 'BAN_HANG') OR u.vai_tro IN ('KHO', 'BAN_HANG'))`,
+         AND (r.ma_quyen IN ('KHO', 'BAN_HANG') OR u.vai_tro IN ('KHO', 'BAN_HANG'))`,
       [ma_kho],
     );
 

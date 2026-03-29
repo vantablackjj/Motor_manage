@@ -790,7 +790,7 @@ class MaintenanceService {
     const { ma_kho } = filters;
     let sql = `
       SELECT DISTINCT u.id, u.username, u.ho_ten, u.ma_kho,
-             r.ten_quyen as ten_vai_tro, r.ma_quyen as vai_tro
+             r.ten_vai_tro, r.ma_quyen as vai_tro
       FROM sys_user u
       JOIN sys_role r ON u.role_id = r.id
       LEFT JOIN sys_user_kho uk ON u.id = uk.user_id

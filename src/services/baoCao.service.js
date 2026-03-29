@@ -834,6 +834,12 @@ class BaoCaoService {
       params.push(Array.isArray(ma_kho_nhap) ? ma_kho_nhap : [ma_kho_nhap]);
       sql += ` AND ck.ma_ben_nhap = ANY($${params.length}::text[])`;
     }
+    const { ma_kho } = filters;
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND (ck.ma_ben_xuat = ANY($${params.length}::text[]) OR ck.ma_ben_nhap = ANY($${params.length}::text[]))`;
+    }
     sql += ` ORDER BY ck.ngay_dat_hang DESC`;
     const { rows } = await pool.query(sql, params);
     return rows;
@@ -866,7 +872,8 @@ class BaoCaoService {
       sql += ` AND ck.ngay_dat_hang < ($${params.length}::date + 1)`;
     }
     if (ma_kho) {
-      params.push(Array.isArray(ma_kho) ? ma_kho : [ma_kho]);
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
       sql += ` AND (ck.ma_ben_xuat = ANY($${params.length}::text[]) OR ck.ma_ben_nhap = ANY($${params.length}::text[]))`;
     }
     sql += ` ORDER BY ck.ngay_dat_hang DESC, ck.so_don_hang`;
@@ -1127,6 +1134,12 @@ class BaoCaoService {
       params.push(den_ngay);
       sql += ` AND ngay_giao_dich < ($${params.length}::date + 1)`;
     }
+    const { ma_kho } = filters;
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND tc.ma_kho = ANY($${params.length}::text[])`;
+    }
     sql += ` GROUP BY k.ten_kho`;
     const { rows } = await pool.query(sql, params);
     return rows;
@@ -1146,6 +1159,12 @@ class BaoCaoService {
       AND kh.loai_doi_tac IN ('KHACH_HANG', 'CA_HAI')
     `;
     const params = [];
+    const { ma_kho } = filters;
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length}::text[])`;
+    }
     if (tu_ngay) {
       params.push(tu_ngay);
       sql += ` AND h.ngay_hoa_don >= $${params.length}`;
@@ -1170,6 +1189,12 @@ class BaoCaoService {
       WHERE h.ma_ben_nhap = $1 AND h.loai_hoa_don = 'BAN_HANG'
     `;
     const params = [ma_kh];
+    const { ma_kho } = filters;
+    if (ma_kho) {
+      const ma_kho_arr = Array.isArray(ma_kho) ? ma_kho : [ma_kho];
+      params.push(ma_kho_arr);
+      sql += ` AND h.ma_ben_xuat = ANY($${params.length}::text[])`;
+    }
     if (tu_ngay) {
       params.push(tu_ngay);
       sql += ` AND h.ngay_hoa_don >= $${params.length}`;

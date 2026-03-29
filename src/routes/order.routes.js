@@ -5,8 +5,9 @@ const OrderController = require("../controllers/order.controller");
 
 const { authenticate } = require("../middleware/auth");
 const { checkPermission, checkAnyPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 
-router.use(authenticate);
+router.use(authenticate, warehouseIsolation);
 
 router.get("/", checkPermission("sales_orders", "view"), OrderController.getList);
 router.get("/:id", checkPermission("sales_orders", "view"), OrderController.getDetail);

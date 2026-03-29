@@ -1,0 +1,15 @@
+--- COLUMNS ---
+created_at: timestamp without time zone (Nullable: YES)
+ghi_chu: text (Nullable: YES)
+id: integer (Nullable: NO)
+loai_nhac_nho: character varying (Nullable: YES)
+ma_khach_hang: character varying (Nullable: YES)
+ma_serial: character varying (Nullable: YES)
+ngay_du_kien: date (Nullable: YES)
+so_km_du_kien: integer (Nullable: YES)
+trang_thai: character varying (Nullable: YES)
+updated_at: timestamp without time zone (Nullable: YES)
+
+--- FKs ---
+tm_nhac_nho_bao_duong_ma_khach_hang_fkey: FOREIGN KEY (ma_khach_hang) REFERENCES dm_doi_tac(ma_doi_tac)
+tm_nhac_nho_bao_duong_ma_serial_fkey: FOREIGN KEY (ma_serial) REFERENCES tm_hang_hoa_serial(ma_serial)

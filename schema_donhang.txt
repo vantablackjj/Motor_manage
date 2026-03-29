@@ -1,0 +1,4 @@
+
+--- FKs for tm_don_hang ---
+tm_don_hang_created_by_fkey: FOREIGN KEY (created_by) REFERENCES sys_user(id)
+tm_don_hang_nguoi_gui_fkey: FOREIGN KEY (nguoi_gui) REFERENCES sys_user(id)

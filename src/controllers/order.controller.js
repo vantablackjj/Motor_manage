@@ -80,14 +80,12 @@ class OrderController {
       const isGlobalAdmin = req.user.vai_tro === ROLES.ADMIN;
       
       if (!isGlobalAdmin) {
-        const allowedWarehouses = (req.user.allowed_warehouses || []).map(w => w.ma_kho);
-        if (req.user.ma_kho) allowedWarehouses.push(req.user.ma_kho);
-
+        const authorized = req.user.authorized_warehouses || [];
         const ma_kho_xuat = order.ma_ben_xuat;
         const ma_kho_nhap = order.ma_ben_nhap;
 
-        const isRelated = (order.loai_ben_xuat === "KHO" && allowedWarehouses.includes(ma_kho_xuat)) ||
-                          (order.loai_ben_nhap === "KHO" && allowedWarehouses.includes(ma_kho_nhap));
+        const isRelated = (order.loai_ben_xuat === "KHO" && authorized.includes(ma_kho_xuat)) ||
+                          (order.loai_ben_nhap === "KHO" && authorized.includes(ma_kho_nhap));
 
         if (!isRelated) {
           return res.status(403).json({

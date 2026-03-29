@@ -1,15 +1,19 @@
-require("dotenv").config();
-const { pool } = require("./src/config/database");
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+const { pool } = require('./src/config/database');
 
-async function check() {
+async function check_users() {
   try {
-    const res = await pool.query(`SELECT id, ho_ten, ma_kho, vai_tro FROM sys_user;`);
-    console.log("sys_user data:", JSON.stringify(res.rows, null, 2));
-    process.exit(0);
+    const res = await pool.query("SELECT id, username, ho_ten, vai_tro, ma_kho FROM sys_user");
+    console.log('Users:', JSON.stringify(res.rows, null, 2));
+    
+    const roles = await pool.query("SELECT * FROM sys_role");
+     console.log('Roles:', JSON.stringify(roles.rows, null, 2));
   } catch (err) {
     console.error(err);
-    process.exit(1);
+  } finally {
+    process.exit(0);
   }
 }
 
-check();
+check_users();

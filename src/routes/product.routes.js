@@ -5,8 +5,9 @@ const ProductController = require("../controllers/product.controller");
 
 const { authenticate } = require("../middleware/auth");
 const { checkPermission } = require("../middleware/roleCheck");
+const { warehouseIsolation } = require("../middleware/warehouseIsolation");
 
-router.use(authenticate);
+router.use(authenticate, warehouseIsolation);
 
 router.get("/", checkPermission("products", "view"), ProductController.getAll);
 router.get("/:id", checkPermission("products", "view"), ProductController.getById);
